@@ -5,9 +5,9 @@ authors = ["Rain Liu <yuliu@outlook.com>"]
 edition = "2018"
 description = "Rust Essential Video Coding (MPEG-5 EVC)"
 license = "MIT"
-documentation = "https://github.com/rainliu/revc"
-homepage = "https://github.com/rainliu/revc"
-repository = "https://github.com/rainliu/revc"
+documentation = "https://github.com/revcx/revc"
+homepage = "https://github.com/revcx/revc"
+repository = "https://github.com/revcx/revc"
 
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
