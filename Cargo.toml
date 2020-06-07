@@ -1,0 +1,15 @@
+[package]
+name = "revc"
+version = "0.1.0"
+authors = ["Rain Liu <yuliu@outlook.com>"]
+edition = "2018"
+description = "Rust Essential Video Coding (MPEG-5 EVC)"
+license = "MIT"
+documentation = "https://github.com/rainliu/revc"
+homepage = "https://github.com/rainliu/revc"
+repository = "https://github.com/rainliu/revc"
+
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
