@@ -10,6 +10,23 @@ homepage = "https://github.com/revcx/revc"
 repository = "https://github.com/revcx/revc"
 
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[features]
+binaries = [
+    "clap",
+    "y4m",
+]
+default = ["binaries"]
 
 [dependencies]
+clap = { version = "2", optional = true, default-features = false }
+y4m = { version = "0.6", optional = true }
+
+[[bin]]
+name = "revcd"
+path = "src/bin/revcd.rs"
+required-features = ["binaries"]
+
+[[bin]]
+name = "revce"
+path = "src/bin/revce.rs"
+required-features = ["binaries"]
