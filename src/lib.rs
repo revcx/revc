@@ -4,7 +4,7 @@
 #[macro_use]
 extern crate num_derive;
 
-mod api;
-mod com;
+pub mod api;
+pub mod com;
 mod dec;
 mod enc;
