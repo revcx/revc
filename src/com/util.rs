@@ -8,9 +8,9 @@
 // PATENTS file, you can obtain it at www.aomedia.org/license/patent.
 
 use num_traits::*;
-use std::mem;
-use std::mem::size_of;
 use std::fmt::{Debug, Display};
+use std::mem::size_of;
+use std::mem::MaybeUninit;
 use std::{cmp, io};
 
 //TODO: Nice to have (although I wasnt able to find a way to do it yet in rust): zero-fill arrays that are
@@ -20,7 +20,9 @@ macro_rules! cdf {
 }
 
 macro_rules! cdf_size {
-    ($x:expr) => ($x+1);
+    ($x:expr) => {
+        $x + 1
+    };
 }
 
 #[derive(Clone)]
@@ -40,71 +42,73 @@ pub struct Align32;
 /// assert!(x.array.as_ptr() as usize % 16 == 0);
 /// ```
 #[derive(Clone, Default)]
-pub struct AlignedArray<ARRAY>
-{
-  _alignment: [Align32; 0],
-  pub array: ARRAY
+pub struct AlignedArray<ARRAY> {
+    _alignment: [Align32; 0],
+    pub array: ARRAY,
 }
 
 #[allow(non_snake_case)]
 pub fn AlignedArray<ARRAY>(array: ARRAY) -> AlignedArray<ARRAY> {
-  AlignedArray { _alignment: [], array }
+    AlignedArray {
+        _alignment: [],
+        array,
+    }
 }
 
 #[allow(non_snake_case)]
 pub fn UninitializedAlignedArray<ARRAY>() -> AlignedArray<ARRAY> {
-  AlignedArray(unsafe { mem::uninitialized() })
+    AlignedArray(unsafe { MaybeUninit::uninit().assume_init() })
 }
 
 #[test]
 fn sanity() {
-  let a: AlignedArray<_> = AlignedArray([0u8; 3]);
-  assert!(is_aligned(a.array.as_ptr(), 4));
+    let a: AlignedArray<_> = AlignedArray([0u8; 3]);
+    assert!(is_aligned(a.array.as_ptr(), 4));
 }
 
 pub trait Fixed {
-  fn floor_log2(&self, n: usize) -> usize;
-  fn ceil_log2(&self, n: usize) -> usize;
-  fn align_power_of_two(&self, n: usize) -> usize;
-  fn align_power_of_two_and_shift(&self, n: usize) -> usize;
+    fn floor_log2(&self, n: usize) -> usize;
+    fn ceil_log2(&self, n: usize) -> usize;
+    fn align_power_of_two(&self, n: usize) -> usize;
+    fn align_power_of_two_and_shift(&self, n: usize) -> usize;
 }
 
 impl Fixed for usize {
-  #[inline]
-  fn floor_log2(&self, n: usize) -> usize {
-    self & !((1 << n) - 1)
-  }
-  #[inline]
-  fn ceil_log2(&self, n: usize) -> usize {
-    (self + (1 << n) - 1).floor_log2(n)
-  }
-  #[inline]
-  fn align_power_of_two(&self, n: usize) -> usize {
-    self.ceil_log2(n)
-  }
-  #[inline]
-  fn align_power_of_two_and_shift(&self, n: usize) -> usize {
-    (self + (1 << n) - 1) >> n
-  }
+    #[inline]
+    fn floor_log2(&self, n: usize) -> usize {
+        self & !((1 << n) - 1)
+    }
+    #[inline]
+    fn ceil_log2(&self, n: usize) -> usize {
+        (self + (1 << n) - 1).floor_log2(n)
+    }
+    #[inline]
+    fn align_power_of_two(&self, n: usize) -> usize {
+        self.ceil_log2(n)
+    }
+    #[inline]
+    fn align_power_of_two_and_shift(&self, n: usize) -> usize {
+        (self + (1 << n) - 1) >> n
+    }
 }
 
 /// Check alignment.
 pub fn is_aligned<T>(ptr: *const T, n: usize) -> bool {
-  ((ptr as usize) & ((1 << n) - 1)) == 0
+    ((ptr as usize) & ((1 << n) - 1)) == 0
 }
 
 pub fn clamp<T: PartialOrd>(input: T, min: T, max: T) -> T {
-  if input < min {
-    min
-  } else if input > max {
-    max
-  } else {
-    input
-  }
+    if input < min {
+        min
+    } else if input > max {
+        max
+    } else {
+        input
+    }
 }
 
-pub trait CastFromPrimitive<T> : Copy + 'static {
-  fn cast_from(v: T) -> Self;
+pub trait CastFromPrimitive<T>: Copy + 'static {
+    fn cast_from(v: T) -> Self;
 }
 
 macro_rules! impl_cast_from_primitive {
@@ -131,38 +135,41 @@ impl_cast_from_primitive!(i32 => { u32, u64, usize });
 impl_cast_from_primitive!(i32 => { i8, i16, i32, i64, isize });
 
 pub trait Pixel:
-  PrimInt
-  + Into<u32>
-  + Into<i32>
-  + AsPrimitive<u8>
-  + AsPrimitive<i16>
-  + AsPrimitive<u16>
-  + AsPrimitive<i32>
-  + AsPrimitive<u32>
-  + AsPrimitive<usize>
-  + CastFromPrimitive<u8>
-  + CastFromPrimitive<i16>
-  + CastFromPrimitive<u16>
-  + CastFromPrimitive<i32>
-  + CastFromPrimitive<u32>
-  + CastFromPrimitive<usize>
-  + Debug
-  + Display
-  + Send
-  + Sync
-  + 'static
-{}
+    PrimInt
+    + Into<u32>
+    + Into<i32>
+    + AsPrimitive<u8>
+    + AsPrimitive<i16>
+    + AsPrimitive<u16>
+    + AsPrimitive<i32>
+    + AsPrimitive<u32>
+    + AsPrimitive<usize>
+    + CastFromPrimitive<u8>
+    + CastFromPrimitive<i16>
+    + CastFromPrimitive<u16>
+    + CastFromPrimitive<i32>
+    + CastFromPrimitive<u32>
+    + CastFromPrimitive<usize>
+    + Debug
+    + Display
+    + Send
+    + Sync
+    + 'static
+{
+}
 
 impl Pixel for u8 {}
 impl Pixel for u16 {}
 
 macro_rules! impl_cast_from_pixel_to_primitive {
-  ( $T:ty ) => {
-    impl<T: Pixel> CastFromPrimitive<T> for $T {
-      #[inline(always)]
-      fn cast_from(v: T) -> Self { v.as_() }
-    }
-  };
+    ( $T:ty ) => {
+        impl<T: Pixel> CastFromPrimitive<T> for $T {
+            #[inline(always)]
+            fn cast_from(v: T) -> Self {
+                v.as_()
+            }
+        }
+    };
 }
 
 impl_cast_from_pixel_to_primitive!(u8);
@@ -172,49 +179,49 @@ impl_cast_from_pixel_to_primitive!(i32);
 impl_cast_from_pixel_to_primitive!(u32);
 
 pub trait ILog: PrimInt {
-  fn ilog(self) -> Self {
-    Self::from(size_of::<Self>() * 8 - self.leading_zeros() as usize).unwrap()
-  }
+    fn ilog(self) -> Self {
+        Self::from(size_of::<Self>() * 8 - self.leading_zeros() as usize).unwrap()
+    }
 }
 
 impl<T> ILog for T where T: PrimInt {}
 
 #[inline(always)]
 pub fn msb(x: i32) -> i32 {
-  debug_assert!(x > 0);
-  31 ^ (x.leading_zeros() as i32)
+    debug_assert!(x > 0);
+    31 ^ (x.leading_zeros() as i32)
 }
 
 #[inline(always)]
 pub fn round_shift(value: i32, bit: usize) -> i32 {
-  (value + (1 << bit >> 1)) >> bit
+    (value + (1 << bit >> 1) as i32) >> bit as i32
 }
 
 #[inline(always)]
 pub fn clip<T: PartialOrd>(v: T, min: T, max: T) -> T {
-  if v < min {
-    min
-  } else if v > max {
-    max
-  } else {
-    v
-  }
+    if v < min {
+        min
+    } else if v > max {
+        max
+    } else {
+        v
+    }
 }
 
 #[inline(always)]
 pub fn check_error(condition: bool, msg: &str) -> io::Result<()> {
-  if condition {
-    Err(io::Error::new(io::ErrorKind::InvalidInput, msg))
-  } else {
-    Ok(())
-  }
+    if condition {
+        Err(io::Error::new(io::ErrorKind::InvalidInput, msg))
+    } else {
+        Ok(())
+    }
 }
 
 #[inline(always)]
 pub fn tile_log2(sz: i32, tgt: i32) -> i32 {
-  let mut k = 0;
-  while (sz << k) < tgt {
-    k += 1;
-  }
-  k
+    let mut k = 0;
+    while (sz << k) < tgt {
+        k += 1;
+    }
+    k
 }

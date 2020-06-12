@@ -9,11 +9,9 @@ documentation = "https://github.com/revcx/revc"
 homepage = "https://github.com/revcx/revc"
 repository = "https://github.com/revcx/revc"
 
-
 [features]
 binaries = [
     "clap",
-    "y4m",
 ]
 default = ["binaries"]
 
@@ -25,7 +23,6 @@ clap = { version = "2", optional = true, default-features = false }
 log = "0.4"
 num-traits = "0.2"
 num-derive = "0.3"
-y4m = { path = "y4m/", optional = true }
 
 [[bin]]
 name = "revcd"
@@ -36,6 +33,3 @@ required-features = ["binaries"]
 name = "revce"
 path = "src/bin/revce.rs"
 required-features = ["binaries"]
-
-[workspace]
-members = [".", "y4m"]
