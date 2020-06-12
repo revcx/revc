@@ -1,3 +1,6 @@
+#![allow(warnings)]
+#![allow(dead_code)]
+
 use clap::{App, AppSettings, Arg};
 
 use std::fs::File;
