@@ -1,7 +1,6 @@
 #![allow(warnings)]
 #![allow(dead_code)]
 
-mod common;
 mod demuxer;
 mod muxer;
 
@@ -13,7 +12,7 @@ use std::io;
 struct CLISettings {
     pub demuxer: Box<dyn demuxer::Demuxer>,
     pub muxer: Box<dyn muxer::Muxer>,
-    pub limit: usize,
+    pub frames: usize,
     pub verbose: bool,
     pub threads: usize,
 }
@@ -39,23 +38,25 @@ fn parse_cli() -> CLISettings {
         )
         .arg(
             Arg::with_name("INPUT")
-                .help("Compressed EVC baseline bitstream input")
+                .help("file name of input bitstream")
+                .short("i")
+                .long("input")
                 .required_unless("FULLHELP")
-                .index(1),
+                .takes_value(true),
         )
         .arg(
             Arg::with_name("OUTPUT")
-                .help("Uncompressed YUV4MPEG2 video output")
+                .help("file name of decoded output")
                 .short("o")
                 .long("output")
                 .required_unless("FULLHELP")
                 .takes_value(true),
         )
         .arg(
-            Arg::with_name("LIMIT")
-                .help("Maximum number of frames to decode")
-                .short("l")
-                .long("limit")
+            Arg::with_name("FRAMES")
+                .help("maximum number of frames to be decoded")
+                .short("f")
+                .long("frames")
                 .takes_value(true)
                 .default_value("0"),
         )
@@ -77,7 +78,7 @@ fn parse_cli() -> CLISettings {
     CLISettings {
         demuxer: demuxer::new(matches.value_of("INPUT").unwrap()),
         muxer: muxer::new(matches.value_of("OUTPUT").unwrap()),
-        limit: matches.value_of("LIMIT").unwrap().parse().unwrap(),
+        frames: matches.value_of("FRAMES").unwrap().parse().unwrap(),
         verbose: matches.is_present("VERBOSE"),
         threads: matches
             .value_of("THREADS")
@@ -86,51 +87,11 @@ fn parse_cli() -> CLISettings {
     }
 }
 
-// Decode and write a frame, returns frame information.
-fn process_frame(
-    cli: &mut CLISettings,
-    ctx: &mut Context<u8>,
-    count: &mut usize,
-) -> Option<Vec<common::FrameSummary>> {
-    let mut frame_summaries = Vec::new();
-
-    if cli.limit != 0 && *count == cli.limit {
-        ctx.flush();
-    } else {
-        match cli.demuxer.read() {
-            Ok(pkt) => {
-                if cli.verbose {
-                    eprintln!("{}", pkt);
-                }
-                *count += 1;
-                let _ = ctx.send_packet(&mut Some(pkt));
-            }
-            _ => {
-                ctx.flush();
-            }
-        };
-    }
-
-    loop {
-        let frame_wrapped = ctx.receive_frame();
-        match frame_wrapped {
-            Ok(frame) => {
-                //cli.muxer.write(&frame);
-                frame_summaries.push(frame.into());
-            }
-            Err(CodecStatus::NeedMoreData) => {
-                break;
-            }
-            Err(CodecStatus::EnoughData) => {}
-            Err(CodecStatus::LimitReached) => {
-                return None;
-            }
-            Err(CodecStatus::Failure) => {
-                panic!("Failed to decode video");
-            } //Err(CodecStatus::Decoded) => {}
-        }
-    }
-    Some(frame_summaries)
+#[derive(PartialEq)]
+enum EvcdState {
+    STATE_DECODING,
+    STATE_PULLING,
+    STATE_BUMPING,
 }
 
 fn main() -> io::Result<()> {
@@ -140,30 +101,64 @@ fn main() -> io::Result<()> {
         ..Default::default()
     };
 
-    // TODO: use sps probe to find out pixel type
     let mut ctx: Context<u8> = Context::new(&cfg);
+    let mut pic_cnt: usize = 0;
+    let mut state = EvcdState::STATE_DECODING;
 
-    let mut progress = common::ProgressInfo::new(
-        Rational { num: 30, den: 1 },
-        if cli.limit == 0 {
-            None
-        } else {
-            Some(cli.limit)
-        },
-    );
-
-    let mut count = 0;
-    while let Some(frame_info) = process_frame(&mut cli, &mut ctx, &mut count) {
-        for frame in frame_info {
-            progress.add_frame(frame);
-            if cli.verbose {
-                eprintln!("{} - {}", frame, progress);
+    loop {
+        if (state == EvcdState::STATE_DECODING) {
+            if cli.frames != 0 && pic_cnt == cli.frames {
+                if cli.verbose {
+                    eprint!("bumping process starting...\n");
+                }
+                state = EvcdState::STATE_BUMPING;
+                continue;
             } else {
-                eprint!("\r{}     ", progress);
-            };
+                match cli.demuxer.read() {
+                    Ok(pkt) => {
+                        let ret = ctx.decode(&mut Some(pkt));
+                        if let Ok(stat) = ret {
+                            if stat.fnum >= 0 {
+                                state = EvcdState::STATE_PULLING;
+                            }
+                        //print_stat(stat);
+                        } else {
+                            break;
+                        }
+                    }
+                    _ => {
+                        if cli.verbose {
+                            eprint!("bumping process starting...\n");
+                        }
+                        state = EvcdState::STATE_BUMPING;
+                        continue;
+                    }
+                };
+            }
+        }
+
+        if (state != EvcdState::STATE_DECODING) {
+            let ret = ctx.pull();
+            match ret {
+                Ok(_) => {}
+                Err(err) => {
+                    if (err == EvcStatus::EVC_ERR_UNEXPECTED) {
+                        if cli.verbose {
+                            eprint!("bumping process completed\n");
+                        }
+                    } else {
+                        eprint!("failed to pull the decoded image\n");
+                    }
+                    break;
+                }
+            }
+
+            // after pulling, reset state to decoding mode
+            if (state == EvcdState::STATE_PULLING) {
+                state = EvcdState::STATE_DECODING;
+            }
         }
     }
-    eprint!("\n{}\n", progress.print_summary());
 
     Ok(())
 }

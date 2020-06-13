@@ -2,35 +2,17 @@ use super::context::{MAX_SB_SIZE, SUBPEL_FILTER_SIZE};
 use super::plane::*;
 use super::plane_region::*;
 use super::util::*;
-use crate::api::ChromaSampling;
+use crate::api::*;
 
 use std::fmt;
 
 const FRAME_MARGIN: usize = 16 + SUBPEL_FILTER_SIZE;
 
-#[allow(dead_code, non_camel_case_types)]
-#[derive(Debug, PartialEq, Clone, Copy)]
-#[repr(C)]
-pub enum FrameType {
-    KEY,
-    INTER,
-}
-
-impl fmt::Display for FrameType {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        use self::FrameType::*;
-        match self {
-            KEY => write!(f, "Key (IDR) frame"),
-            INTER => write!(f, "Inter frame"),
-        }
-    }
-}
-
 #[derive(Debug, Clone)]
 pub struct Frame<T: Pixel> {
     pub planes: [Plane<T>; 3],
     pub pts: u64,
-    pub frame_type: FrameType,
+    pub frame_type: NaluType,
     pub chroma_sampling: ChromaSampling,
 }
 
@@ -70,7 +52,7 @@ impl<T: Pixel> Frame<T> {
                 ),
             ],
             pts: 0,
-            frame_type: FrameType::KEY,
+            frame_type: NaluType::EVC_IDR_NUT,
             chroma_sampling,
         }
     }

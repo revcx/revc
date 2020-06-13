@@ -11,25 +11,127 @@ use std::{cmp, fmt, io};
 use arg_enum_proc_macro::ArgEnum;
 use num_derive::*;
 
-#[derive(Clone, Copy, Debug)]
-#[repr(C)]
-pub enum CodecStatus {
-    /// The codec needs more data to produce an output Packet/Frame
-    NeedMoreData,
-    /// There are enough Frames/Packets queue
-    EnoughData,
-    /// The codec already produced the number of frames/packets requested
-    LimitReached,
-    /// A Frame had been decoded but not emitted yet
-    //Decoded,
-    /// Generic fatal error
-    Failure,
+/*****************************************************************************
+ * return values and error code
+ *****************************************************************************/
+#[derive(FromPrimitive, ToPrimitive, PartialOrd, Ord, PartialEq, Eq)]
+pub enum EvcStatus {
+    /* no more frames, but it is OK */
+    EVC_OK_NO_MORE_FRM = 205,
+    /* progress success, but output is not available temporarily */
+    EVC_OK_OUT_NOT_AVAILABLE = 204,
+    /* frame dimension (width or height) has been changed */
+    EVC_OK_DIM_CHANGED = (203),
+    /* decoding success, but output frame has been delayed */
+    EVC_OK_FRM_DELAYED = (202),
+    /* not matched CRC value */
+    EVC_ERR_BAD_CRC = (201),
+    /* CRC value presented but ignored at decoder*/
+    EVC_WARN_CRC_IGNORED = (200),
+
+    EVC_OK = 0,
+
+    EVC_ERR = (-1), /* generic error */
+    EVC_ERR_INVALID_ARGUMENT = (-101),
+    EVC_ERR_OUT_OF_MEMORY = (-102),
+    EVC_ERR_REACHED_MAX = (-103),
+    EVC_ERR_UNSUPPORTED = (-104),
+    EVC_ERR_UNEXPECTED = (-105),
+    EVC_ERR_UNSUPPORTED_COLORSPACE = (-201),
+    EVC_ERR_MALFORMED_BITSTREAM = (-202),
+
+    EVC_ERR_UNKNOWN = (-32767), /* unknown error */
 }
 
-impl Default for CodecStatus {
+impl Default for EvcStatus {
     fn default() -> Self {
-        CodecStatus::NeedMoreData
+        EvcStatus::EVC_OK
     }
+}
+
+#[allow(dead_code, non_camel_case_types)]
+#[derive(Debug, PartialEq, Clone, Copy)]
+#[repr(C)]
+pub enum NaluType {
+    EVC_NONIDR_NUT = 0,
+    EVC_IDR_NUT = 1,
+    EVC_SPS_NUT = 24,
+    EVC_PPS_NUT = 25,
+    EVC_APS_NUT = 26,
+    EVC_SEI_NUT = 27,
+}
+
+impl fmt::Display for NaluType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        use self::NaluType::*;
+        match self {
+            EVC_NONIDR_NUT => write!(f, "Non-IDR"),
+            EVC_IDR_NUT => write!(f, "Instantaneous Decoder Refresh"),
+            EVC_SPS_NUT => write!(f, "Sequence Parameter Se"),
+            EVC_PPS_NUT => write!(f, "Picture Parameter Set"),
+            EVC_APS_NUT => write!(f, "Adaptation Parameter Set"),
+            EVC_SEI_NUT => write!(f, "Supplemental Enhancement Information"),
+        }
+    }
+}
+
+impl Default for NaluType {
+    fn default() -> Self {
+        NaluType::EVC_NONIDR_NUT
+    }
+}
+
+#[allow(dead_code, non_camel_case_types)]
+#[derive(Debug, PartialEq, Clone, Copy)]
+#[repr(C)]
+pub enum SliceType {
+    EVC_ST_UNKNOWN = 0,
+    EVC_ST_I = 1,
+    EVC_ST_P = 2,
+    EVC_ST_B = 3,
+}
+
+impl fmt::Display for SliceType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        use self::SliceType::*;
+        match self {
+            EVC_ST_UNKNOWN => write!(f, "Unknown Slice Type"),
+            EVC_ST_I => write!(f, "I Slice"),
+            EVC_ST_P => write!(f, "P Slice"),
+            EVC_ST_B => write!(f, "B Slice"),
+        }
+    }
+}
+
+impl Default for SliceType {
+    fn default() -> Self {
+        SliceType::EVC_ST_UNKNOWN
+    }
+}
+
+/*****************************************************************************
+ * status after decoder operation
+ *****************************************************************************/
+#[derive(Debug, Default)]
+pub struct EvcdStat {
+    /* byte size of decoded bitstream (read size of bitstream) */
+    pub read: usize,
+    /* nalu type */
+    pub nalu_type: NaluType,
+    /* slice type */
+    pub stype: SliceType,
+    /* frame number monotonically increased whenever decoding a frame.
+    note that it has negative value if the decoded data is not frame */
+    pub fnum: isize,
+    /* picture order count */
+    pub poc: isize,
+    /* layer id */
+    pub tid: isize,
+
+    /* number of reference pictures */
+    pub refpic_num: [u8; 2],
+    /* list of reference pictures */
+    pub refpic: [[isize; 2]; 16],
 }
 
 pub struct Packet {
@@ -136,8 +238,8 @@ impl<T: Pixel> Context<T> {
         }
     }
 
-    pub fn send_packet(&mut self, pkt: &mut Option<Packet>) -> Result<(), CodecStatus> {
-        if pkt.is_none() {
+    pub fn decode(&mut self, pkt: &mut Option<Packet>) -> Result<EvcdStat, EvcStatus> {
+        /*if pkt.is_none() {
             return Err(CodecStatus::NeedMoreData);
         }
 
@@ -148,12 +250,12 @@ impl<T: Pixel> Context<T> {
         }
 
         self.packet = pkt.take();
-
-        Ok(())
+        */
+        Ok(EvcdStat::default())
     }
 
-    pub fn receive_frame(&mut self) -> Result<Frame<T>, CodecStatus> {
-        if self.drain {
+    pub fn pull(&mut self) -> Result<Frame<T>, EvcStatus> {
+        /*if self.drain {
             return self.drain_frame();
         }
 
@@ -192,14 +294,11 @@ impl<T: Pixel> Context<T> {
         match frame {
             Some(f) => Ok(f),
             None => Err(CodecStatus::NeedMoreData),
-        }
+        }*/
+        Err(EvcStatus::default())
     }
 
     pub fn flush(&mut self) {
         self.drain = true;
-    }
-
-    fn drain_frame(&mut self) -> Result<Frame<T>, CodecStatus> {
-        Err(CodecStatus::LimitReached)
     }
 }
