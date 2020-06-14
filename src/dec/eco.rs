@@ -15,7 +15,7 @@ pub(crate) fn evcd_eco_nalu(bs: &mut EvcdBsr) -> Result<EvcNalu, EvcError> {
         return Err(EvcError::EVC_ERR_MALFORMED_BITSTREAM);
     }
 
-    nalu.nal_unit_type_plus1 = bs.read(6) as u8;
+    nalu.nal_unit_type = bs.read(6) as u8 - 1;
     nalu.nuh_temporal_id = bs.read(3) as u8;
     nalu.nuh_reserved_zero_5bits = bs.read(5) as u8;
 

@@ -120,7 +120,7 @@ pub(crate) const AVAIL_UP_RI_RI: usize = (1 << AVAIL_BIT_UP_RI_RI);
 pub(crate) struct EvcNalu {
     pub(crate) nal_unit_size: u32,
     pub(crate) forbidden_zero_bit: u8,
-    pub(crate) nal_unit_type_plus1: u8,
+    pub(crate) nal_unit_type: u8,
     pub(crate) nuh_temporal_id: u8,
     pub(crate) nuh_reserved_zero_5bits: u8,
     pub(crate) nuh_extension_flag: bool,

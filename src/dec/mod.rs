@@ -277,7 +277,7 @@ impl EvcdCtx {
         let nalu = evcd_eco_nalu(&mut self.bs)?;
 
         Ok(EvcdStat {
-            nalu_type: (nalu.nal_unit_type_plus1 - 1),
+            nalu_type: nalu.nal_unit_type,
             read: nalu_size_field_in_bytes + self.bs.EVC_BSR_GET_READ_BYTE() as usize,
             ..Default::default()
         })
