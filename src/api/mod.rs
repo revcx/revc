@@ -94,10 +94,10 @@ impl fmt::Display for SliceType {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         use self::SliceType::*;
         match self {
-            EVC_ST_UNKNOWN => write!(f, "Unknown Slice Type"),
-            EVC_ST_I => write!(f, "I Slice"),
-            EVC_ST_P => write!(f, "P Slice"),
-            EVC_ST_B => write!(f, "B Slice"),
+            EVC_ST_UNKNOWN => write!(f, "Unknown"),
+            EVC_ST_I => write!(f, "I"),
+            EVC_ST_P => write!(f, "P"),
+            EVC_ST_B => write!(f, "B"),
         }
     }
 }
@@ -130,7 +130,7 @@ pub struct EvcdStat {
     /* number of reference pictures */
     pub refpic_num: [u8; 2],
     /* list of reference pictures */
-    pub refpic: [[isize; 2]; 16],
+    pub refpic: [[isize; 16]; 2], //[2][16]
 
     pub ret: usize,
 }
