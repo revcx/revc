@@ -14,23 +14,22 @@ use num_derive::*;
 /*****************************************************************************
  * return values and error code
  *****************************************************************************/
-#[derive(FromPrimitive, ToPrimitive, PartialOrd, Ord, PartialEq, Eq)]
-pub enum EvcStatus {
-    /* no more frames, but it is OK */
-    EVC_OK_NO_MORE_FRM = 205,
-    /* progress success, but output is not available temporarily */
-    EVC_OK_OUT_NOT_AVAILABLE = 204,
-    /* frame dimension (width or height) has been changed */
-    EVC_OK_DIM_CHANGED = (203),
-    /* decoding success, but output frame has been delayed */
-    EVC_OK_FRM_DELAYED = (202),
-    /* not matched CRC value */
-    EVC_ERR_BAD_CRC = (201),
-    /* CRC value presented but ignored at decoder*/
-    EVC_WARN_CRC_IGNORED = (200),
+/* no more frames, but it is OK */
+const EVC_OK_NO_MORE_FRM: usize = 205;
+/* progress success, but output is not available temporarily */
+const EVC_OK_OUT_NOT_AVAILABLE: usize = 204;
+/* frame dimension (width or height) has been changed */
+const EVC_OK_DIM_CHANGED: usize = (203);
+/* decoding success, but output frame has been delayed */
+const EVC_OK_FRM_DELAYED: usize = (202);
+/* not matched CRC value */
+pub const EVC_ERR_BAD_CRC: usize = (201);
+/* CRC value presented but ignored at decoder*/
+pub const EVC_WARN_CRC_IGNORED: usize = (200);
+pub const EVC_OK: usize = 0;
 
-    EVC_OK = 0,
-
+#[derive(Debug, FromPrimitive, ToPrimitive, PartialOrd, Ord, PartialEq, Eq)]
+pub enum EvcError {
     EVC_ERR = (-1), /* generic error */
     EVC_ERR_INVALID_ARGUMENT = (-101),
     EVC_ERR_OUT_OF_MEMORY = (-102),
@@ -43,14 +42,14 @@ pub enum EvcStatus {
     EVC_ERR_UNKNOWN = (-32767), /* unknown error */
 }
 
-impl Default for EvcStatus {
+impl Default for EvcError {
     fn default() -> Self {
-        EvcStatus::EVC_OK
+        EvcError::EVC_ERR
     }
 }
 
 #[allow(dead_code, non_camel_case_types)]
-#[derive(Debug, PartialEq, Clone, Copy)]
+#[derive(Debug, PartialEq, PartialOrd, Clone, Copy)]
 #[repr(C)]
 pub enum NaluType {
     EVC_NONIDR_NUT = 0,
@@ -82,7 +81,7 @@ impl Default for NaluType {
 }
 
 #[allow(dead_code, non_camel_case_types)]
-#[derive(Debug, PartialEq, Clone, Copy)]
+#[derive(Debug, PartialEq, PartialOrd, Clone, Copy)]
 #[repr(C)]
 pub enum SliceType {
     EVC_ST_UNKNOWN = 0,
@@ -132,6 +131,8 @@ pub struct EvcdStat {
     pub refpic_num: [u8; 2],
     /* list of reference pictures */
     pub refpic: [[isize; 2]; 16],
+
+    pub ret: usize,
 }
 
 pub struct Packet {
@@ -238,7 +239,7 @@ impl<T: Pixel> Context<T> {
         }
     }
 
-    pub fn decode(&mut self, pkt: &mut Option<Packet>) -> Result<EvcdStat, EvcStatus> {
+    pub fn decode(&mut self, pkt: &mut Option<Packet>) -> Result<EvcdStat, EvcError> {
         /*if pkt.is_none() {
             return Err(CodecStatus::NeedMoreData);
         }
@@ -254,7 +255,7 @@ impl<T: Pixel> Context<T> {
         Ok(EvcdStat::default())
     }
 
-    pub fn pull(&mut self) -> Result<Frame<T>, EvcStatus> {
+    pub fn pull(&mut self) -> Result<Frame<T>, EvcError> {
         /*if self.drain {
             return self.drain_frame();
         }
@@ -295,7 +296,7 @@ impl<T: Pixel> Context<T> {
             Some(f) => Ok(f),
             None => Err(CodecStatus::NeedMoreData),
         }*/
-        Err(EvcStatus::default())
+        Err(EvcError::default())
     }
 
     pub fn flush(&mut self) {

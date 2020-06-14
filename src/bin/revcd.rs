@@ -94,6 +94,29 @@ enum EvcdState {
     STATE_BUMPING,
 }
 
+fn print_stat(stat: EvcdStat, bs_cnt: usize, verbose: bool) {
+    if verbose {
+        eprint!("[{:4}] NALU --> ", bs_cnt);
+        if stat.nalu_type < NaluType::EVC_SPS_NUT {
+        } else if stat.nalu_type == NaluType::EVC_SPS_NUT {
+            eprint!("Sequence Parameter Set ({} bytes)", stat.read);
+        } else if stat.nalu_type == NaluType::EVC_PPS_NUT {
+            eprint!("Picture Parameter Set ({} bytes)", stat.read);
+        } else if stat.nalu_type == NaluType::EVC_APS_NUT {
+            eprint!("Adaptation Parameter Set ({} bytes)", stat.read);
+        } else if stat.nalu_type == NaluType::EVC_SEI_NUT {
+            eprint!("SEI message: ");
+            if stat.ret == EVC_OK {
+                eprint!("MD5 check OK");
+            } else if stat.ret == EVC_ERR_BAD_CRC {
+                eprint!("MD5 check mismatch!");
+            } else if stat.ret == EVC_WARN_CRC_IGNORED {
+                eprint!("MD5 check ignored!");
+            }
+        }
+    }
+}
+
 fn main() -> io::Result<()> {
     let mut cli = parse_cli();
     let cfg = Config {
@@ -103,6 +126,7 @@ fn main() -> io::Result<()> {
 
     let mut ctx: Context<u8> = Context::new(&cfg);
     let mut pic_cnt: usize = 0;
+    let mut bs_cnt = 0;
     let mut state = EvcdState::STATE_DECODING;
 
     loop {
@@ -117,13 +141,18 @@ fn main() -> io::Result<()> {
                 match cli.demuxer.read() {
                     Ok(pkt) => {
                         let ret = ctx.decode(&mut Some(pkt));
-                        if let Ok(stat) = ret {
-                            if stat.fnum >= 0 {
-                                state = EvcdState::STATE_PULLING;
+                        match ret {
+                            Ok(stat) => {
+                                if stat.fnum >= 0 {
+                                    state = EvcdState::STATE_PULLING;
+                                }
+                                print_stat(stat, bs_cnt, cli.verbose);
+                                bs_cnt += 1;
                             }
-                        //print_stat(stat);
-                        } else {
-                            break;
+                            Err(err) => {
+                                eprint!("Decoding error = {:?}\n", err);
+                                break;
+                            }
                         }
                     }
                     _ => {
@@ -142,7 +171,7 @@ fn main() -> io::Result<()> {
             match ret {
                 Ok(_) => {}
                 Err(err) => {
-                    if (err == EvcStatus::EVC_ERR_UNEXPECTED) {
+                    if (err == EvcError::EVC_ERR_UNEXPECTED) {
                         if cli.verbose {
                             eprint!("bumping process completed\n");
                         }
