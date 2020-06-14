@@ -1,15 +1,15 @@
-use crate::com::frame::Frame;
-use crate::com::util::Pixel;
-//use crate::headers::*;
-//use crate::internal::*;
-//use crate::obu::*;
-
 use std::rc::Rc;
 use std::vec::Vec;
 use std::{cmp, fmt, io};
 
 use arg_enum_proc_macro::ArgEnum;
 use num_derive::*;
+
+pub mod frame;
+pub mod util;
+
+use frame::Frame;
+use util::Pixel;
 
 /*****************************************************************************
  * return values and error code
@@ -133,6 +133,48 @@ pub struct EvcdStat {
     pub refpic: [[isize; 16]; 2], //[2][16]
 
     pub ret: usize,
+}
+
+pub const MAX_NUM_REF_PICS: usize = 21;
+pub const MAX_NUM_ACTIVE_REF_FRAME: usize = 5;
+pub const MAX_NUM_RPLS: usize = 32;
+
+/* rpl structure */
+#[derive(Default)]
+pub struct EvcRpl {
+    pub poc: usize,
+    pub tid: usize,
+    pub ref_pic_num: u8,
+    pub ref_pic_active_num: u8,
+    pub ref_pics: [u8; MAX_NUM_REF_PICS],
+    pub pic_type: u8,
+}
+
+pub const MAX_QP_TABLE_SIZE: usize = 58;
+pub const MAX_QP_TABLE_SIZE_EXT: usize = 70;
+
+/* chromaQP table structure to be signalled in SPS*/
+pub struct EvcChromaTable {
+    pub chroma_qp_table_present_flag: bool,
+    pub same_qp_table_for_chroma: bool,
+    pub global_offset_flag: bool,
+    pub num_points_in_qp_table_minus1: [usize; 2],
+    pub delta_qp_in_val_minus1: [[i8; MAX_QP_TABLE_SIZE]; 2],
+    pub delta_qp_out_val: [[i8; MAX_QP_TABLE_SIZE]; 2],
+}
+
+static default_qp_talbe: [[i8; MAX_QP_TABLE_SIZE]; 2] = [[0; MAX_QP_TABLE_SIZE]; 2];
+impl Default for EvcChromaTable {
+    fn default() -> Self {
+        EvcChromaTable {
+            chroma_qp_table_present_flag: false,
+            same_qp_table_for_chroma: false,
+            global_offset_flag: false,
+            num_points_in_qp_table_minus1: [0; 2],
+            delta_qp_in_val_minus1: default_qp_talbe,
+            delta_qp_out_val: default_qp_talbe,
+        }
+    }
 }
 
 pub struct Packet {

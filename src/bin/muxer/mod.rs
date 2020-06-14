@@ -3,7 +3,7 @@ use std::io;
 mod yuv;
 use self::yuv::YuvMuxer;
 
-use revc::com::frame::Frame;
+use revc::api::frame::Frame;
 
 pub trait Muxer {
     fn write(&mut self, f: &Frame<u8>) -> io::Result<()>;

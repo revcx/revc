@@ -1,8 +1,9 @@
-use super::context::{MAX_SB_SIZE, SUBPEL_FILTER_SIZE};
-use super::plane::*;
-use super::plane_region::*;
+use crate::com::context::{MAX_SB_SIZE, SUBPEL_FILTER_SIZE};
+use crate::com::plane::*;
+use crate::com::plane_region::*;
+
 use super::util::*;
-use crate::api::*;
+use super::*;
 
 use std::fmt;
 
@@ -11,8 +12,6 @@ const FRAME_MARGIN: usize = 16 + SUBPEL_FILTER_SIZE;
 #[derive(Debug, Clone)]
 pub struct Frame<T: Pixel> {
     pub planes: [Plane<T>; 3],
-    pub pts: u64,
-    pub frame_type: NaluType,
     pub chroma_sampling: ChromaSampling,
 }
 
@@ -51,8 +50,6 @@ impl<T: Pixel> Frame<T> {
                     chroma_padding_y,
                 ),
             ],
-            pts: 0,
-            frame_type: NaluType::EVC_IDR_NUT,
             chroma_sampling,
         }
     }

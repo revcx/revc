@@ -1,6 +1,7 @@
 use super::context::*;
 use super::plane::*;
-use super::util::*;
+
+use crate::api::util::*;
 
 use std::marker::PhantomData;
 use std::ops::{Index, IndexMut};

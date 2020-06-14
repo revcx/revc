@@ -5,8 +5,8 @@ use std::io;
 use std::io::Write;
 use std::slice;
 
-use revc::com::frame::*;
-use revc::com::util::*;
+use revc::api::frame::*;
+use revc::api::util::*;
 
 pub struct YuvMuxer {
     writer: Box<dyn Write>,
