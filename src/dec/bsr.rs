@@ -6,7 +6,8 @@ use log::*;
  * NOTE: Don't change location of variable because this variable is used
  *       for assembly coding!
  */
-pub(crate) struct EvcdBsr<'a> {
+#[derive(Default)]
+pub(crate) struct EvcdBsr {
     /* temporary read code buffer */
     code: u32,
     /* left bits count in code */
@@ -14,13 +15,13 @@ pub(crate) struct EvcdBsr<'a> {
     /* bitstream cur position */
     cur: usize,
     /* buffer */
-    buf: &'a [u8],
+    buf: Vec<u8>,
 }
 
 /* Table of count of leading zero for 4 bit value */
 static tbl_zero_count4: [u8; 16] = [4, 3, 2, 2, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0];
 
-impl<'a> EvcdBsr<'a> {
+impl EvcdBsr {
     #[inline]
     fn EVC_BSR_SKIP_CODE(&mut self, size: usize) {
         assert!(self.leftbits >= size as isize);
@@ -45,7 +46,7 @@ impl<'a> EvcdBsr<'a> {
         self.cur as isize - (self.leftbits >> 3)
     }
 
-    pub fn new(buf: &'a [u8]) -> Self {
+    pub fn new(buf: Vec<u8>) -> Self {
         EvcdBsr {
             code: 0,
             leftbits: 0,

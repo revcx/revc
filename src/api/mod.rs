@@ -11,6 +11,8 @@ pub mod util;
 use frame::Frame;
 use util::Pixel;
 
+use crate::dec::*;
+
 /*****************************************************************************
  * return values and error code
  *****************************************************************************/
@@ -263,85 +265,34 @@ impl Default for Config {
 }
 
 pub struct Context<T: Pixel> {
-    //pub(crate) seq_hdr: Option<Rc<SequenceHeader>>,
-    //pub(crate) frame_hdr: Option<Rc<FrameHeader>>,
-    pub(crate) drain: bool,
     pub(crate) frame: Option<Frame<T>>,
     pub(crate) packet: Option<Packet>,
+
+    evcd_ctx: EvcdCtx,
 }
 
 impl<T: Pixel> Context<T> {
     pub fn new(cfg: &Config) -> Self {
+        let mut evcd_ctx = EvcdCtx::default();
+        evcd_ctx.magic = EVCD_MAGIC_CODE;
+
+        //TODO:
+        //evc_scan_tbl_init
+        //evc_init_multi_tbl();
+        //evc_init_multi_inv_tbl();
+
         Context {
-            //seq_hdr: None,
-            //frame_hdr: None,
-            drain: false,
             frame: None,
             packet: None,
+            evcd_ctx,
         }
     }
 
     pub fn decode(&mut self, pkt: &mut Option<Packet>) -> Result<EvcdStat, EvcError> {
-        /*if pkt.is_none() {
-            return Err(CodecStatus::NeedMoreData);
-        }
-
-        self.drain = false;
-
-        if self.packet.is_some() {
-            return Err(CodecStatus::EnoughData);
-        }
-
-        self.packet = pkt.take();
-        */
         Ok(EvcdStat::default())
     }
 
     pub fn pull(&mut self) -> Result<Frame<T>, EvcError> {
-        /*if self.drain {
-            return self.drain_frame();
-        }
-
-        if self.packet.is_none() {
-            return Err(CodecStatus::NeedMoreData);
-        }
-
-        let pkt = self.packet.as_ref().unwrap();
-        let (mut offset, size) = (pkt.offset, pkt.data.len());
-
-        while offset < size {
-            /*
-            let res = self.parse_obus(offset, false);
-            let err = res.is_err();
-            if err {
-                self.packet.take(); // all packet data are consumed, then release it
-            } else {
-                offset += res.unwrap();
-                if offset >= size {
-                    self.packet.take();
-                }
-            }
-            if self.frame.is_some() {
-                break;
-            } else if err {
-                return Err(CodecStatus::Failure);
-            }
-             */
-        }
-
-        if self.packet.is_some() {
-            self.packet.as_mut().unwrap().offset = offset;
-        }
-
-        let frame = self.frame.take();
-        match frame {
-            Some(f) => Ok(f),
-            None => Err(CodecStatus::NeedMoreData),
-        }*/
         Err(EvcError::default())
-    }
-
-    pub fn flush(&mut self) {
-        self.drain = true;
     }
 }

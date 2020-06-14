@@ -1,6 +1,7 @@
 pub(crate) mod context;
 pub(crate) mod plane;
 pub(crate) mod plane_region;
+pub(crate) mod tbl;
 
 use crate::api::*;
 

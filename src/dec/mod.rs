@@ -1,7 +1,10 @@
+use super::com::*;
+
 pub(crate) mod bsr;
+use bsr::EvcdBsr;
 
 /* evc decoder magic code */
-const EVCD_MAGIC_CODE: u32 = 0x45565944; /* EVYD */
+pub(crate) const EVCD_MAGIC_CODE: u32 = 0x45565944; /* EVYD */
 
 /*****************************************************************************
  * SBAC structure
@@ -147,50 +150,49 @@ TREE_CONS      tree_cons;
  *
  * All have to be stored are in this structure.
  *****************************************************************************/
+#[derive(Default)]
 pub(crate) struct EvcdCtx {
     /* magic code */
-    magic: u32,
-    /*
+    pub(crate) magic: u32,
+
     /* EVCD identifier */
     //EVCD                    id;
     /* CORE information used for fast operation */
-     core: EvcdCore,
+    // core: EvcdCore,
     /* current decoding bitstream */
-                     bs:EvcBsr,
+    bs: EvcdBsr,
     /* current nalu header */
-    EVC_NALU                nalu:
+    nalu: EvcNalu,
     /* current slice header */
-    EVC_SH                  sh;
+    sh: EvcSh,
     /* decoded picture buffer management */
-    EVC_PM                  dpm;
+    // EVC_PM                  dpm;
     /* create descriptor */
     //EVCD_CDSC               cdsc;
     /* sequence parameter set */
-    EVC_SPS                 sps;
+    sps: EvcSps,
     /* picture parameter set */
-    EVC_PPS                 pps;
+    pps: EvcPps,
     /* current decoded (decoding) picture buffer */
-    EVC_PIC               * pic;
+    //EVC_PIC               * pic;
     /* SBAC */
-    EVCD_SBAC               sbac_dec;
+    //EVCD_SBAC               sbac_dec;
     /* decoding picture width */
-    u16                     w;
+    w: u16,
     /* decoding picture height */
-    u16                     h;
+    h: u16,
     /* maximum CU width and height */
-    u16                     max_cuwh;
+    max_cuwh: u16,
     /* log2 of maximum CU width and height */
-    u8                      log2_max_cuwh;
+    log2_max_cuwh: u8,
 
     /* minimum CU width and height */
-    u16                     min_cuwh;
+    min_cuwh: u16,
     /* log2 of minimum CU width and height */
-    u8                      log2_min_cuwh;
-
-
+    log2_min_cuwh: u8,
     /* MAPS *******************************************************************/
     /* SCU map for CU information */
-    u32                   * map_scu;
+    /*u32                   * map_scu;
     /* LCU split information */
     s8                   (* map_split)[NUM_CU_DEPTH][NUM_BLOCK_SHAPE][MAX_CU_CNT_IN_LCU];
     s8                   (* map_suco)[NUM_CU_DEPTH][NUM_BLOCK_SHAPE][MAX_CU_CNT_IN_LCU];
@@ -206,51 +208,49 @@ pub(crate) struct EvcdCtx {
     /* new coding tool flag*/
     u32                   * map_cu_mode;
     /* ats_inter info map */
-    u8                    * map_ats_inter;
+    u8                    * map_ats_inter;*/
     /**************************************************************************/
     /* current slice number, which is increased whenever decoding a slice.
     when receiving a slice for new picture, this value is set to zero.
     this value can be used for distinguishing b/w slices */
-    u16                     slice_num;
+    slice_num: u16,
     /* last coded intra picture's picture order count */
-    int                     last_intra_poc;
+    last_intra_poc: isize,
     /* picture width in LCU unit */
-    u16                     w_lcu;
+    w_lcu: u16,
     /* picture height in LCU unit */
-    u16                     h_lcu;
+    h_lcu: u16,
     /* picture size in LCU unit (= w_lcu * h_lcu) */
-    u32                     f_lcu;
+    f_lcu: u32,
     /* picture width in SCU unit */
-    u16                     w_scu;
+    w_scu: u16,
     /* picture height in SCU unit */
-    u16                     h_scu;
+    h_scu: u16,
     /* picture size in SCU unit (= w_scu * h_scu) */
-    u32                     f_scu;
+    f_scu: u32,
     /* the picture order count value */
-    EVC_POC                 poc;
+    //EVC_POC                 poc;
     /* the picture order count of the previous Tid0 picture */
-    u32                     prev_pic_order_cnt_val;
+    prev_pic_order_cnt_val: u32,
     /* the decoding order count of the previous picture */
-    u32                     prev_doc_offset;
+    prev_doc_offset: u32,
     /* the number of currently decoded pictures */
-    u32                     pic_cnt;
+    pic_cnt: u32,
     /* flag whether current picture is refecened picture or not */
-    u8                      slice_ref_flag;
+    slice_ref_flag: u8,
     /* distance between ref pics in addition to closest ref ref pic in LD*/
-    int                     ref_pic_gap_length;
+    ref_pic_gap_length: isize,
     /* bitstream has an error? */
-    u8                      bs_err;
+    bs_err: u8,
     /* reference picture (0: foward, 1: backward) */
-    EVC_REFP                refp[MAX_NUM_REF_PICS][REFP_NUM];
+    //EVC_REFP                refp[MAX_NUM_REF_PICS][REFP_NUM];
     /* flag for picture signature enabling */
-    u8                      use_pic_sign;
+    use_pic_sign: u8,
     /* picture signature (MD5 digest 128bits) for each component */
-    u8                      pic_sign[N_C][16];
+    pic_sign: [[u8; 16]; N_C],
     /* flag to indicate picture signature existing or not */
-    u8                      pic_sign_exist;
+    pic_sign_exist: u8,
     /* flag to indicate opl decoder output */
-    u8                      use_opl;
-    u32                     num_ctb;
-
-     */
+    use_opl: u8,
+    num_ctb: u32,
 }
