@@ -4,7 +4,7 @@ use super::com::*;
 mod bsr;
 mod eco;
 
-use crate::dec::eco::evcd_eco_nalu;
+use crate::dec::eco::*;
 use bsr::EvcdBsr;
 
 /* evc decoder magic code */
@@ -277,6 +277,7 @@ impl EvcdCtx {
         let nalu = evcd_eco_nalu(&mut self.bs)?;
         let nalu_type = nalu.nal_unit_type.into();
         if nalu_type == NaluType::EVC_SPS_NUT {
+            evcd_eco_sps(&mut self.bs, &mut self.sps)?;
         } else if nalu_type == NaluType::EVC_PPS_NUT {
         } else if nalu_type < NaluType::EVC_SPS_NUT {
         } else if nalu_type == NaluType::EVC_SEI_NUT {
