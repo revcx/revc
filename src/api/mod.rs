@@ -61,6 +61,7 @@ pub enum NaluType {
     EVC_PPS_NUT = 25,
     EVC_APS_NUT = 26,
     EVC_SEI_NUT = 27,
+    EVC_UNKNOWN_NUT,
 }
 
 impl fmt::Display for NaluType {
@@ -73,6 +74,22 @@ impl fmt::Display for NaluType {
             EVC_PPS_NUT => write!(f, "Picture Parameter Set"),
             EVC_APS_NUT => write!(f, "Adaptation Parameter Set"),
             EVC_SEI_NUT => write!(f, "Supplemental Enhancement Information"),
+            EVC_UNKNOWN_NUT => write!(f, "Unknown"),
+        }
+    }
+}
+
+impl From<u8> for NaluType {
+    fn from(val: u8) -> Self {
+        use self::NaluType::*;
+        match val {
+            0 => EVC_NONIDR_NUT,
+            1 => EVC_IDR_NUT,
+            24 => EVC_SPS_NUT,
+            25 => EVC_PPS_NUT,
+            26 => EVC_APS_NUT,
+            27 => EVC_SEI_NUT,
+            _ => EVC_UNKNOWN_NUT,
         }
     }
 }
@@ -105,6 +122,18 @@ impl fmt::Display for SliceType {
     }
 }
 
+impl From<u8> for SliceType {
+    fn from(val: u8) -> Self {
+        use self::SliceType::*;
+        match val {
+            1 => EVC_ST_I,
+            2 => EVC_ST_P,
+            3 => EVC_ST_B,
+            _ => EVC_ST_UNKNOWN,
+        }
+    }
+}
+
 impl Default for SliceType {
     fn default() -> Self {
         SliceType::EVC_ST_UNKNOWN
@@ -119,7 +148,7 @@ pub struct EvcdStat {
     /* byte size of decoded bitstream (read size of bitstream) */
     pub read: usize,
     /* nalu type */
-    pub nalu_type: u8, //NaluType,
+    pub nalu_type: NaluType,
     /* slice type */
     pub stype: SliceType,
     /* frame number monotonically increased whenever decoding a frame.

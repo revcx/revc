@@ -96,7 +96,7 @@ enum EvcdState {
 
 fn print_stat(stat: EvcdStat, bs_cnt: usize) {
     eprint!("[{:4}] NALU --> ", bs_cnt);
-    if stat.nalu_type < NaluType::EVC_SPS_NUT as u8 {
+    if stat.nalu_type < NaluType::EVC_SPS_NUT {
         eprint!("{}-slice", stat.stype);
 
         eprint!(" ({} bytes", stat.read);
@@ -109,13 +109,13 @@ fn print_stat(stat: EvcdStat, bs_cnt: usize) {
             }
             eprint!("] ");
         }
-    } else if stat.nalu_type == NaluType::EVC_SPS_NUT as u8 {
+    } else if stat.nalu_type == NaluType::EVC_SPS_NUT {
         eprint!("Sequence Parameter Set ({} bytes)", stat.read);
-    } else if stat.nalu_type == NaluType::EVC_PPS_NUT as u8 {
+    } else if stat.nalu_type == NaluType::EVC_PPS_NUT {
         eprint!("Picture Parameter Set ({} bytes)", stat.read);
-    } else if stat.nalu_type == NaluType::EVC_APS_NUT as u8 {
+    } else if stat.nalu_type == NaluType::EVC_APS_NUT {
         eprint!("Adaptation Parameter Set ({} bytes)", stat.read);
-    } else if stat.nalu_type == NaluType::EVC_SEI_NUT as u8 {
+    } else if stat.nalu_type == NaluType::EVC_SEI_NUT {
         eprint!("SEI message: ");
         if stat.ret == EVC_OK {
             eprint!("MD5 check OK");

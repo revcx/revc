@@ -275,9 +275,17 @@ impl EvcdCtx {
 
         /* parse nalu header */
         let nalu = evcd_eco_nalu(&mut self.bs)?;
+        let nalu_type = nalu.nal_unit_type.into();
+        if nalu_type == NaluType::EVC_SPS_NUT {
+        } else if nalu_type == NaluType::EVC_PPS_NUT {
+        } else if nalu_type < NaluType::EVC_SPS_NUT {
+        } else if nalu_type == NaluType::EVC_SEI_NUT {
+        } else {
+            return Err(EvcError::EVC_ERR_MALFORMED_BITSTREAM);
+        }
 
         Ok(EvcdStat {
-            nalu_type: nalu.nal_unit_type,
+            nalu_type,
             read: nalu_size_field_in_bytes + self.bs.EVC_BSR_GET_READ_BYTE() as usize,
             ..Default::default()
         })
