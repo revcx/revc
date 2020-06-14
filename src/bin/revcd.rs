@@ -96,7 +96,7 @@ enum EvcdState {
 
 fn print_stat(stat: EvcdStat, bs_cnt: usize) {
     eprint!("[{:4}] NALU --> ", bs_cnt);
-    if stat.nalu_type < NaluType::EVC_SPS_NUT {
+    if stat.nalu_type < NaluType::EVC_SPS_NUT as u8 {
         eprint!("{}-slice", stat.stype);
 
         eprint!(" ({} bytes", stat.read);
@@ -109,13 +109,13 @@ fn print_stat(stat: EvcdStat, bs_cnt: usize) {
             }
             eprint!("] ");
         }
-    } else if stat.nalu_type == NaluType::EVC_SPS_NUT {
+    } else if stat.nalu_type == NaluType::EVC_SPS_NUT as u8 {
         eprint!("Sequence Parameter Set ({} bytes)", stat.read);
-    } else if stat.nalu_type == NaluType::EVC_PPS_NUT {
+    } else if stat.nalu_type == NaluType::EVC_PPS_NUT as u8 {
         eprint!("Picture Parameter Set ({} bytes)", stat.read);
-    } else if stat.nalu_type == NaluType::EVC_APS_NUT {
+    } else if stat.nalu_type == NaluType::EVC_APS_NUT as u8 {
         eprint!("Adaptation Parameter Set ({} bytes)", stat.read);
-    } else if stat.nalu_type == NaluType::EVC_SEI_NUT {
+    } else if stat.nalu_type == NaluType::EVC_SEI_NUT as u8 {
         eprint!("SEI message: ");
         if stat.ret == EVC_OK {
             eprint!("MD5 check OK");
@@ -180,8 +180,8 @@ fn main() -> io::Result<()> {
                 continue;
             } else {
                 match cli.demuxer.read() {
-                    Ok(pkt) => {
-                        let ret = ctx.decode(&mut Some(pkt));
+                    Ok(mut pkt) => {
+                        let ret = ctx.decode(&mut pkt);
                         match ret {
                             Ok(stat) => {
                                 if stat.fnum >= 0 {

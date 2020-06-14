@@ -118,12 +118,12 @@ pub(crate) const AVAIL_UP_RI_RI: usize = (1 << AVAIL_BIT_UP_RI_RI);
  *****************************************************************************/
 #[derive(Default)]
 pub(crate) struct EvcNalu {
-    nal_unit_size: u32,
-    forbidden_zero_bit: u8,
-    nal_unit_type_plus1: u8,
-    nuh_temporal_id: u8,
-    nuh_reserved_zero_5bits: u8,
-    nuh_extension_flag: bool,
+    pub(crate) nal_unit_size: u32,
+    pub(crate) forbidden_zero_bit: u8,
+    pub(crate) nal_unit_type_plus1: u8,
+    pub(crate) nuh_temporal_id: u8,
+    pub(crate) nuh_reserved_zero_5bits: u8,
+    pub(crate) nuh_extension_flag: bool,
 }
 
 pub(crate) const EXTENDED_SAR: usize = 255;

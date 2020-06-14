@@ -1,6 +1,10 @@
+use super::api::*;
 use super::com::*;
 
-pub(crate) mod bsr;
+mod bsr;
+mod eco;
+
+use crate::dec::eco::evcd_eco_nalu;
 use bsr::EvcdBsr;
 
 /* evc decoder magic code */
@@ -253,4 +257,29 @@ pub(crate) struct EvcdCtx {
     /* flag to indicate opl decoder output */
     use_opl: u8,
     num_ctb: u32,
+}
+
+const nalu_size_field_in_bytes: usize = 4;
+
+impl EvcdCtx {
+    pub(crate) fn decode_nalu(&mut self, pkt: &mut Packet) -> Result<EvcdStat, EvcError> {
+        let data = pkt.data.take();
+        let buf = if let Some(b) = data {
+            b
+        } else {
+            return Err(EvcError::EVC_ERR_EMPTY_PACKET);
+        };
+
+        /* bitstream reader initialization */
+        self.bs = EvcdBsr::new(buf);
+
+        /* parse nalu header */
+        let nalu = evcd_eco_nalu(&mut self.bs)?;
+
+        Ok(EvcdStat {
+            nalu_type: (nalu.nal_unit_type_plus1 - 1),
+            read: nalu_size_field_in_bytes + self.bs.EVC_BSR_GET_READ_BYTE() as usize,
+            ..Default::default()
+        })
+    }
 }

@@ -3,7 +3,8 @@ use std::vec::Vec;
 use std::{cmp, fmt, io};
 
 use arg_enum_proc_macro::ArgEnum;
-use num_derive::*;
+use num_derive::FromPrimitive;
+use num_traits::FromPrimitive;
 
 pub mod frame;
 pub mod util;
@@ -40,6 +41,7 @@ pub enum EvcError {
     EVC_ERR_UNEXPECTED = (-105),
     EVC_ERR_UNSUPPORTED_COLORSPACE = (-201),
     EVC_ERR_MALFORMED_BITSTREAM = (-202),
+    EVC_ERR_EMPTY_PACKET = (-203),
 
     EVC_ERR_UNKNOWN = (-32767), /* unknown error */
 }
@@ -51,8 +53,7 @@ impl Default for EvcError {
 }
 
 #[allow(dead_code, non_camel_case_types)]
-#[derive(Debug, PartialEq, PartialOrd, Clone, Copy)]
-#[repr(C)]
+#[derive(Debug, FromPrimitive, ToPrimitive, PartialEq, PartialOrd, Clone, Copy)]
 pub enum NaluType {
     EVC_NONIDR_NUT = 0,
     EVC_IDR_NUT = 1,
@@ -83,7 +84,7 @@ impl Default for NaluType {
 }
 
 #[allow(dead_code, non_camel_case_types)]
-#[derive(Debug, PartialEq, PartialOrd, Clone, Copy)]
+#[derive(Debug, FromPrimitive, ToPrimitive, PartialEq, PartialOrd, Clone, Copy)]
 #[repr(C)]
 pub enum SliceType {
     EVC_ST_UNKNOWN = 0,
@@ -118,7 +119,7 @@ pub struct EvcdStat {
     /* byte size of decoded bitstream (read size of bitstream) */
     pub read: usize,
     /* nalu type */
-    pub nalu_type: NaluType,
+    pub nalu_type: u8, //NaluType,
     /* slice type */
     pub stype: SliceType,
     /* frame number monotonically increased whenever decoding a frame.
@@ -180,14 +181,18 @@ impl Default for EvcChromaTable {
 }
 
 pub struct Packet {
-    pub data: Vec<u8>,
-    pub offset: usize,
+    pub data: Option<Vec<u8>>,
     pub pts: u64,
 }
 
 impl fmt::Display for Packet {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Packet {} - {} bytes", self.pts, self.data.len())
+        let len = if let Some(data) = &self.data {
+            data.len()
+        } else {
+            0
+        };
+        write!(f, "Packet {} - {} bytes", self.pts, len)
     }
 }
 
@@ -288,8 +293,8 @@ impl<T: Pixel> Context<T> {
         }
     }
 
-    pub fn decode(&mut self, pkt: &mut Option<Packet>) -> Result<EvcdStat, EvcError> {
-        Ok(EvcdStat::default())
+    pub fn decode(&mut self, pkt: &mut Packet) -> Result<EvcdStat, EvcError> {
+        self.evcd_ctx.decode_nalu(pkt)
     }
 
     pub fn pull(&mut self) -> Result<Frame<T>, EvcError> {

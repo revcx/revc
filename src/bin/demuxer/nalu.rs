@@ -31,8 +31,7 @@ impl Demuxer for NaluDemuxer {
         self.reader.read_exact(&mut data)?;
 
         Ok(Packet {
-            data,
-            offset: 0,
+            data: Some(data),
             pts: 0,
         })
     }
