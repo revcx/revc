@@ -14,6 +14,8 @@ binaries = [
     "clap",
 ]
 default = ["binaries"]
+ENC_DEC_TRACE = []
+TRACE_HLS = ["ENC_DEC_TRACE"]
 
 [dependencies]
 arg_enum_proc_macro = "0.1.1"
