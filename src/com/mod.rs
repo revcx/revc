@@ -2,6 +2,7 @@ pub(crate) mod context;
 pub(crate) mod plane;
 pub(crate) mod plane_region;
 pub(crate) mod tbl;
+pub(crate) mod util;
 
 use crate::api::*;
 
@@ -204,12 +205,31 @@ pub(crate) struct EvcSps {
     pub(crate) pic_height_in_luma_samples: u16,
     pub(crate) bit_depth_luma_minus8: u8,
     pub(crate) bit_depth_chroma_minus8: u8,
+    pub(crate) sps_btt_flag: bool,
+    pub(crate) sps_suco_flag: bool,
 
     pub(crate) log2_ctu_size_minus5: u8,
     pub(crate) log2_min_cb_size_minus2: u8,
     pub(crate) log2_diff_ctu_max_14_cb_size: u8,
     pub(crate) log2_diff_ctu_max_tt_cb_size: u8,
     pub(crate) log2_diff_min_cb_min_tt_cb_size_minus2: u8,
+
+    pub(crate) tool_amvr: bool,
+    pub(crate) tool_mmvd: bool,
+    pub(crate) tool_affine: bool,
+    pub(crate) tool_dmvr: bool,
+    pub(crate) tool_addb: bool,
+    pub(crate) tool_alf: bool,
+    pub(crate) tool_htdf: bool,
+    pub(crate) tool_admvp: bool,
+    pub(crate) tool_hmvp: bool,
+    pub(crate) tool_eipd: bool,
+    pub(crate) tool_iqt: bool,
+    pub(crate) tool_cm_init: bool,
+    pub(crate) tool_ats: bool,
+    pub(crate) tool_rpl: bool,
+    pub(crate) tool_pocs: bool,
+    pub(crate) tool_adcc: bool,
 
     pub(crate) log2_sub_gop_length: u8,
     pub(crate) log2_ref_pic_gap_length: u8,
@@ -221,7 +241,10 @@ pub(crate) struct EvcSps {
     pub(crate) picture_crop_top_offset: u16,
     pub(crate) picture_crop_bottom_offset: u16,
 
+    pub(crate) dquant_flag: bool,
     pub(crate) chroma_qp_table_struct: EvcChromaTable,
+
+    pub(crate) tool_dra: bool,
 
     pub(crate) vui_parameters_present_flag: bool,
     pub(crate) vui_parameters: EvcVui,
@@ -237,8 +260,10 @@ pub(crate) struct EvcPps {
     pub(crate) num_ref_idx_default_active_minus1: [u8; 2],
     pub(crate) additional_lt_poc_lsb_len: u8,
     pub(crate) rpl1_idx_present_flag: bool,
+    pub(crate) single_tile_in_pic_flag: bool,
     pub(crate) tile_id_len_minus1: u8,
     pub(crate) explicit_tile_id_flag: bool,
+    pub(crate) pic_dra_enabled_flag: bool,
     pub(crate) arbitrary_slice_present_flag: bool,
     pub(crate) constrained_intra_pred_flag: bool,
     pub(crate) cu_qp_delta_enabled_flag: bool,

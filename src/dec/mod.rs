@@ -4,6 +4,7 @@ use super::com::*;
 mod bsr;
 mod eco;
 
+use crate::com::util::*;
 use crate::dec::eco::*;
 use bsr::EvcdBsr;
 
@@ -182,9 +183,9 @@ pub(crate) struct EvcdCtx {
     /* SBAC */
     //EVCD_SBAC               sbac_dec;
     /* decoding picture width */
-    w: u16,
+    pub(crate) w: u16,
     /* decoding picture height */
-    h: u16,
+    pub(crate) h: u16,
     /* maximum CU width and height */
     max_cuwh: u16,
     /* log2 of maximum CU width and height */
@@ -262,6 +263,46 @@ pub(crate) struct EvcdCtx {
 const nalu_size_field_in_bytes: usize = 4;
 
 impl EvcdCtx {
+    fn sequence_deinit(&mut self) {
+        /*evc_mfree(self.map_scu);
+        evc_mfree(self.map_split);
+        evc_mfree(self.map_ipm);
+        evc_mfree(self.map_suco);
+        evc_mfree(self.map_affine);
+        evc_mfree(self.map_cu_mode);
+        evc_mfree(self.map_ats_inter);
+        evc_mfree_fast(self.map_tidx);
+        evc_picman_deinit(&self.dpm);*/
+    }
+
+    fn sequence_init(&mut self) {
+        if self.sps.pic_width_in_luma_samples != self.w
+            || self.sps.pic_height_in_luma_samples != self.h
+        {
+            /* resolution was changed */
+            self.sequence_deinit();
+
+            self.w = self.sps.pic_width_in_luma_samples;
+            self.h = self.sps.pic_height_in_luma_samples;
+
+            assert_eq!(self.sps.sps_btt_flag, false);
+
+            self.max_cuwh = 1 << 6;
+            self.min_cuwh = 1 << 2;
+
+            self.log2_max_cuwh = CONV_LOG2(self.max_cuwh as usize);
+            self.log2_min_cuwh = CONV_LOG2(self.min_cuwh as usize);
+        }
+
+        let size = self.max_cuwh;
+        self.w_lcu = (self.w + (size - 1)) / size;
+        self.h_lcu = (self.h + (size - 1)) / size;
+        self.f_lcu = (self.w_lcu * self.h_lcu) as u32;
+        self.w_scu = (self.w + ((1 << MIN_CU_LOG2) - 1) as u16) >> MIN_CU_LOG2 as u16;
+        self.h_scu = (self.h + ((1 << MIN_CU_LOG2) - 1) as u16) >> MIN_CU_LOG2 as u16;
+        self.f_scu = (self.w_scu * self.h_scu) as u32;
+    }
+
     pub(crate) fn decode_nalu(&mut self, pkt: &mut Packet) -> Result<EvcdStat, EvcError> {
         let data = pkt.data.take();
         let buf = if let Some(b) = data {
@@ -278,7 +319,10 @@ impl EvcdCtx {
         let nalu_type = nalu.nal_unit_type.into();
         if nalu_type == NaluType::EVC_SPS_NUT {
             evcd_eco_sps(&mut self.bs, &mut self.sps)?;
+
+            self.sequence_init();
         } else if nalu_type == NaluType::EVC_PPS_NUT {
+            evcd_eco_pps(&mut self.bs, &self.sps, &mut self.pps)?;
         } else if nalu_type < NaluType::EVC_SPS_NUT {
         } else if nalu_type == NaluType::EVC_SEI_NUT {
         } else {
@@ -287,6 +331,7 @@ impl EvcdCtx {
 
         Ok(EvcdStat {
             nalu_type,
+            fnum: -1,
             read: nalu_size_field_in_bytes + self.bs.EVC_BSR_GET_READ_BYTE() as usize,
             ..Default::default()
         })

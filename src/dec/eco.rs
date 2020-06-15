@@ -48,26 +48,26 @@ pub(crate) fn evcd_eco_sps(bs: &mut EvcdBsr, sps: &mut EvcSps) -> Result<(), Evc
     sps.pic_height_in_luma_samples = bs.read_ue(Some("sps->pic_height_in_luma_samples")) as u16;
     sps.bit_depth_luma_minus8 = bs.read_ue(Some("sps->bit_depth_luma_minus8")) as u8;
     sps.bit_depth_chroma_minus8 = bs.read_ue(Some("sps->bit_depth_chroma_minus8")) as u8;
-    let _sps_btt_flag = bs.read1(Some("sps->sps_btt_flag"));
-    let _sps_suco_flag = bs.read1(Some("sps->sps_suco_flag"));
-    let _tool_admvp = bs.read1(Some("sps->tool_admvp"));
-    let _tool_eipd = bs.read1(Some("sps->tool_eipd"));
-    let _tool_cm_init = bs.read1(Some("sps->tool_cm_init"));
-    let _tool_iqt = bs.read1(Some("sps->tool_iqt"));
-    let _tool_addb = bs.read1(Some("sps->tool_addb"));
-    let _tool_alf = bs.read1(Some("sps->tool_alf"));
-    let _tool_htdf = bs.read1(Some("sps->tool_htdf"));
-    let _tool_rpl = bs.read1(Some("sps->tool_rpl")) != 0;
-    let _tool_pocs = bs.read1(Some("sps->tool_pocs")) != 0;
-    let _dquant_flag = bs.read1(Some("sps->dquant_flag"));
-    let _tool_dra = bs.read1(Some("sps->tool_dra"));
-    if !_tool_rpl || !_tool_pocs {
+    sps.sps_btt_flag = bs.read1(Some("sps->sps_btt_flag")) != 0;
+    sps.sps_suco_flag = bs.read1(Some("sps->sps_suco_flag")) != 0;
+    sps.tool_admvp = bs.read1(Some("sps->tool_admvp")) != 0;
+    sps.tool_eipd = bs.read1(Some("sps->tool_eipd")) != 0;
+    sps.tool_cm_init = bs.read1(Some("sps->tool_cm_init")) != 0;
+    sps.tool_iqt = bs.read1(Some("sps->tool_iqt")) != 0;
+    sps.tool_addb = bs.read1(Some("sps->tool_addb")) != 0;
+    sps.tool_alf = bs.read1(Some("sps->tool_alf")) != 0;
+    sps.tool_htdf = bs.read1(Some("sps->tool_htdf")) != 0;
+    sps.tool_rpl = bs.read1(Some("sps->tool_rpl")) != 0;
+    sps.tool_pocs = bs.read1(Some("sps->tool_pocs")) != 0;
+    sps.dquant_flag = bs.read1(Some("sps->dquant_flag")) != 0;
+    sps.tool_dra = bs.read1(Some("sps->tool_dra")) != 0;
+    if !sps.tool_rpl || !sps.tool_pocs {
         sps.log2_sub_gop_length = bs.read_ue(Some("sps->log2_sub_gop_length")) as u8;
         if sps.log2_sub_gop_length == 0 {
             sps.log2_ref_pic_gap_length = bs.read_ue(Some("sps->log2_ref_pic_gap_length")) as u8;
         }
     }
-    if !_tool_rpl {
+    if !sps.tool_rpl {
         sps.max_num_ref_pics = bs.read_ue(Some("sps->max_num_ref_pics")) as u8;
     }
 
@@ -121,6 +121,51 @@ pub(crate) fn evcd_eco_sps(bs: &mut EvcdBsr, sps: &mut EvcSps) -> Result<(), Evc
     }
 
     EVC_TRACE_STR(&mut bs.fp_trace, "************ SPS End   ************\n");
+    EVC_TRACE_STR(&mut bs.fp_trace, "***********************************\n");
+
+    Ok(())
+}
+
+pub(crate) fn evcd_eco_pps(
+    bs: &mut EvcdBsr,
+    sps: &EvcSps,
+    pps: &mut EvcPps,
+) -> Result<(), EvcError> {
+    EVC_TRACE_STR(&mut bs.fp_trace, "***********************************\n");
+    EVC_TRACE_STR(&mut bs.fp_trace, "************ PPS Start ************\n");
+
+    pps.pps_pic_parameter_set_id = bs.read_ue(Some("pps->pps_pic_parameter_set_id")) as u8;
+    pps.pps_seq_parameter_set_id = bs.read_ue(Some("pps->pps_seq_parameter_set_id")) as u8;
+    pps.num_ref_idx_default_active_minus1[0] =
+        bs.read_ue(Some("pps->num_ref_idx_default_active_minus1[0]")) as u8;
+    pps.num_ref_idx_default_active_minus1[1] =
+        bs.read_ue(Some("pps->num_ref_idx_default_active_minus1[1]")) as u8;
+    pps.additional_lt_poc_lsb_len = bs.read_ue(Some("pps->additional_lt_poc_lsb_len")) as u8;
+    pps.rpl1_idx_present_flag = bs.read1(Some("pps->rpl1_idx_present_flag")) != 0;
+    pps.single_tile_in_pic_flag = bs.read1(Some("pps->single_tile_in_pic_flag")) != 0;
+    assert_eq!(pps.single_tile_in_pic_flag, true);
+
+    pps.tile_id_len_minus1 = bs.read_ue(Some("pps->tile_id_len_minus1")) as u8;
+    pps.explicit_tile_id_flag = bs.read1(Some("pps->explicit_tile_id_flag")) != 0;
+    assert_eq!(pps.explicit_tile_id_flag, false);
+
+    pps.pic_dra_enabled_flag = bs.read1(Some("pps->pic_dra_enabled_flag")) != 0;
+    assert_eq!(pps.pic_dra_enabled_flag, false);
+
+    pps.arbitrary_slice_present_flag = bs.read1(Some("pps->arbitrary_slice_present_flag")) != 0;
+    pps.constrained_intra_pred_flag = bs.read1(Some("pps->constrained_intra_pred_flag")) != 0;
+
+    pps.cu_qp_delta_enabled_flag = bs.read1(Some("pps->cu_qp_delta_enabled_flag")) != 0;
+    if pps.cu_qp_delta_enabled_flag {
+        pps.cu_qp_delta_area = bs.read_ue(Some("pps->cu_qp_delta_area")) as u8;
+        pps.cu_qp_delta_area += 6;
+    }
+
+    while !bs.EVC_BSR_IS_BYTE_ALIGN() {
+        bs.read1(Some("t0"));
+    }
+
+    EVC_TRACE_STR(&mut bs.fp_trace, "************ PPS End   ************\n");
     EVC_TRACE_STR(&mut bs.fp_trace, "***********************************\n");
 
     Ok(())
