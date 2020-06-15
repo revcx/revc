@@ -234,7 +234,7 @@ pub(crate) struct EvcdCtx {
     /* picture size in SCU unit (= w_scu * h_scu) */
     f_scu: u32,
     /* the picture order count value */
-    //EVC_POC                 poc;
+    poc: EvcPoc,
     /* the picture order count of the previous Tid0 picture */
     prev_pic_order_cnt_val: u32,
     /* the decoding order count of the previous picture */
@@ -242,7 +242,7 @@ pub(crate) struct EvcdCtx {
     /* the number of currently decoded pictures */
     pic_cnt: u32,
     /* flag whether current picture is refecened picture or not */
-    slice_ref_flag: u8,
+    slice_ref_flag: bool,
     /* distance between ref pics in addition to closest ref ref pic in LD*/
     ref_pic_gap_length: isize,
     /* bitstream has an error? */
@@ -315,8 +315,9 @@ impl EvcdCtx {
         self.bs = EvcdBsr::new(buf);
 
         /* parse nalu header */
-        let nalu = evcd_eco_nalu(&mut self.bs)?;
-        let nalu_type = nalu.nal_unit_type.into();
+        evcd_eco_nalu(&mut self.bs, &mut self.nalu)?;
+
+        let nalu_type = self.nalu.nal_unit_type;
         if nalu_type == NaluType::EVC_SPS_NUT {
             evcd_eco_sps(&mut self.bs, &mut self.sps)?;
 
@@ -328,15 +329,39 @@ impl EvcdCtx {
             self.sh.num_ctb = self.f_lcu as u16;
 
             evcd_eco_sh(&mut self.bs, &self.sps, &self.pps, &mut self.sh, nalu_type)?;
+
+            if self.num_ctb == 0 {
+                self.num_ctb = self.f_lcu;
+            }
+
+            /* POC derivation process */
+            assert_eq!(self.sps.tool_pocs, false);
+            if !self.sps.tool_pocs {
+                //sps_pocs_flag == 0
+                if nalu_type == NaluType::EVC_IDR_NUT {
+                    self.sh.poc_lsb = 0;
+                    self.poc.prev_doc_offset = -1;
+                    self.poc.prev_poc_val = 0;
+                    self.slice_ref_flag = (self.nalu.nuh_temporal_id == 0
+                        || self.nalu.nuh_temporal_id < self.sps.log2_sub_gop_length);
+                    self.poc.poc_val = 0;
+                } else {
+                    self.slice_ref_flag = (self.nalu.nuh_temporal_id == 0
+                        || self.nalu.nuh_temporal_id < self.sps.log2_sub_gop_length);
+                    evc_poc_derivation(&self.sps, self.nalu.nuh_temporal_id, &mut self.poc);
+                    self.sh.poc_lsb = self.poc.poc_val;
+                }
+            }
         } else if nalu_type == NaluType::EVC_SEI_NUT {
         } else {
             return Err(EvcError::EVC_ERR_MALFORMED_BITSTREAM);
         }
 
         Ok(EvcdStat {
-            nalu_type,
-            fnum: -1,
             read: nalu_size_field_in_bytes + self.bs.EVC_BSR_GET_READ_BYTE() as usize,
+            nalu_type,
+            stype: self.sh.slice_type,
+            fnum: -1,
             ..Default::default()
         })
     }

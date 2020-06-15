@@ -121,7 +121,7 @@ pub(crate) const AVAIL_UP_RI_RI: usize = (1 << AVAIL_BIT_UP_RI_RI);
 pub(crate) struct EvcNalu {
     pub(crate) nal_unit_size: u32,
     pub(crate) forbidden_zero_bit: u8,
-    pub(crate) nal_unit_type: u8,
+    pub(crate) nal_unit_type: NaluType,
     pub(crate) nuh_temporal_id: u8,
     pub(crate) nuh_reserved_zero_5bits: u8,
     pub(crate) nuh_extension_flag: bool,
@@ -279,6 +279,13 @@ pub(crate) struct EvcSh {
     pub(crate) slice_type: SliceType,
     pub(crate) no_output_of_prior_pics_flag: bool,
 
+    pub(crate) poc_lsb: i32,
+
+    /*   HLS_RPL */
+    pub(crate) ref_pic_list_sps_flag: [u32; 2],
+    pub(crate) rpl_l0_idx: isize, //-1 means this slice does not use RPL candidate in SPS for RPL0
+    pub(crate) rpl_l1_idx: isize, //-1 means this slice does not use RPL candidate in SPS for RPL1
+
     pub(crate) rpl_l0: EvcRpl,
     pub(crate) rpl_l1: EvcRpl,
 
@@ -292,4 +299,15 @@ pub(crate) struct EvcSh {
     pub(crate) qp_v_offset: i8,
 
     pub(crate) num_ctb: u16,
+}
+
+/*****************************************************************************/
+#[derive(Default)]
+pub(crate) struct EvcPoc {
+    /* current picture order count value */
+    pub(crate) poc_val: i32,
+    /* the picture order count of the previous Tid0 picture */
+    pub(crate) prev_poc_val: u32,
+    /* the decoding order count of the previous picture */
+    pub(crate) prev_doc_offset: i32,
 }

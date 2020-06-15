@@ -5,9 +5,7 @@ use crate::com::*;
 
 use log::*;
 
-pub(crate) fn evcd_eco_nalu(bs: &mut EvcdBsr) -> Result<EvcNalu, EvcError> {
-    let mut nalu = EvcNalu::default();
-
+pub(crate) fn evcd_eco_nalu(bs: &mut EvcdBsr, nalu: &mut EvcNalu) -> Result<(), EvcError> {
     //nalu->nal_unit_size = bs.read(32);
     nalu.forbidden_zero_bit = bs.read(1, Some("nalu->forbidden_zero_bit")) as u8;
 
@@ -16,7 +14,7 @@ pub(crate) fn evcd_eco_nalu(bs: &mut EvcdBsr) -> Result<EvcNalu, EvcError> {
         return Err(EvcError::EVC_ERR_MALFORMED_BITSTREAM);
     }
 
-    nalu.nal_unit_type = bs.read(6, Some("nalu->nal_unit_type_plus1")) as u8 - 1;
+    nalu.nal_unit_type = (bs.read(6, Some("nalu->nal_unit_type_plus1")) as u8 - 1).into();
     nalu.nuh_temporal_id = bs.read(3, Some("nalu->nuh_temporal_id")) as u8;
     nalu.nuh_reserved_zero_5bits = bs.read(5, Some("nalu->nuh_reserved_zero_5bits")) as u8;
 
@@ -32,7 +30,7 @@ pub(crate) fn evcd_eco_nalu(bs: &mut EvcdBsr) -> Result<EvcNalu, EvcError> {
         return Err(EvcError::EVC_ERR_MALFORMED_BITSTREAM);
     }
 
-    Ok(nalu)
+    Ok(())
 }
 
 pub(crate) fn evcd_eco_sps(bs: &mut EvcdBsr, sps: &mut EvcSps) -> Result<(), EvcError> {

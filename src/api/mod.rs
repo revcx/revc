@@ -327,10 +327,6 @@ impl<T: Pixel> Context<T> {
     }
 
     pub fn pull(&mut self) -> Result<Frame<T>, EvcError> {
-        Ok(Frame::new(
-            self.evcd_ctx.w as usize,
-            self.evcd_ctx.h as usize,
-            ChromaSampling::Cs420,
-        ))
+        Err(EvcError::EVC_ERR_UNEXPECTED)
     }
 }
