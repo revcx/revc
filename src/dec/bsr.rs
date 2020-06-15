@@ -17,15 +17,15 @@ fn OPEN_TRACE() -> Option<Box<dyn Write>> {
 }
 
 #[cfg(feature = "TRACE_HLS")]
-pub(crate) fn EVC_TRACE_STR(writer: &mut Option<Box<dyn Write>>, name: &str) {
-    if let Some(writer) = writer {
+pub(crate) fn EVC_TRACE_STR(tracer: &mut Option<Box<dyn Write>>, name: &str) {
+    if let Some(writer) = tracer {
         writer.write_fmt(format_args!("{}", name));
     }
 }
 
 #[cfg(feature = "TRACE_HLS")]
-pub(crate) fn EVC_TRACE_HLS<T: Display>(writer: &mut Option<Box<dyn Write>>, name: &str, val: T) {
-    if let Some(writer) = writer {
+pub(crate) fn EVC_TRACE_HLS<T: Display>(tracer: &mut Option<Box<dyn Write>>, name: &str, val: T) {
+    if let Some(writer) = tracer {
         writer.write_fmt(format_args!("{} {} \n", name, val));
     }
 }
@@ -58,7 +58,7 @@ pub(crate) struct EvcdBsr {
     /* buffer */
     buf: Vec<u8>,
     /* trace */
-    pub(crate) fp_trace: Option<Box<dyn Write>>,
+    pub(crate) tracer: Option<Box<dyn Write>>,
 }
 
 /* Table of count of leading zero for 4 bit value */
@@ -95,7 +95,7 @@ impl EvcdBsr {
             leftbits: 0,
             cur: 0,
             buf,
-            fp_trace: OPEN_TRACE(),
+            tracer: OPEN_TRACE(),
         }
     }
 
@@ -165,7 +165,7 @@ impl EvcdBsr {
         self.EVC_BSR_SKIP_CODE(size as usize);
 
         if let Some(name) = name {
-            EVC_TRACE_HLS(&mut self.fp_trace, name, val);
+            EVC_TRACE_HLS(&mut self.tracer, name, val);
         }
 
         val
@@ -184,7 +184,7 @@ impl EvcdBsr {
         self.leftbits -= 1;
 
         if let Some(name) = name {
-            EVC_TRACE_HLS(&mut self.fp_trace, name, val);
+            EVC_TRACE_HLS(&mut self.tracer, name, val);
         }
 
         val
@@ -200,7 +200,7 @@ impl EvcdBsr {
             let val = 0;
 
             if let Some(name) = name {
-                EVC_TRACE_HLS(&mut self.fp_trace, name, val);
+                EVC_TRACE_HLS(&mut self.tracer, name, val);
             }
 
             return val;
@@ -228,7 +228,7 @@ impl EvcdBsr {
         };
 
         if let Some(name) = name {
-            EVC_TRACE_HLS(&mut self.fp_trace, name, val);
+            EVC_TRACE_HLS(&mut self.tracer, name, val);
         }
 
         val
@@ -244,7 +244,7 @@ impl EvcdBsr {
         };
 
         if let Some(name) = name {
-            EVC_TRACE_HLS(&mut self.fp_trace, name, val);
+            EVC_TRACE_HLS(&mut self.tracer, name, val);
         }
 
         val

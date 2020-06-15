@@ -34,8 +34,8 @@ pub(crate) fn evcd_eco_nalu(bs: &mut EvcdBsr, nalu: &mut EvcNalu) -> Result<(), 
 }
 
 pub(crate) fn evcd_eco_sps(bs: &mut EvcdBsr, sps: &mut EvcSps) -> Result<(), EvcError> {
-    EVC_TRACE_STR(&mut bs.fp_trace, "***********************************\n");
-    EVC_TRACE_STR(&mut bs.fp_trace, "************ SPS Start ************\n");
+    EVC_TRACE_STR(&mut bs.tracer, "***********************************\n");
+    EVC_TRACE_STR(&mut bs.tracer, "************ SPS Start ************\n");
 
     sps.sps_seq_parameter_set_id = bs.read_ue(Some("sps->sps_seq_parameter_set_id")) as u8;
     sps.profile_idc = bs.read(8, Some("sps->profile_idc")) as u8;
@@ -119,8 +119,8 @@ pub(crate) fn evcd_eco_sps(bs: &mut EvcdBsr, sps: &mut EvcSps) -> Result<(), Evc
         bs.read1(Some("t0"));
     }
 
-    EVC_TRACE_STR(&mut bs.fp_trace, "************ SPS End   ************\n");
-    EVC_TRACE_STR(&mut bs.fp_trace, "***********************************\n");
+    EVC_TRACE_STR(&mut bs.tracer, "************ SPS End   ************\n");
+    EVC_TRACE_STR(&mut bs.tracer, "***********************************\n");
 
     Ok(())
 }
@@ -130,8 +130,8 @@ pub(crate) fn evcd_eco_pps(
     sps: &EvcSps,
     pps: &mut EvcPps,
 ) -> Result<(), EvcError> {
-    EVC_TRACE_STR(&mut bs.fp_trace, "***********************************\n");
-    EVC_TRACE_STR(&mut bs.fp_trace, "************ PPS Start ************\n");
+    EVC_TRACE_STR(&mut bs.tracer, "***********************************\n");
+    EVC_TRACE_STR(&mut bs.tracer, "************ PPS Start ************\n");
 
     pps.pps_pic_parameter_set_id = bs.read_ue(Some("pps->pps_pic_parameter_set_id")) as u8;
     pps.pps_seq_parameter_set_id = bs.read_ue(Some("pps->pps_seq_parameter_set_id")) as u8;
@@ -164,8 +164,8 @@ pub(crate) fn evcd_eco_pps(
         bs.read1(Some("t0"));
     }
 
-    EVC_TRACE_STR(&mut bs.fp_trace, "************ PPS End   ************\n");
-    EVC_TRACE_STR(&mut bs.fp_trace, "***********************************\n");
+    EVC_TRACE_STR(&mut bs.tracer, "************ PPS End   ************\n");
+    EVC_TRACE_STR(&mut bs.tracer, "***********************************\n");
 
     Ok(())
 }
@@ -177,8 +177,8 @@ pub(crate) fn evcd_eco_sh(
     sh: &mut EvcSh,
     nalu_type: NaluType,
 ) -> Result<(), EvcError> {
-    EVC_TRACE_STR(&mut bs.fp_trace, "***********************************\n");
-    EVC_TRACE_STR(&mut bs.fp_trace, "************ SH  Start ************\n");
+    EVC_TRACE_STR(&mut bs.tracer, "***********************************\n");
+    EVC_TRACE_STR(&mut bs.tracer, "************ SH  Start ************\n");
 
     sh.slice_pic_parameter_set_id = bs.read_ue(Some("sh->slice_pic_parameter_set_id")) as u8;
     sh.slice_type = (bs.read_ue(Some("sh->slice_type")) as u8).into();
@@ -224,8 +224,8 @@ pub(crate) fn evcd_eco_sh(
         }
     }
 
-    EVC_TRACE_STR(&mut bs.fp_trace, "************ SH  End   ************\n");
-    EVC_TRACE_STR(&mut bs.fp_trace, "***********************************\n");
+    EVC_TRACE_STR(&mut bs.tracer, "************ SH  End   ************\n");
+    EVC_TRACE_STR(&mut bs.tracer, "***********************************\n");
 
     Ok(())
 }
