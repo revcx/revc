@@ -324,6 +324,10 @@ impl EvcdCtx {
         } else if nalu_type == NaluType::EVC_PPS_NUT {
             evcd_eco_pps(&mut self.bs, &self.sps, &mut self.pps)?;
         } else if nalu_type < NaluType::EVC_SPS_NUT {
+            /* decode slice header */
+            self.sh.num_ctb = self.f_lcu as u16;
+
+            evcd_eco_sh(&mut self.bs, &self.sps, &self.pps, &mut self.sh, nalu_type)?;
         } else if nalu_type == NaluType::EVC_SEI_NUT {
         } else {
             return Err(EvcError::EVC_ERR_MALFORMED_BITSTREAM);

@@ -276,7 +276,7 @@ pub(crate) struct EvcPps {
 #[derive(Default)]
 pub(crate) struct EvcSh {
     pub(crate) slice_pic_parameter_set_id: u8,
-    pub(crate) slice_type: u8,
+    pub(crate) slice_type: SliceType,
     pub(crate) no_output_of_prior_pics_flag: bool,
 
     pub(crate) rpl_l0: EvcRpl,
@@ -285,9 +285,11 @@ pub(crate) struct EvcSh {
     pub(crate) num_ref_idx_active_override_flag: bool,
     pub(crate) deblocking_filter_on: bool,
 
-    pub(crate) qp: u8,
-    pub(crate) qp_u: u8,
-    pub(crate) qp_v: u8,
+    pub(crate) qp: i8,
+    pub(crate) qp_u: i8,
+    pub(crate) qp_v: i8,
     pub(crate) qp_u_offset: i8,
     pub(crate) qp_v_offset: i8,
+
+    pub(crate) num_ctb: u16,
 }

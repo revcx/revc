@@ -1,5 +1,6 @@
 use super::bsr::*;
-use crate::api::EvcError;
+use crate::api::{EvcError, NaluType, SliceType};
+use crate::com::util::*;
 use crate::com::*;
 
 use log::*;
@@ -166,6 +167,66 @@ pub(crate) fn evcd_eco_pps(
     }
 
     EVC_TRACE_STR(&mut bs.fp_trace, "************ PPS End   ************\n");
+    EVC_TRACE_STR(&mut bs.fp_trace, "***********************************\n");
+
+    Ok(())
+}
+
+pub(crate) fn evcd_eco_sh(
+    bs: &mut EvcdBsr,
+    sps: &EvcSps,
+    pps: &EvcPps,
+    sh: &mut EvcSh,
+    nalu_type: NaluType,
+) -> Result<(), EvcError> {
+    EVC_TRACE_STR(&mut bs.fp_trace, "***********************************\n");
+    EVC_TRACE_STR(&mut bs.fp_trace, "************ SH  Start ************\n");
+
+    sh.slice_pic_parameter_set_id = bs.read_ue(Some("sh->slice_pic_parameter_set_id")) as u8;
+    sh.slice_type = (bs.read_ue(Some("sh->slice_type")) as u8).into();
+
+    if nalu_type == NaluType::EVC_IDR_NUT {
+        sh.no_output_of_prior_pics_flag = bs.read1(Some("sh->no_output_of_prior_pics_flag")) != 0;
+    } else {
+        if sh.slice_type == SliceType::EVC_ST_P || sh.slice_type == SliceType::EVC_ST_B {
+            sh.num_ref_idx_active_override_flag =
+                bs.read1(Some("sh->num_ref_idx_active_override_flag")) != 0;
+            if sh.num_ref_idx_active_override_flag {
+                sh.rpl_l0.ref_pic_active_num =
+                    bs.read_ue(Some("num_ref_idx_active_minus1")) as u8 + 1;
+                if sh.slice_type == SliceType::EVC_ST_B {
+                    sh.rpl_l1.ref_pic_active_num =
+                        bs.read_ue(Some("num_ref_idx_active_minus1")) as u8 + 1;
+                }
+            } else {
+                sh.rpl_l0.ref_pic_active_num = pps.num_ref_idx_default_active_minus1[REFP_0] + 1;
+                sh.rpl_l1.ref_pic_active_num = pps.num_ref_idx_default_active_minus1[REFP_1] + 1;
+            }
+        }
+    }
+
+    sh.deblocking_filter_on = bs.read1(Some("sh->deblocking_filter_on")) != 0;
+    sh.qp = bs.read(6, Some("sh->qp")) as i8;
+    if sh.qp < 0 || sh.qp > 51 {
+        error!("malformed bitstream: slice_qp should be in the range of 0 to 51\n");
+        return Err(EvcError::EVC_ERR_MALFORMED_BITSTREAM);
+    }
+
+    sh.qp_u_offset = bs.read_se(Some("sh->qp_u_offset")) as i8;
+    sh.qp_v_offset = bs.read_se(Some("sh->qp_v_offset")) as i8;
+
+    sh.qp_u = EVC_CLIP3(-6 * (BIT_DEPTH - 8) as i8, 57, sh.qp + sh.qp_u_offset);
+    sh.qp_v = EVC_CLIP3(-6 * (BIT_DEPTH - 8) as i8, 57, sh.qp + sh.qp_v_offset);
+
+    /* byte align */
+    while !bs.EVC_BSR_IS_BYTE_ALIGN() {
+        let t0 = bs.read1(Some("t0"));
+        if t0 != 0 {
+            return Err(EvcError::EVC_ERR_MALFORMED_BITSTREAM);
+        }
+    }
+
+    EVC_TRACE_STR(&mut bs.fp_trace, "************ SH  End   ************\n");
     EVC_TRACE_STR(&mut bs.fp_trace, "***********************************\n");
 
     Ok(())
