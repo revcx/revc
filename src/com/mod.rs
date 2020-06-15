@@ -292,9 +292,9 @@ pub(crate) struct EvcSh {
     pub(crate) num_ref_idx_active_override_flag: bool,
     pub(crate) deblocking_filter_on: bool,
 
-    pub(crate) qp: i8,
-    pub(crate) qp_u: i8,
-    pub(crate) qp_v: i8,
+    pub(crate) qp: u8,
+    pub(crate) qp_u: u8,
+    pub(crate) qp_v: u8,
     pub(crate) qp_u_offset: i8,
     pub(crate) qp_v_offset: i8,
 

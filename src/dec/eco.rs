@@ -204,7 +204,7 @@ pub(crate) fn evcd_eco_sh(
     }
 
     sh.deblocking_filter_on = bs.read1(Some("sh->deblocking_filter_on")) != 0;
-    sh.qp = bs.read(6, Some("sh->qp")) as i8;
+    sh.qp = bs.read(6, Some("sh->qp")) as u8;
     if sh.qp < 0 || sh.qp > 51 {
         error!("malformed bitstream: slice_qp should be in the range of 0 to 51\n");
         return Err(EvcError::EVC_ERR_MALFORMED_BITSTREAM);
@@ -213,8 +213,8 @@ pub(crate) fn evcd_eco_sh(
     sh.qp_u_offset = bs.read_se(Some("sh->qp_u_offset")) as i8;
     sh.qp_v_offset = bs.read_se(Some("sh->qp_v_offset")) as i8;
 
-    sh.qp_u = EVC_CLIP3(-6 * (BIT_DEPTH - 8) as i8, 57, sh.qp + sh.qp_u_offset);
-    sh.qp_v = EVC_CLIP3(-6 * (BIT_DEPTH - 8) as i8, 57, sh.qp + sh.qp_v_offset);
+    sh.qp_u = EVC_CLIP3(-6 * (BIT_DEPTH - 8) as i8, 57, sh.qp as i8 + sh.qp_u_offset) as u8;
+    sh.qp_v = EVC_CLIP3(-6 * (BIT_DEPTH - 8) as i8, 57, sh.qp as i8 + sh.qp_v_offset) as u8;
 
     /* byte align */
     while !bs.EVC_BSR_IS_BYTE_ALIGN() {
