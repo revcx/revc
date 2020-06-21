@@ -14,12 +14,17 @@ pub(crate) struct EvcdSbac {
 }
 
 impl EvcdSbac {
-    pub(crate) fn reset(&mut self, bs: &mut EvcdBsr, slice_type: SliceType, slice_qp: u8) {
+    pub(crate) fn reset(
+        &mut self,
+        bs: &mut EvcdBsr,
+        slice_type: SliceType,
+        slice_qp: u8,
+    ) -> Result<(), EvcError> {
         /* Initialization of the internal variables */
         self.range = 16384;
         self.value = 0;
         for i in 0..14 {
-            let t0 = bs.read1(Some("t0"));
+            let t0 = bs.read1(Some("t0"))?;
             self.value = ((self.value << 1) | t0) & 0xFFFF;
         }
 
@@ -176,13 +181,15 @@ impl EvcdSbac {
         for i in 0..NUM_CTX_ATS_INTER_POS_FLAG {
             sbac_ctx.ats_cu_inter_pos_flag[i] = PROB_INIT;
         }
+
+        Ok(())
     }
 
-    pub(crate) fn evcd_sbac_decode_bin(
+    pub(crate) fn decode_bin(
         &mut self,
         bs: &mut EvcdBsr,
         model: &mut SBAC_CTX_MODEL,
-    ) -> u32 {
+    ) -> Result<u32, EvcError> {
         let mut state: u16 = (*model) >> 1;
         let mut mps: u16 = (*model) & 1;
 
@@ -195,13 +202,13 @@ impl EvcdSbac {
 
         //#if TRACE_BIN
         EVC_TRACE_COUNTER(&mut bs.tracer);
-        EVC_TRACE_STR(&mut bs.tracer, "model ");
-        EVC_TRACE_INT(&mut bs.tracer, *model as isize);
-        EVC_TRACE_STR(&mut bs.tracer, "range ");
-        EVC_TRACE_INT(&mut bs.tracer, self.range as isize);
-        EVC_TRACE_STR(&mut bs.tracer, "lps ");
-        EVC_TRACE_INT(&mut bs.tracer, lps as isize);
-        EVC_TRACE_STR(&mut bs.tracer, "\n");
+        EVC_TRACE(&mut bs.tracer, "model ");
+        EVC_TRACE(&mut bs.tracer, *model);
+        EVC_TRACE(&mut bs.tracer, "range ");
+        EVC_TRACE(&mut bs.tracer, self.range);
+        EVC_TRACE(&mut bs.tracer, "lps ");
+        EVC_TRACE(&mut bs.tracer, lps);
+        EVC_TRACE(&mut bs.tracer, "\n");
         //#endif
 
         if self.value >= self.range {
@@ -224,14 +231,14 @@ impl EvcdSbac {
         while self.range < 8192 {
             self.range <<= 1;
 
-            let t0 = bs.read1(Some("t0"));
+            let t0 = bs.read1(Some("t0"))?;
             self.value = ((self.value << 1) | t0) & 0xFFFF;
         }
 
-        bin
+        Ok(bin)
     }
 
-    pub(crate) fn decode_bin_ep(&mut self, bs: &mut EvcdBsr) -> u32 {
+    pub(crate) fn decode_bin_ep(&mut self, bs: &mut EvcdBsr) -> Result<u32, EvcError> {
         self.range >>= 1;
 
         let bin = if self.value >= self.range {
@@ -242,24 +249,24 @@ impl EvcdSbac {
         };
 
         self.range <<= 1;
-        let t0 = bs.read1(Some("t0"));
+        let t0 = bs.read1(Some("t0"))?;
         self.value = ((self.value << 1) | t0) & 0xFFFF;
 
-        bin
+        Ok(bin)
     }
 
     pub(crate) fn decode_bin_trm(&mut self, bs: &mut EvcdBsr) -> Result<u32, EvcError> {
         self.range -= 1;
         if self.value >= self.range {
-            while !bs.EVC_BSR_IS_BYTE_ALIGN() {
-                let t0 = bs.read1(Some("t0"));
+            while !bs.is_byte_aligned() {
+                let t0 = bs.read1(Some("t0"))?;
                 evc_assert_rv(t0 == 0, EvcError::EVC_ERR_MALFORMED_BITSTREAM)?;
             }
             Ok(1)
         } else {
             while self.range < 8192 {
                 self.range <<= 1;
-                let t0 = bs.read1(Some("t0"));
+                let t0 = bs.read1(Some("t0"))?;
                 self.value = ((self.value << 1) | t0) & 0xFFFF;
             }
             Ok(0)

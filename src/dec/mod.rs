@@ -14,6 +14,19 @@ use sbac::*;
 /* evc decoder magic code */
 pub(crate) const EVCD_MAGIC_CODE: u32 = 0x45565944; /* EVYD */
 
+#[derive(Clone)]
+pub(crate) struct LcuSplitModeArray {
+    pub(crate) array:
+        [[[i8; MAX_CU_CNT_IN_LCU]; BlockShape::NUM_BLOCK_SHAPE as usize]; NUM_CU_DEPTH],
+}
+
+impl Default for LcuSplitModeArray {
+    fn default() -> Self {
+        LcuSplitModeArray {
+            array: [[[0; MAX_CU_CNT_IN_LCU]; BlockShape::NUM_BLOCK_SHAPE as usize]; NUM_CU_DEPTH],
+        }
+    }
+}
 /*****************************************************************************
  * CORE information used for decoding process.
  *
@@ -85,7 +98,7 @@ pub(crate) struct EvcdCore {
     /* top pel position of current LCU */
     y_pel: u16,
     /* split mode map for current LCU */
-    //split_mode: [[[i8; MAX_CU_CNT_IN_LCU]; BlockShape::NUM_BLOCK_SHAPE as usize]; NUM_CU_DEPTH],
+    split_mode: LcuSplitModeArray,
 
     /* platform specific data, if needed */
     //void          *pf;
@@ -149,23 +162,19 @@ pub(crate) struct EvcdCtx {
     log2_min_cuwh: u8,
     /* MAPS *******************************************************************/
     /* SCU map for CU information */
-    /*u32                   * map_scu;
+    map_scu: Vec<u32>,
     /* LCU split information */
-    s8                   (* map_split)[NUM_CU_DEPTH][NUM_BLOCK_SHAPE][MAX_CU_CNT_IN_LCU];
-    s8                   (* map_suco)[NUM_CU_DEPTH][NUM_BLOCK_SHAPE][MAX_CU_CNT_IN_LCU];
+    map_split: Vec<LcuSplitModeArray>,
     /* decoded motion vector for every blocks */
-    s16                  (* map_mv)[REFP_NUM][MV_D];
+    /*s16                  (* map_mv)[REFP_NUM][MV_D];
     /* decoded motion vector for every blocks */
     s16                  (* map_unrefined_mv)[REFP_NUM][MV_D];
     /* reference frame indices */
     s8                   (* map_refi)[REFP_NUM];
     /* intra prediction modes */
-    s8                    * map_ipm;
-    u32                   * map_affine;
+    s8                    * map_ipm;*/
     /* new coding tool flag*/
-    u32                   * map_cu_mode;
-    /* ats_inter info map */
-    u8                    * map_ats_inter;*/
+    map_cu_mode: Vec<u32>,
     /**************************************************************************/
     /* current slice number, which is increased whenever decoding a slice.
     when receiving a slice for new picture, this value is set to zero.
@@ -253,6 +262,15 @@ impl EvcdCtx {
         self.w_scu = (self.w + ((1 << MIN_CU_LOG2) - 1) as u16) >> MIN_CU_LOG2 as u16;
         self.h_scu = (self.h + ((1 << MIN_CU_LOG2) - 1) as u16) >> MIN_CU_LOG2 as u16;
         self.f_scu = (self.w_scu * self.h_scu) as u32;
+
+        /* alloc SCU map */
+        self.map_scu = vec![0; self.f_scu as usize];
+
+        /* alloc cu mode SCU map */
+        self.map_cu_mode = vec![0; self.f_scu as usize];
+
+        /* alloc map for CU split flag */
+        self.map_split = vec![LcuSplitModeArray::default(); self.f_lcu as usize];
     }
 
     fn slice_init(&mut self) {
@@ -306,7 +324,14 @@ impl EvcdCtx {
             )?;
 
             // invoke coding_tree() recursion
-            //evc_mset(self.core.split_mode, 0, sizeof(s8) * NUM_CU_DEPTH * NUM_BLOCK_SHAPE * MAX_CU_CNT_IN_LCU);
+            for i in 0..NUM_CU_DEPTH {
+                for j in 0..BlockShape::NUM_BLOCK_SHAPE as usize {
+                    for k in 0..MAX_CU_CNT_IN_LCU {
+                        self.core.split_mode.array[i][j][k] = 0;
+                    }
+                }
+            }
+
             /*
             self.evcd_eco_tree(
                 self.core.x_pel,
@@ -329,7 +354,7 @@ impl EvcdCtx {
                 ModeCons::eAll,
             )?; */
             // set split flags to map
-            //evc_mcpy(ctx->map_split[core->lcu_num], core->split_mode, sizeof(s8) * NUM_CU_DEPTH * NUM_BLOCK_SHAPE * MAX_CU_CNT_IN_LCU);
+            self.map_split[self.core.lcu_num as usize].clone_from(&self.core.split_mode);
 
             self.num_ctb -= 1;
             // read end_of_picture_flag
@@ -428,7 +453,7 @@ impl EvcdCtx {
         }
 
         Ok(EvcdStat {
-            read: nalu_size_field_in_bytes + self.bs.EVC_BSR_GET_READ_BYTE() as usize,
+            read: nalu_size_field_in_bytes + self.bs.get_read_byte() as usize,
             nalu_type,
             stype: self.sh.slice_type,
             fnum: -1,

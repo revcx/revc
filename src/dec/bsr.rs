@@ -3,6 +3,8 @@ use std::fmt::Display;
 use std::fs::OpenOptions;
 use std::io::Write;
 
+use crate::api::EvcError;
+
 type Tracer = (Box<dyn Write>, isize);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -28,23 +30,9 @@ pub(crate) fn EVC_TRACE_COUNTER(tracer: &mut Option<Tracer>) {
 }
 
 #[cfg(feature = "trace")]
-pub(crate) fn EVC_TRACE_STR(tracer: &mut Option<Tracer>, name: &str) {
+pub(crate) fn EVC_TRACE<T: Display>(tracer: &mut Option<Tracer>, name: T) {
     if let Some((writer, _)) = tracer {
         writer.write_fmt(format_args!("{}", name));
-    }
-}
-
-#[cfg(feature = "trace")]
-pub(crate) fn EVC_TRACE_DOUBLE(tracer: &mut Option<Tracer>, val: f64) {
-    if let Some((writer, _)) = tracer {
-        writer.write_fmt(format_args!("{}", val));
-    }
-}
-
-#[cfg(feature = "trace")]
-pub(crate) fn EVC_TRACE_INT(tracer: &mut Option<Tracer>, val: isize) {
-    if let Some((writer, _)) = tracer {
-        writer.write_fmt(format_args!("{}", val));
     }
 }
 
@@ -52,13 +40,6 @@ pub(crate) fn EVC_TRACE_INT(tracer: &mut Option<Tracer>, val: isize) {
 pub(crate) fn EVC_TRACE_INT_HEX(tracer: &mut Option<Tracer>, val: isize) {
     if let Some((writer, _)) = tracer {
         writer.write_fmt(format_args!("0x{:x}", val));
-    }
-}
-
-#[cfg(feature = "trace")]
-pub(crate) fn EVC_TRACE_HLS<T: Display>(tracer: &mut Option<Tracer>, name: &str, val: T) {
-    if let Some((writer, _)) = tracer {
-        writer.write_fmt(format_args!("{} {} \n", name, val));
     }
 }
 
@@ -71,19 +52,10 @@ fn OPEN_TRACE() -> Option<Tracer> {
 pub(crate) fn EVC_TRACE_COUNTER(tracer: &mut Option<Tracer>) {}
 
 #[cfg(not(feature = "trace"))]
-pub(crate) fn EVC_TRACE_STR(writer: &mut Option<Tracer>, name: &str) {}
-
-#[cfg(not(feature = "trace"))]
-pub(crate) fn EVC_TRACE_DOUBLE(tracer: &mut Option<Tracer>, val: f64) {}
-
-#[cfg(not(feature = "trace"))]
-pub(crate) fn EVC_TRACE_INT(tracer: &mut Option<Tracer>, val: isize) {}
+pub(crate) fn EVC_TRACE<T: Display>(writer: &mut Option<Tracer>, name: T) {}
 
 #[cfg(not(feature = "trace"))]
 pub(crate) fn EVC_TRACE_INT_HEX(tracer: &mut Option<Tracer>, val: isize) {}
-
-#[cfg(not(feature = "trace"))]
-pub(crate) fn EVC_TRACE_HLS<T: Display>(writer: &mut Option<Tracer>, name: &str, val: T) {}
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /*
@@ -111,7 +83,7 @@ static tbl_zero_count4: [u8; 16] = [4, 3, 2, 2, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0,
 
 impl EvcdBsr {
     #[inline]
-    pub(crate) fn EVC_BSR_SKIP_CODE(&mut self, size: usize) {
+    pub(crate) fn skip_code(&mut self, size: usize) {
         assert!(self.leftbits >= size as isize);
         if size == 32 {
             self.code = 0;
@@ -124,13 +96,13 @@ impl EvcdBsr {
 
     /* Is bitstream byte aligned? */
     #[inline]
-    pub(crate) fn EVC_BSR_IS_BYTE_ALIGN(&self) -> bool {
+    pub(crate) fn is_byte_aligned(&self) -> bool {
         (self.leftbits & 0x7) == 0
     }
 
     /* get number of byte consumed */
     #[inline]
-    pub(crate) fn EVC_BSR_GET_READ_BYTE(&self) -> isize {
+    pub(crate) fn get_read_byte(&self) -> isize {
         self.cur as isize - (self.leftbits >> 3)
     }
 
@@ -144,7 +116,7 @@ impl EvcdBsr {
         }
     }
 
-    pub(crate) fn flush(&mut self, mut byte: isize) -> isize {
+    pub(crate) fn flush(&mut self, mut byte: isize) -> Result<(), EvcError> {
         let mut shift: i32 = 24;
         let mut code: u32 = 0;
 
@@ -158,7 +130,7 @@ impl EvcdBsr {
         if byte <= 0 {
             self.code = 0;
             self.leftbits = 0;
-            return -1;
+            return Err(EvcError::EVC_ERR);
         }
 
         self.leftbits = byte << 3;
@@ -171,7 +143,7 @@ impl EvcdBsr {
         }
         self.code = code;
 
-        return 0;
+        Ok(())
     }
 
     pub(crate) fn clz_in_code(code: u32) -> isize {
@@ -191,7 +163,7 @@ impl EvcdBsr {
         return clz;
     }
 
-    pub(crate) fn read(&mut self, mut size: isize, name: Option<&str>) -> u32 {
+    pub(crate) fn read(&mut self, mut size: isize, name: Option<&str>) -> Result<u32, EvcError> {
         let mut val = 0;
 
         assert!(size > 0);
@@ -200,28 +172,25 @@ impl EvcdBsr {
             val = self.code >> (32 - size) as u32;
             size -= self.leftbits;
 
-            if self.flush(4) != 0 {
-                trace!("already reached the end of bitstream\n");
-                return std::u32::MAX;
-            }
+            self.flush(4)?;
         }
         val |= self.code >> (32 - size) as u32;
 
-        self.EVC_BSR_SKIP_CODE(size as usize);
+        self.skip_code(size as usize);
 
         if let Some(name) = name {
-            EVC_TRACE_HLS(&mut self.tracer, name, val);
+            EVC_TRACE(&mut self.tracer, name);
+            EVC_TRACE(&mut self.tracer, " ");
+            EVC_TRACE(&mut self.tracer, val);
+            EVC_TRACE(&mut self.tracer, " \n");
         }
 
-        val
+        Ok(val)
     }
 
-    pub(crate) fn read1(&mut self, name: Option<&str>) -> u32 {
+    pub(crate) fn read1(&mut self, name: Option<&str>) -> Result<u32, EvcError> {
         if self.leftbits == 0 {
-            if self.flush(4) != 0 {
-                trace!("already reached the end of bitstream\n");
-                return std::u32::MAX;
-            }
+            self.flush(4)?;
         }
         let val = self.code >> 31;
 
@@ -229,13 +198,16 @@ impl EvcdBsr {
         self.leftbits -= 1;
 
         if let Some(name) = name {
-            EVC_TRACE_HLS(&mut self.tracer, name, val);
+            EVC_TRACE(&mut self.tracer, name);
+            EVC_TRACE(&mut self.tracer, " ");
+            EVC_TRACE(&mut self.tracer, val);
+            EVC_TRACE(&mut self.tracer, " \n");
         }
 
-        val
+        Ok(val)
     }
 
-    pub(crate) fn read_ue(&mut self, name: Option<&str>) -> u32 {
+    pub(crate) fn read_ue(&mut self, name: Option<&str>) -> Result<u32, EvcError> {
         if (self.code >> 31) == 1 {
             /* early termination.
             we don't have to worry about leftbits == 0 case, because if the self.code
@@ -245,17 +217,20 @@ impl EvcdBsr {
             let val = 0;
 
             if let Some(name) = name {
-                EVC_TRACE_HLS(&mut self.tracer, name, val);
+                EVC_TRACE(&mut self.tracer, name);
+                EVC_TRACE(&mut self.tracer, " ");
+                EVC_TRACE(&mut self.tracer, val);
+                EVC_TRACE(&mut self.tracer, " \n");
             }
 
-            return val;
+            return Ok(val);
         }
 
         let mut clz = 0;
         if self.code == 0 {
             clz = self.leftbits;
 
-            self.flush(4);
+            self.flush(4)?;
         }
 
         let len = EvcdBsr::clz_in_code(self.code);
@@ -269,18 +244,21 @@ impl EvcdBsr {
             0
         } else {
             assert!(self.leftbits >= 0);
-            self.read(len + clz + 1, None) - 1
+            self.read(len + clz + 1, None)? - 1
         };
 
         if let Some(name) = name {
-            EVC_TRACE_HLS(&mut self.tracer, name, val);
+            EVC_TRACE(&mut self.tracer, name);
+            EVC_TRACE(&mut self.tracer, " ");
+            EVC_TRACE(&mut self.tracer, val);
+            EVC_TRACE(&mut self.tracer, " \n");
         }
 
-        val
+        Ok(val)
     }
 
-    pub(crate) fn read_se(&mut self, name: Option<&str>) -> i32 {
-        let mut val = self.read_ue(None) as i32;
+    pub(crate) fn read_se(&mut self, name: Option<&str>) -> Result<i32, EvcError> {
+        let mut val = self.read_ue(None)? as i32;
 
         val = if (val & 0x01) != 0 {
             (val + 1) >> 1
@@ -289,9 +267,12 @@ impl EvcdBsr {
         };
 
         if let Some(name) = name {
-            EVC_TRACE_HLS(&mut self.tracer, name, val);
+            EVC_TRACE(&mut self.tracer, name);
+            EVC_TRACE(&mut self.tracer, " ");
+            EVC_TRACE(&mut self.tracer, val);
+            EVC_TRACE(&mut self.tracer, " \n");
         }
 
-        val
+        Ok(val)
     }
 }
