@@ -3,6 +3,7 @@ use crate::api::{EvcError, NaluType, SliceType};
 use crate::com::util::*;
 use crate::com::*;
 
+use crate::dec::sbac::EvcdSbac;
 use log::*;
 
 pub(crate) fn evcd_eco_nalu(bs: &mut EvcdBsr, nalu: &mut EvcNalu) -> Result<(), EvcError> {
@@ -228,4 +229,11 @@ pub(crate) fn evcd_eco_sh(
     EVC_TRACE_STR(&mut bs.tracer, "***********************************\n");
 
     Ok(())
+}
+
+pub(crate) fn evcd_eco_tile_end_flag(
+    bs: &mut EvcdBsr,
+    sbac: &mut EvcdSbac,
+) -> Result<u32, EvcError> {
+    sbac.decode_bin_trm(bs)
 }

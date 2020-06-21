@@ -21,74 +21,54 @@ pub(crate) const EVCD_MAGIC_CODE: u32 = 0x45565944; /* EVYD */
  *****************************************************************************/
 #[derive(Default)]
 pub(crate) struct EvcdCore {
-    /*
     /************** current CU **************/
     /* coefficient buffer of current CU */
-                coef: [[s16;MAX_CU_DIM]; N_C], //[N_C][MAX_CU_DIM]
+    //coef: [[i16; MAX_CU_DIM]; N_C], //[N_C][MAX_CU_DIM]
     /* pred buffer of current CU */
     /* [1] is used for bi-pred. */
-                pred: [[[pel;MAX_CU_DIM]; N_C]; 2], //[2][N_C][MAX_CU_DIM]
-                dmvr_template:[pel; MAX_CU_DIM], //[MAX_CU_DIM]
-    pel            dmvr_half_pred_interpolated[REFP_NUM][(MAX_CU_SIZE + 1) * (MAX_CU_SIZE + 1)];
-    pel            dmvr_ref_pred_interpolated[REFP_NUM][(MAX_CU_SIZE + ((DMVR_NEW_VERSION_ITER_COUNT + 1) * REF_PRED_EXTENTION_PEL_COUNT)) * (MAX_CU_SIZE + ((DMVR_NEW_VERSION_ITER_COUNT + 1) * REF_PRED_EXTENTION_PEL_COUNT))];
+    //pred: [[[pel; MAX_CU_DIM]; N_C]; 2], //[2][N_C][MAX_CU_DIM]
 
-    #if DMVR_PADDING
-    pel  dmvr_padding_buf[2][N_C][PAD_BUFFER_STRIDE * PAD_BUFFER_STRIDE];
-    #endif
     /* neighbor pixel buffer for intra prediction */
-    pel            nb[N_C][N_REF][MAX_CU_SIZE * 3];
+    //nb: [[[pel; MAX_CU_SIZE * 3]; N_REF]; N_C],
     /* reference index for current CU */
-    s8             refi[REFP_NUM];
+    refi: [i8; REFP_NUM],
     /* motion vector for current CU */
-    s16            mv[REFP_NUM][MV_D];
-    #if DMVR_LAG
-    /* dmvr refined motion vector for current CU */
-    s16             dmvr_mv[MAX_CU_CNT_IN_LCU][REFP_NUM][MV_D];
-    #endif
-    /* CU position in current frame in SCU unit */
-    u32            scup;
-    /* CU position X in a frame in SCU unit */
+    mv: [[i16; MV_D]; REFP_NUM],
 
-     */
+    /* CU position in current frame in SCU unit */
+    scup: u32,
+    /* CU position X in a frame in SCU unit */
     x_scu: u16,
     /* CU position Y in a frame in SCU unit */
     y_scu: u16,
-    /*
     /* neighbor CUs availability of current CU */
-    u16            avail_cu;
+    avail_cu: u16,
     /* Left, right availability of current CU */
-    u16            avail_lr;
+    avail_lr: u16,
     /* intra prediction direction of current CU */
-    u8             ipm[2];
+    ipm: [u8; 2],
     /* most probable mode for intra prediction */
-    u8             * mpm_b_list;
-    u8             mpm[2];
-    u8             mpm_ext[8];
-    u8             pims[IPD_CNT]; /* probable intra mode set*/
+    mpm_b_list: Vec<u8>,
+    mpm: [u8; 2],
+    mpm_ext: [u8; 8],
+    //pims: [u8; IPD_CNT], /* probable intra mode set*/
     /* prediction mode of current CU: INTRA, INTER, ... */
-    u8             pred_mode;
-    u8             DMVRenable;
+    pred_mode: u8,
+    DMVRenable: u8,
     /* log2 of cuw */
-    u8             log2_cuw;
+    log2_cuw: u8,
     /* log2 of cuh */
-    u8             log2_cuh;
+    log2_cuh: u8,
     /* is there coefficient? */
-    int            is_coef[N_C];
-    int            is_coef_sub[N_C][MAX_SUB_TB_NUM];
+    is_coef: [bool; N_C],
+    is_coef_sub: [[bool; MAX_SUB_TB_NUM]; N_C],
 
-         */
     /* QP for Luma of current encoding MB */
     qp_y: u8,
     /* QP for Chroma of current encoding MB */
     qp_u: u8,
     qp_v: u8,
 
-    //s16            affine_mv[REFP_NUM][VER_NUM][MV_D];
-    //u8             affine_flag;
-
-    //u8             ibc_flag;
-    //u8             ibc_skip_flag;
-    //u8             ibc_merge_flag;
     qp: u8,
     cu_qp_delta_code: u8,
     cu_qp_delta_is_coded: bool,
@@ -104,51 +84,23 @@ pub(crate) struct EvcdCore {
     x_pel: u16,
     /* top pel position of current LCU */
     y_pel: u16,
-    /*
     /* split mode map for current LCU */
-    s8             split_mode[NUM_CU_DEPTH][NUM_BLOCK_SHAPE][MAX_CU_CNT_IN_LCU];
-    /* SUCO flag for current LCU */
-    s8             suco_flag[NUM_CU_DEPTH][NUM_BLOCK_SHAPE][MAX_CU_CNT_IN_LCU];
+    //split_mode: [[[i8; MAX_CU_CNT_IN_LCU]; BlockShape::NUM_BLOCK_SHAPE as usize]; NUM_CU_DEPTH],
+
     /* platform specific data, if needed */
-    void          *pf;
-    s16            mmvd_idx;
-    u8             mmvd_flag;
-    /* ATS_INTRA flags */
-    u8             ats_intra_cu;
-    u8             ats_intra_mode_h;
-    u8             ats_intra_mode_v;
+    //void          *pf;
+    //s16            mmvd_idx;
+    //u8             mmvd_flag;
 
-    /* ATS_INTER info (index + position)*/
-    u8             ats_inter_info;
     /* temporal pixel buffer for inter prediction */
-    pel            eif_tmp_buffer[ (MAX_CU_SIZE + 2) * (MAX_CU_SIZE + 2) ];
-    u8             mvr_idx;
-    #if DMVR_FLAG
-    u8            dmvr_flag;
-    #endif
-
-    /* history-based motion vector prediction candidate list */
-    EVC_HISTORY_BUFFER     history_buffer;
-    #if AFFINE_UPDATE
-    // spatial neighboring MV of affine block
-    s8             refi_sp[REFP_NUM];
-    s16            mv_sp[REFP_NUM][MV_D];
-    #endif
-    #if TRACE_ENC_CU_DATA
-    u64            trace_idx;
-    #endif
+    //pel            eif_tmp_buffer[ (MAX_CU_SIZE + 2) * (MAX_CU_SIZE + 2) ];
+    mvr_idx: u8,
+    /*
     int            mvp_idx[REFP_NUM];
     s16            mvd[REFP_NUM][MV_D];
     int            inter_dir;
     int            bi_idx;
-    int            affine_bzero[REFP_NUM];
-    s16            affine_mvd[REFP_NUM][3][MV_D];
-    int            tile_num;
-    u8             ctx_flags[NUM_CNID];
-    #if M50761_CHROMA_NOT_SPLIT
-    TREE_CONS      tree_cons;
-    #endif
-    */
+    u8             ctx_flags[NUM_CNID];*/
 }
 /******************************************************************************
  * CONTEXT used for decoding process.
@@ -335,12 +287,11 @@ impl EvcdCtx {
     }
 
     fn decode_slice(&mut self) -> Result<(), EvcError> {
-        /*
-        let sbac = GET_SBAC_DEC(bs);
-
         // Initialize CABAC at each tile
-        evcd_eco_sbac_reset(bs, self.sh.slice_type, self.sh.qp, self.sps.tool_cm_init);
+        self.sbac_dec
+            .reset(&mut self.bs, self.sh.slice_type, self.sh.qp);
 
+        //TODO: move x_lcu/y_lcu=0 to pic init
         self.core.x_lcu = 0; //entry point lcu's x location
         self.core.y_lcu = 0; // entry point lcu's y location
         while self.num_ctb > 0 {
@@ -349,11 +300,14 @@ impl EvcdCtx {
             //LCU decoding with in a tile
             let mut same_layer_split = vec![0; 4];
             let mut split_allow = vec![0, 0, 0, 0, 0, 1];
-            //evc_assert_rv(core->lcu_num < ctx->f_lcu, EVC_ERR_UNEXPECTED);
+            evc_assert_rv(
+                (self.core.lcu_num as u32) < self.f_lcu,
+                EvcError::EVC_ERR_UNEXPECTED,
+            )?;
 
             // invoke coding_tree() recursion
             //evc_mset(self.core.split_mode, 0, sizeof(s8) * NUM_CU_DEPTH * NUM_BLOCK_SHAPE * MAX_CU_CNT_IN_LCU);
-
+            /*
             self.evcd_eco_tree(
                 self.core.x_pel,
                 self.corey_pel,
@@ -373,24 +327,22 @@ impl EvcdCtx {
                 0,
                 0,
                 ModeCons::eAll,
-            )?;
+            )?; */
             // set split flags to map
             //evc_mcpy(ctx->map_split[core->lcu_num], core->split_mode, sizeof(s8) * NUM_CU_DEPTH * NUM_BLOCK_SHAPE * MAX_CU_CNT_IN_LCU);
-            //evc_mcpy(ctx->map_suco[core->lcu_num], core->suco_flag, sizeof(s8) * NUM_CU_DEPTH * NUM_BLOCK_SHAPE * MAX_CU_CNT_IN_LCU);
 
             self.num_ctb -= 1;
             // read end_of_picture_flag
             if (self.num_ctb == 0) {
-                evcd_eco_tile_end_flag(&mut self.bs, sbac)?;
+                evcd_eco_tile_end_flag(&mut self.bs, &mut self.sbac_dec)?;
             } else {
                 self.core.x_lcu += 1;
-                if self.core.x_lcu >= self.w_ctb {
+                if self.core.x_lcu >= self.w_lcu {
                     self.core.x_lcu = 0;
                     self.core.y_lcu += 1;
                 }
             }
         }
-         */
 
         Ok(())
     }

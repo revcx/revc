@@ -230,21 +230,39 @@ impl EvcdSbac {
 
         bin
     }
-    pub(crate) fn decode_bin_trm(&mut self, bs: &mut EvcdBsr) -> u32 {
+
+    pub(crate) fn decode_bin_ep(&mut self, bs: &mut EvcdBsr) -> u32 {
+        self.range >>= 1;
+
+        let bin = if self.value >= self.range {
+            self.value -= self.range;
+            1
+        } else {
+            0
+        };
+
+        self.range <<= 1;
+        let t0 = bs.read1(Some("t0"));
+        self.value = ((self.value << 1) | t0) & 0xFFFF;
+
+        bin
+    }
+
+    pub(crate) fn decode_bin_trm(&mut self, bs: &mut EvcdBsr) -> Result<u32, EvcError> {
         self.range -= 1;
         if self.value >= self.range {
             while !bs.EVC_BSR_IS_BYTE_ALIGN() {
                 let t0 = bs.read1(Some("t0"));
-                assert_eq!(t0, 0);
+                evc_assert_rv(t0 == 0, EvcError::EVC_ERR_MALFORMED_BITSTREAM)?;
             }
-            1
+            Ok(1)
         } else {
             while self.range < 8192 {
                 self.range <<= 1;
                 let t0 = bs.read1(Some("t0"));
                 self.value = ((self.value << 1) | t0) & 0xFFFF;
             }
-            0
+            Ok(0)
         }
     }
 }

@@ -6,6 +6,21 @@ pub(crate) mod util;
 
 use crate::api::*;
 
+/*****************************************************************************
+ * types
+ *****************************************************************************/
+pub(crate) type pel = i16;
+pub(crate) type double_pel = i32;
+
+#[inline]
+pub(crate) fn evc_assert_rv(x: bool, r: EvcError) -> Result<(), EvcError> {
+    if !x {
+        assert!(x);
+        return Err(r);
+    }
+    Ok(())
+}
+
 /********* Conditional tools definition ********/
 
 /* number of picture order count lsb bit */
@@ -324,6 +339,20 @@ pub(crate) enum SplitMode {
     SPLIT_QUAD = 5,
 }
 
+pub(crate) enum SplitDir {
+    SPLIT_VER = 0,
+    SPLIT_HOR = 1,
+}
+
+pub(crate) enum BlockShape {
+    NON_SQUARE_14 = 0,
+    NON_SQUARE_12 = 1,
+    SQUARE = 2,
+    NON_SQUARE_21 = 3,
+    NON_SQUARE_41 = 4,
+    NUM_BLOCK_SHAPE = 5,
+}
+
 pub(crate) enum ModeCons {
     eOnlyIntra,
     eOnlyInter,
@@ -463,3 +492,5 @@ pub(crate) struct EvcSbacCtx {
     pub(crate) ats_cu_inter_hor_flag: [SBAC_CTX_MODEL; NUM_CTX_ATS_INTER_HOR_FLAG],
     pub(crate) ats_cu_inter_pos_flag: [SBAC_CTX_MODEL; NUM_CTX_ATS_INTER_POS_FLAG],
 }
+
+pub(crate) const MAX_SUB_TB_NUM: usize = 4;
