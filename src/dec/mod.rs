@@ -5,22 +5,14 @@ use super::com::*;
 
 mod bsr;
 mod eco;
+mod sbac;
 
 use bsr::EvcdBsr;
 use eco::*;
+use sbac::*;
 
 /* evc decoder magic code */
 pub(crate) const EVCD_MAGIC_CODE: u32 = 0x45565944; /* EVYD */
-
-/*****************************************************************************
- * SBAC structure
- *****************************************************************************/
-#[derive(Default)]
-pub(crate) struct EvcdSbac {
-    pub(crate) range: u32,
-    pub(crate) value: u32,
-    pub(crate) ctx: EvcSbacCtx,
-}
 
 /*****************************************************************************
  * CORE information used for decoding process.

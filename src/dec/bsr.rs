@@ -3,43 +3,88 @@ use std::fmt::Display;
 use std::fs::OpenOptions;
 use std::io::Write;
 
-#[cfg(feature = "TRACE_HLS")]
-fn OPEN_TRACE() -> Option<Box<dyn Write>> {
+type Tracer = (Box<dyn Write>, isize);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+#[cfg(feature = "trace")]
+fn OPEN_TRACE() -> Option<Tracer> {
     let fp_trace = OpenOptions::new()
         .append(true)
         .create(true)
         .open("dec_trace.txt");
     if let Ok(fp) = fp_trace {
-        Some(Box::new(fp))
+        Some((Box::new(fp), 0))
     } else {
         None
     }
 }
 
-#[cfg(feature = "TRACE_HLS")]
-pub(crate) fn EVC_TRACE_STR(tracer: &mut Option<Box<dyn Write>>, name: &str) {
-    if let Some(writer) = tracer {
+#[cfg(feature = "trace")]
+pub(crate) fn EVC_TRACE_COUNTER(tracer: &mut Option<Tracer>) {
+    if let Some((writer, counter)) = tracer {
+        writer.write_fmt(format_args!("{}\t", *counter));
+        *counter += 1;
+    }
+}
+
+#[cfg(feature = "trace")]
+pub(crate) fn EVC_TRACE_STR(tracer: &mut Option<Tracer>, name: &str) {
+    if let Some((writer, _)) = tracer {
         writer.write_fmt(format_args!("{}", name));
     }
 }
 
-#[cfg(feature = "TRACE_HLS")]
-pub(crate) fn EVC_TRACE_HLS<T: Display>(tracer: &mut Option<Box<dyn Write>>, name: &str, val: T) {
-    if let Some(writer) = tracer {
+#[cfg(feature = "trace")]
+pub(crate) fn EVC_TRACE_DOUBLE(tracer: &mut Option<Tracer>, val: f64) {
+    if let Some((writer, _)) = tracer {
+        writer.write_fmt(format_args!("{}", val));
+    }
+}
+
+#[cfg(feature = "trace")]
+pub(crate) fn EVC_TRACE_INT(tracer: &mut Option<Tracer>, val: isize) {
+    if let Some((writer, _)) = tracer {
+        writer.write_fmt(format_args!("{}", val));
+    }
+}
+
+#[cfg(feature = "trace")]
+pub(crate) fn EVC_TRACE_INT_HEX(tracer: &mut Option<Tracer>, val: isize) {
+    if let Some((writer, _)) = tracer {
+        writer.write_fmt(format_args!("0x{:x}", val));
+    }
+}
+
+#[cfg(feature = "trace")]
+pub(crate) fn EVC_TRACE_HLS<T: Display>(tracer: &mut Option<Tracer>, name: &str, val: T) {
+    if let Some((writer, _)) = tracer {
         writer.write_fmt(format_args!("{} {} \n", name, val));
     }
 }
 
-#[cfg(not(feature = "TRACE_HLS"))]
-fn OPEN_TRACE() -> Option<Box<dyn Write>> {
+#[cfg(not(feature = "trace"))]
+fn OPEN_TRACE() -> Option<Tracer> {
     None
 }
+////////////////////////////////////////////////////////////////////////////////////////////////////
+#[cfg(not(feature = "trace"))]
+pub(crate) fn EVC_TRACE_COUNTER(tracer: &mut Option<Tracer>) {}
 
-#[cfg(not(feature = "TRACE_HLS"))]
-pub(crate) fn EVC_TRACE_STR(writer: &mut Option<Box<dyn Write>>, name: &str) {}
+#[cfg(not(feature = "trace"))]
+pub(crate) fn EVC_TRACE_STR(writer: &mut Option<Tracer>, name: &str) {}
 
-#[cfg(not(feature = "TRACE_HLS"))]
-pub(crate) fn EVC_TRACE_HLS<T: Display>(writer: &mut Option<Box<dyn Write>>, name: &str, val: T) {}
+#[cfg(not(feature = "trace"))]
+pub(crate) fn EVC_TRACE_DOUBLE(tracer: &mut Option<Tracer>, val: f64) {}
+
+#[cfg(not(feature = "trace"))]
+pub(crate) fn EVC_TRACE_INT(tracer: &mut Option<Tracer>, val: isize) {}
+
+#[cfg(not(feature = "trace"))]
+pub(crate) fn EVC_TRACE_INT_HEX(tracer: &mut Option<Tracer>, val: isize) {}
+
+#[cfg(not(feature = "trace"))]
+pub(crate) fn EVC_TRACE_HLS<T: Display>(writer: &mut Option<Tracer>, name: &str, val: T) {}
+////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /*
  * bitstream structure for decoder.
@@ -58,7 +103,7 @@ pub(crate) struct EvcdBsr {
     /* buffer */
     buf: Vec<u8>,
     /* trace */
-    pub(crate) tracer: Option<Box<dyn Write>>,
+    pub(crate) tracer: Option<Tracer>,
 }
 
 /* Table of count of leading zero for 4 bit value */
