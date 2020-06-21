@@ -311,3 +311,156 @@ pub(crate) struct EvcPoc {
     /* the decoding order count of the previous picture */
     pub(crate) prev_doc_offset: i32,
 }
+
+/*****************************************************************************
+ * for binary and triple tree structure
+ *****************************************************************************/
+pub(crate) enum SplitMode {
+    NO_SPLIT = 0,
+    SPLIT_BI_VER = 1,
+    SPLIT_BI_HOR = 2,
+    SPLIT_TRI_VER = 3,
+    SPLIT_TRI_HOR = 4,
+    SPLIT_QUAD = 5,
+}
+
+pub(crate) enum ModeCons {
+    eOnlyIntra,
+    eOnlyInter,
+    eAll,
+}
+
+/* MMVD (START) */
+pub(crate) const MMVD_BASE_MV_NUM: usize = 4;
+pub(crate) const MMVD_DIST_NUM: usize = 8;
+pub(crate) const MMVD_MAX_REFINE_NUM: usize = (MMVD_DIST_NUM * 4);
+pub(crate) const MMVD_SKIP_CON_NUM: usize = 4;
+pub(crate) const MMVD_GRP_NUM: usize = 3;
+pub(crate) const MMVD_THRESHOLD: f32 = 1.5;
+/* MMVD (END) */
+
+pub(crate) const AFF_MAX_NUM_MVP: usize = 2; // maximum affine inter candidates
+pub(crate) const AFF_MAX_CAND: usize = 5; // maximum affine merge candidates
+
+pub(crate) type SBAC_CTX_MODEL = u16;
+
+/* CABAC (START) */
+pub(crate) const PROB_INIT: SBAC_CTX_MODEL = (512); /* 1/2 of initialization with mps = 0 */
+/* CABAC (END) */
+
+pub(crate) const NUM_CTX_MMVD_FLAG: usize = 1;
+pub(crate) const NUM_CTX_MMVD_GROUP_IDX: usize = (MMVD_GRP_NUM - 1);
+pub(crate) const NUM_CTX_MMVD_MERGE_IDX: usize = (MMVD_BASE_MV_NUM - 1);
+pub(crate) const NUM_CTX_MMVD_DIST_IDX: usize = (MMVD_DIST_NUM - 1);
+pub(crate) const NUM_CTX_MMVD_DIRECTION_IDX: usize = 2;
+pub(crate) const NUM_CTX_AFFINE_MVD_FLAG: usize = 2; /* number of context models for affine_mvd_flag_l0 and affine_mvd_flag_l1 (1st one is for affine_mvd_flag_l0 and 2nd one if for affine_mvd_flag_l1) */
+pub(crate) const NUM_CTX_SKIP_FLAG: usize = 2;
+pub(crate) const NUM_CTX_IBC_FLAG: usize = 2;
+pub(crate) const NUM_CTX_BTT_SPLIT_FLAG: usize = 15;
+pub(crate) const NUM_CTX_BTT_SPLIT_DIR: usize = 5;
+pub(crate) const NUM_CTX_BTT_SPLIT_TYPE: usize = 1;
+pub(crate) const NUM_CTX_SUCO_FLAG: usize = 14;
+pub(crate) const NUM_CTX_CBF_LUMA: usize = 1;
+pub(crate) const NUM_CTX_CBF_CB: usize = 1;
+pub(crate) const NUM_CTX_CBF_CR: usize = 1;
+pub(crate) const NUM_CTX_CBF_ALL: usize = 1;
+pub(crate) const NUM_CTX_PRED_MODE: usize = 3;
+pub(crate) const NUM_CTX_MODE_CONS: usize = 3;
+pub(crate) const NUM_CTX_INTER_PRED_IDC: usize = 2; /* number of context models for inter prediction direction */
+pub(crate) const NUM_CTX_DIRECT_MODE_FLAG: usize = 1;
+pub(crate) const NUM_CTX_MERGE_MODE_FLAG: usize = 1;
+pub(crate) const NUM_CTX_REF_IDX: usize = 2;
+pub(crate) const NUM_CTX_MERGE_IDX: usize = 5;
+pub(crate) const NUM_CTX_MVP_IDX: usize = 3;
+pub(crate) const NUM_CTX_AMVR_IDX: usize = 4;
+pub(crate) const NUM_CTX_BI_PRED_IDX: usize = 2;
+pub(crate) const NUM_CTX_MVD: usize = 1; /* number of context models for motion vector difference */
+pub(crate) const NUM_CTX_INTRA_PRED_MODE: usize = 2;
+pub(crate) const NUM_CTX_INTRA_LUMA_PRED_MPM_FLAG: usize = 1;
+pub(crate) const NUM_CTX_INTRA_LUMA_PRED_MPM_IDX: usize = 1;
+pub(crate) const NUM_CTX_INTRA_CHROMA_PRED_MODE: usize = 1;
+pub(crate) const NUM_CTX_AFFINE_FLAG: usize = 2;
+pub(crate) const NUM_CTX_AFFINE_MODE: usize = 1;
+pub(crate) const NUM_CTX_AFFINE_MRG: usize = AFF_MAX_CAND;
+pub(crate) const NUM_CTX_AFFINE_MVP_IDX: usize = (AFF_MAX_NUM_MVP - 1);
+pub(crate) const NUM_CTX_CC_RUN: usize = 24;
+pub(crate) const NUM_CTX_CC_LAST: usize = 2;
+pub(crate) const NUM_CTX_CC_LEVEL: usize = 24;
+pub(crate) const NUM_CTX_ALF_CTB_FLAG: usize = 1;
+pub(crate) const NUM_CTX_SPLIT_CU_FLAG: usize = 1;
+pub(crate) const NUM_CTX_DELTA_QP: usize = 1;
+pub(crate) const NUM_CTX_ATS_INTRA_CU_FLAG: usize = 1;
+pub(crate) const NUM_CTX_ATS_MODE_FLAG: usize = 1;
+pub(crate) const NUM_CTX_ATS_INTER_FLAG: usize = 2;
+pub(crate) const NUM_CTX_ATS_INTER_QUAD_FLAG: usize = 1;
+pub(crate) const NUM_CTX_ATS_INTER_HOR_FLAG: usize = 3;
+pub(crate) const NUM_CTX_ATS_INTER_POS_FLAG: usize = 1;
+
+pub(crate) const NUM_CTX_LAST_SIG_COEFF_LUMA: usize = 18;
+pub(crate) const NUM_CTX_LAST_SIG_COEFF_CHROMA: usize = 3;
+pub(crate) const NUM_CTX_LAST_SIG_COEFF: usize =
+    (NUM_CTX_LAST_SIG_COEFF_LUMA + NUM_CTX_LAST_SIG_COEFF_CHROMA);
+pub(crate) const NUM_CTX_SIG_COEFF_LUMA: usize = 39; /* number of context models for luma sig coeff flag */
+pub(crate) const NUM_CTX_SIG_COEFF_CHROMA: usize = 8; /* number of context models for chroma sig coeff flag */
+pub(crate) const NUM_CTX_SIG_COEFF_LUMA_TU: usize = 13; /* number of context models for luma sig coeff flag per TU */
+pub(crate) const NUM_CTX_SIG_COEFF_FLAG: usize =
+    (NUM_CTX_SIG_COEFF_LUMA + NUM_CTX_SIG_COEFF_CHROMA); /* number of context models for sig coeff flag */
+pub(crate) const NUM_CTX_GTX_LUMA: usize = 13;
+pub(crate) const NUM_CTX_GTX_CHROMA: usize = 5;
+pub(crate) const NUM_CTX_GTX: usize = (NUM_CTX_GTX_LUMA + NUM_CTX_GTX_CHROMA); /* number of context models for gtA/B flag */
+
+/* context models for arithemetic coding */
+#[derive(Default)]
+pub(crate) struct EvcSbacCtx {
+    skip_flag: [SBAC_CTX_MODEL; NUM_CTX_SKIP_FLAG],
+    ibc_flag: [SBAC_CTX_MODEL; NUM_CTX_IBC_FLAG],
+    mmvd_flag: [SBAC_CTX_MODEL; NUM_CTX_MMVD_FLAG],
+    mmvd_merge_idx: [SBAC_CTX_MODEL; NUM_CTX_MMVD_MERGE_IDX],
+    mmvd_distance_idx: [SBAC_CTX_MODEL; NUM_CTX_MMVD_DIST_IDX],
+    mmvd_direction_idx: [SBAC_CTX_MODEL; NUM_CTX_MMVD_DIRECTION_IDX],
+    mmvd_group_idx: [SBAC_CTX_MODEL; NUM_CTX_MMVD_GROUP_IDX],
+    direct_mode_flag: [SBAC_CTX_MODEL; NUM_CTX_DIRECT_MODE_FLAG],
+    merge_mode_flag: [SBAC_CTX_MODEL; NUM_CTX_MERGE_MODE_FLAG],
+    inter_dir: [SBAC_CTX_MODEL; NUM_CTX_INTER_PRED_IDC],
+    intra_dir: [SBAC_CTX_MODEL; NUM_CTX_INTRA_PRED_MODE],
+    intra_luma_pred_mpm_flag: [SBAC_CTX_MODEL; NUM_CTX_INTRA_LUMA_PRED_MPM_FLAG],
+    intra_luma_pred_mpm_idx: [SBAC_CTX_MODEL; NUM_CTX_INTRA_LUMA_PRED_MPM_IDX],
+    intra_chroma_pred_mode: [SBAC_CTX_MODEL; NUM_CTX_INTRA_CHROMA_PRED_MODE],
+    pred_mode: [SBAC_CTX_MODEL; NUM_CTX_PRED_MODE],
+    mode_cons: [SBAC_CTX_MODEL; NUM_CTX_MODE_CONS],
+    refi: [SBAC_CTX_MODEL; NUM_CTX_REF_IDX],
+    merge_idx: [SBAC_CTX_MODEL; NUM_CTX_MERGE_IDX],
+    mvp_idx: [SBAC_CTX_MODEL; NUM_CTX_MVP_IDX],
+    affine_mvp_idx: [SBAC_CTX_MODEL; NUM_CTX_AFFINE_MVP_IDX],
+    mvr_idx: [SBAC_CTX_MODEL; NUM_CTX_AMVR_IDX],
+    bi_idx: [SBAC_CTX_MODEL; NUM_CTX_BI_PRED_IDX],
+    mvd: [SBAC_CTX_MODEL; NUM_CTX_MVD],
+    cbf_all: [SBAC_CTX_MODEL; NUM_CTX_CBF_ALL],
+    cbf_luma: [SBAC_CTX_MODEL; NUM_CTX_CBF_LUMA],
+    cbf_cb: [SBAC_CTX_MODEL; NUM_CTX_CBF_CB],
+    cbf_cr: [SBAC_CTX_MODEL; NUM_CTX_CBF_CR],
+    run: [SBAC_CTX_MODEL; NUM_CTX_CC_RUN],
+    last: [SBAC_CTX_MODEL; NUM_CTX_CC_LAST],
+    level: [SBAC_CTX_MODEL; NUM_CTX_CC_LEVEL],
+    //sig_coeff_flag: [SBAC_CTX_MODEL; NUM_CTX_SIG_COEFF_FLAG],
+    coeff_abs_level_greaterAB_flag: [SBAC_CTX_MODEL; NUM_CTX_GTX],
+    last_sig_coeff_x_prefix: [SBAC_CTX_MODEL; NUM_CTX_LAST_SIG_COEFF],
+    last_sig_coeff_y_prefix: [SBAC_CTX_MODEL; NUM_CTX_LAST_SIG_COEFF],
+    btt_split_flag: [SBAC_CTX_MODEL; NUM_CTX_BTT_SPLIT_FLAG],
+    btt_split_dir: [SBAC_CTX_MODEL; NUM_CTX_BTT_SPLIT_DIR],
+    btt_split_type: [SBAC_CTX_MODEL; NUM_CTX_BTT_SPLIT_TYPE],
+    affine_flag: [SBAC_CTX_MODEL; NUM_CTX_AFFINE_FLAG],
+    affine_mode: [SBAC_CTX_MODEL; NUM_CTX_AFFINE_MODE],
+    affine_mrg: [SBAC_CTX_MODEL; NUM_CTX_AFFINE_MRG],
+    affine_mvd_flag: [SBAC_CTX_MODEL; NUM_CTX_AFFINE_MVD_FLAG],
+    suco_flag: [SBAC_CTX_MODEL; NUM_CTX_SUCO_FLAG],
+    alf_ctb_flag: [SBAC_CTX_MODEL; NUM_CTX_ALF_CTB_FLAG],
+    split_cu_flag: [SBAC_CTX_MODEL; NUM_CTX_SPLIT_CU_FLAG],
+    delta_qp: [SBAC_CTX_MODEL; NUM_CTX_DELTA_QP],
+    ats_mode: [SBAC_CTX_MODEL; NUM_CTX_ATS_MODE_FLAG],
+    ats_cu_inter_flag: [SBAC_CTX_MODEL; NUM_CTX_ATS_INTER_FLAG],
+    ats_cu_inter_quad_flag: [SBAC_CTX_MODEL; NUM_CTX_ATS_INTER_QUAD_FLAG],
+    ats_cu_inter_hor_flag: [SBAC_CTX_MODEL; NUM_CTX_ATS_INTER_HOR_FLAG],
+    ats_cu_inter_pos_flag: [SBAC_CTX_MODEL; NUM_CTX_ATS_INTER_POS_FLAG],
+    sps_cm_init_flag: SBAC_CTX_MODEL,
+}

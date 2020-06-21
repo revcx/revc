@@ -15,10 +15,11 @@ pub(crate) const EVCD_MAGIC_CODE: u32 = 0x45565944; /* EVYD */
 /*****************************************************************************
  * SBAC structure
  *****************************************************************************/
+#[derive(Default)]
 pub(crate) struct EvcdSbac {
     pub(crate) range: u32,
     pub(crate) value: u32,
-    //    pub(crate) ctx: EvcSbacCtx,
+    pub(crate) ctx: EvcSbacCtx,
 }
 
 /*****************************************************************************
@@ -55,9 +56,12 @@ pub(crate) struct EvcdCore {
     /* CU position in current frame in SCU unit */
     u32            scup;
     /* CU position X in a frame in SCU unit */
-    u16            x_scu;
+
+     */
+    x_scu: u16,
     /* CU position Y in a frame in SCU unit */
-    u16            y_scu;
+    y_scu: u16,
+    /*
     /* neighbor CUs availability of current CU */
     u16            avail_cu;
     /* Left, right availability of current CU */
@@ -185,7 +189,7 @@ pub(crate) struct EvcdCtx {
     /* current decoded (decoding) picture buffer */
     //EVC_PIC               * pic;
     /* SBAC */
-    //EVCD_SBAC               sbac_dec;
+    sbac_dec: EvcdSbac,
     /* decoding picture width */
     pub(crate) w: u16,
     /* decoding picture height */
@@ -330,6 +334,75 @@ impl EvcdCtx {
         }
     }
 
+    fn update_core_loc_param(&mut self) {
+        self.core.x_pel = self.core.x_lcu << self.log2_max_cuwh as u16; // entry point's x location in pixel
+        self.core.y_pel = self.core.y_lcu << self.log2_max_cuwh as u16; // entry point's y location in pixel
+        self.core.x_scu = self.core.x_lcu << (MAX_CU_LOG2 - MIN_CU_LOG2) as u16; // set x_scu location
+        self.core.y_scu = self.core.y_lcu << (MAX_CU_LOG2 - MIN_CU_LOG2) as u16; // set y_scu location
+        self.core.lcu_num = self.core.x_lcu + self.core.y_lcu * self.w_lcu; // Init the first lcu_num in tile
+    }
+
+    fn decode_slice(&mut self) -> Result<(), EvcError> {
+        /*
+        let sbac = GET_SBAC_DEC(bs);
+
+        // Initialize CABAC at each tile
+        evcd_eco_sbac_reset(bs, self.sh.slice_type, self.sh.qp, self.sps.tool_cm_init);
+
+        self.core.x_lcu = 0; //entry point lcu's x location
+        self.core.y_lcu = 0; // entry point lcu's y location
+        while self.num_ctb > 0 {
+            self.update_core_loc_param();
+
+            //LCU decoding with in a tile
+            let mut same_layer_split = vec![0; 4];
+            let mut split_allow = vec![0, 0, 0, 0, 0, 1];
+            //evc_assert_rv(core->lcu_num < ctx->f_lcu, EVC_ERR_UNEXPECTED);
+
+            // invoke coding_tree() recursion
+            //evc_mset(self.core.split_mode, 0, sizeof(s8) * NUM_CU_DEPTH * NUM_BLOCK_SHAPE * MAX_CU_CNT_IN_LCU);
+
+            self.evcd_eco_tree(
+                self.core.x_pel,
+                self.corey_pel,
+                self.log2_max_cuwh,
+                self.log2_max_cuwh,
+                0,
+                0,
+                bs,
+                sbac,
+                1,
+                0,
+                SplitMode::NO_SPLIT,
+                same_layer_split,
+                0,
+                split_allow,
+                0,
+                0,
+                0,
+                ModeCons::eAll,
+            )?;
+            // set split flags to map
+            //evc_mcpy(ctx->map_split[core->lcu_num], core->split_mode, sizeof(s8) * NUM_CU_DEPTH * NUM_BLOCK_SHAPE * MAX_CU_CNT_IN_LCU);
+            //evc_mcpy(ctx->map_suco[core->lcu_num], core->suco_flag, sizeof(s8) * NUM_CU_DEPTH * NUM_BLOCK_SHAPE * MAX_CU_CNT_IN_LCU);
+
+            self.num_ctb -= 1;
+            // read end_of_picture_flag
+            if (self.num_ctb == 0) {
+                evcd_eco_tile_end_flag(&mut self.bs, sbac)?;
+            } else {
+                self.core.x_lcu += 1;
+                if self.core.x_lcu >= self.w_ctb {
+                    self.core.x_lcu = 0;
+                    self.core.y_lcu += 1;
+                }
+            }
+        }
+         */
+
+        Ok(())
+    }
+
     pub(crate) fn decode_nalu(&mut self, pkt: &mut Packet) -> Result<EvcdStat, EvcError> {
         let data = pkt.data.take();
         let buf = if let Some(b) = data {
@@ -393,6 +466,18 @@ impl EvcdCtx {
                 /* initialize reference pictures */
                 //evc_picman_refp_init(&ctx->dpm, ctx->sps.max_num_ref_pics, sh->slice_type, ctx->poc.poc_val, ctx->nalu.nuh_temporal_id, ctx->last_intra_poc, ctx->refp);
             }
+
+            if self.num_ctb == self.f_lcu {
+                /* get available frame buffer for decoded image */
+                //self.pic = evc_picman_get_empty_pic(&self.dpm)?;
+
+                /* get available frame buffer for decoded image */
+                //ctx->map_refi = ctx->pic->map_refi;
+                //ctx->map_mv = ctx->pic->map_mv;
+            }
+
+            /* decode slice layer */
+            self.decode_slice()?;
         } else if nalu_type == NaluType::EVC_SEI_NUT {
         } else {
             return Err(EvcError::EVC_ERR_MALFORMED_BITSTREAM);
