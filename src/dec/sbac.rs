@@ -2,6 +2,7 @@ use super::bsr::*;
 
 use crate::api::*;
 use crate::com::*;
+use crate::dec::EvcdCtx;
 
 /*****************************************************************************
  * SBAC structure
@@ -10,13 +11,13 @@ use crate::com::*;
 pub(crate) struct EvcdSbac {
     pub(crate) range: u32,
     pub(crate) value: u32,
-    pub(crate) ctx: EvcSbacCtx,
 }
 
 impl EvcdSbac {
     pub(crate) fn reset(
         &mut self,
         bs: &mut EvcdBsr,
+        sbac_ctx: &mut EvcSbacCtx,
         slice_type: SliceType,
         slice_qp: u8,
     ) -> Result<(), EvcError> {
@@ -27,8 +28,6 @@ impl EvcdSbac {
             let t0 = bs.read1(None)?;
             self.value = ((self.value << 1) | t0) & 0xFFFF;
         }
-
-        let sbac_ctx = &mut self.ctx;
 
         /* Initialization of the context models */
         for i in 0..NUM_CTX_ALF_CTB_FLAG {
@@ -270,5 +269,31 @@ impl EvcdSbac {
             }
             Ok(0)
         }
+    }
+
+    pub(crate) fn read_truncate_unary_sym(
+        &mut self,
+        bs: &mut EvcdBsr,
+        models: &mut [SBAC_CTX_MODEL],
+        num_ctx: u32,
+        max_num: u32,
+    ) -> Result<u32, EvcError> {
+        if max_num > 1 {
+            for ctx_idx in 0..max_num - 1 {
+                let symbol = self.decode_bin(
+                    bs,
+                    &mut models[if ctx_idx > num_ctx - 1 {
+                        num_ctx - 1
+                    } else {
+                        ctx_idx
+                    } as usize],
+                )?;
+                if symbol == 0 {
+                    return Ok(ctx_idx);
+                }
+            }
+        }
+
+        Ok(0)
     }
 }

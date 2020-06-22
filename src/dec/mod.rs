@@ -109,11 +109,11 @@ pub(crate) struct EvcdCore {
     /* temporal pixel buffer for inter prediction */
     //pel            eif_tmp_buffer[ (MAX_CU_SIZE + 2) * (MAX_CU_SIZE + 2) ];
     mvr_idx: u8,
-    /*
-    int            mvp_idx[REFP_NUM];
-    s16            mvd[REFP_NUM][MV_D];
-    int            inter_dir;
-    int            bi_idx;*/
+
+    mvp_idx: [u8; REFP_NUM],
+    mvd: [[i16; MV_D]; REFP_NUM],
+    inter_dir: i16,
+    bi_idx: i16,
     ctx_flags: [u8; CtxNevIdx::NUM_CNID as usize],
     tree_cons: TREE_CONS,
 }
@@ -149,6 +149,7 @@ pub(crate) struct EvcdCtx {
     //EVC_PIC               * pic;
     /* SBAC */
     sbac_dec: EvcdSbac,
+    sbac_ctx: EvcSbacCtx,
     /* decoding picture width */
     pub(crate) w: u16,
     /* decoding picture height */
@@ -296,6 +297,7 @@ impl EvcdCtx {
         let core = &mut self.core;
         let bs = &mut self.bs;
         let sbac = &mut self.sbac_dec;
+        let sbac_ctx = &mut self.sbac_ctx;
 
         core.pred_mode = PredMode::MODE_INTRA;
 
@@ -315,7 +317,7 @@ impl EvcdCtx {
 
         if !evc_check_only_intra(&core.tree_cons) {
             /* CU skip flag */
-            let cu_skip_flag = evcd_eco_cu_skip_flag(bs, sbac, &core.ctx_flags)?;
+            let cu_skip_flag = evcd_eco_cu_skip_flag(bs, sbac, sbac_ctx, &core.ctx_flags)?;
             if cu_skip_flag != 0 {
                 core.pred_mode = PredMode::MODE_SKIP;
             }
@@ -323,8 +325,13 @@ impl EvcdCtx {
 
         /* parse prediction info */
         if core.pred_mode == PredMode::MODE_SKIP {
+            core.mvp_idx[REFP_0] = evcd_eco_mvp_idx(bs, sbac, sbac_ctx)?;
+            if self.sh.slice_type == SliceType::EVC_ST_B {
+                core.mvp_idx[REFP_1] = evcd_eco_mvp_idx(bs, sbac, sbac_ctx)?;
+            }
         } else {
-            core.pred_mode = evcd_eco_pred_mode(bs, sbac, &core.ctx_flags, &core.tree_cons)?;
+            core.pred_mode =
+                evcd_eco_pred_mode(bs, sbac, sbac_ctx, &core.ctx_flags, &core.tree_cons)?;
         }
 
         Ok(())
@@ -411,6 +418,7 @@ impl EvcdCtx {
         let core = &mut self.core;
         let bs = &mut self.bs;
         let sbac = &mut self.sbac_dec;
+        let sbac_ctx = &mut self.sbac_ctx;
 
         let cuw = 1 << log2_cuw as u16;
         let cuh = 1 << log2_cuh as u16;
@@ -418,7 +426,7 @@ impl EvcdCtx {
         if cuw > self.min_cuwh || cuh > self.min_cuwh {
             if x0 + cuw <= self.w && y0 + cuh <= self.h {
                 if next_split {
-                    split_mode = evcd_eco_split_mode(bs, sbac, cuw, cuh)?;
+                    split_mode = evcd_eco_split_mode(bs, sbac, sbac_ctx, cuw, cuh)?;
                     EVC_TRACE_COUNTER(&mut bs.tracer);
                     EVC_TRACE(&mut bs.tracer, "x pos ");
                     EVC_TRACE(
@@ -445,7 +453,7 @@ impl EvcdCtx {
                     split_mode = SplitMode::NO_SPLIT;
                 }
             } else {
-                split_mode = evcd_eco_split_mode(bs, sbac, cuw, cuh)?;
+                split_mode = evcd_eco_split_mode(bs, sbac, sbac_ctx, cuw, cuh)?;
                 EVC_TRACE_COUNTER(&mut bs.tracer);
                 EVC_TRACE(&mut bs.tracer, "x pos ");
                 EVC_TRACE(
@@ -560,8 +568,12 @@ impl EvcdCtx {
 
     fn decode_slice(&mut self) -> Result<(), EvcError> {
         // Initialize CABAC at each tile
-        self.sbac_dec
-            .reset(&mut self.bs, self.sh.slice_type, self.sh.qp);
+        self.sbac_dec.reset(
+            &mut self.bs,
+            &mut self.sbac_ctx,
+            self.sh.slice_type,
+            self.sh.qp,
+        );
 
         //TODO: move x_lcu/y_lcu=0 to pic init
         self.core.x_lcu = 0; //entry point lcu's x location

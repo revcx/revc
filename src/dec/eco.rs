@@ -244,6 +244,7 @@ pub(crate) fn evcd_eco_tile_end_flag(
 pub(crate) fn evcd_eco_split_mode(
     bs: &mut EvcdBsr,
     sbac: &mut EvcdSbac,
+    sbac_ctx: &mut EvcSbacCtx,
     cuw: u16,
     cuh: u16,
 ) -> Result<SplitMode, EvcError> {
@@ -251,9 +252,7 @@ pub(crate) fn evcd_eco_split_mode(
         Ok(SplitMode::NO_SPLIT)
     } else {
         /* split_cu_flag */
-        let mut model = sbac.ctx.split_cu_flag[0];
-        let bin = sbac.decode_bin(bs, &mut model)?;
-        sbac.ctx.split_cu_flag[0] = model;
+        let bin = sbac.decode_bin(bs, &mut sbac_ctx.split_cu_flag[0])?;
 
         if bin != 0 {
             Ok(SplitMode::SPLIT_QUAD)
@@ -266,12 +265,11 @@ pub(crate) fn evcd_eco_split_mode(
 pub(crate) fn evcd_eco_cu_skip_flag(
     bs: &mut EvcdBsr,
     sbac: &mut EvcdSbac,
+    sbac_ctx: &mut EvcSbacCtx,
     ctx_flags: &[u8],
 ) -> Result<u32, EvcError> {
     let ctx_flag = ctx_flags[CtxNevIdx::CNID_SKIP_FLAG as usize] as usize;
-    let mut model = sbac.ctx.skip_flag[ctx_flag];
-    let cu_skip_flag = sbac.decode_bin(bs, &mut model)?; /* cu_skip_flag */
-    sbac.ctx.skip_flag[ctx_flag] = model;
+    let cu_skip_flag = sbac.decode_bin(bs, &mut sbac_ctx.skip_flag[ctx_flag])?; /* cu_skip_flag */
 
     EVC_TRACE_COUNTER(&mut bs.tracer);
     EVC_TRACE(&mut bs.tracer, "skip flag ");
@@ -286,6 +284,7 @@ pub(crate) fn evcd_eco_cu_skip_flag(
 pub(crate) fn evcd_eco_pred_mode(
     bs: &mut EvcdBsr,
     sbac: &mut EvcdSbac,
+    sbac_ctx: &mut EvcSbacCtx,
     ctx_flags: &[u8],
     tree_cons: &TREE_CONS,
 ) -> Result<PredMode, EvcError> {
@@ -294,9 +293,7 @@ pub(crate) fn evcd_eco_pred_mode(
 
     if pred_mode_constraint == MODE_CONS::eAll {
         let ctx_flag = ctx_flags[CtxNevIdx::CNID_PRED_MODE as usize] as usize;
-        let mut model = sbac.ctx.pred_mode[ctx_flag];
-        pred_mode_flag = sbac.decode_bin(bs, &mut model)? != 0;
-        sbac.ctx.pred_mode[ctx_flag] = model;
+        pred_mode_flag = sbac.decode_bin(bs, &mut sbac_ctx.pred_mode[ctx_flag])? != 0;
 
         EVC_TRACE_COUNTER(&mut bs.tracer);
         EVC_TRACE(&mut bs.tracer, "pred mode ");
@@ -324,4 +321,21 @@ pub(crate) fn evcd_eco_pred_mode(
     };
 
     Ok(pred_mode)
+}
+
+pub(crate) fn evcd_eco_mvp_idx(
+    bs: &mut EvcdBsr,
+    sbac: &mut EvcdSbac,
+    sbac_ctx: &mut EvcSbacCtx,
+) -> Result<u8, EvcError> {
+    let idx = sbac.read_truncate_unary_sym(bs, &mut sbac_ctx.mvp_idx, 3, 4)? as u8;
+
+    //#if ENC_DEC_TRACE
+    EVC_TRACE_COUNTER(&mut bs.tracer);
+    EVC_TRACE(&mut bs.tracer, "mvp idx ");
+    EVC_TRACE(&mut bs.tracer, idx);
+    EVC_TRACE(&mut bs.tracer, " \n");
+    //#endif
+
+    Ok(idx)
 }
