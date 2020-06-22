@@ -7,7 +7,7 @@ mod bsr;
 mod eco;
 mod sbac;
 
-use bsr::EvcdBsr;
+use bsr::*;
 use eco::*;
 use sbac::*;
 
@@ -17,13 +17,14 @@ pub(crate) const EVCD_MAGIC_CODE: u32 = 0x45565944; /* EVYD */
 #[derive(Clone)]
 pub(crate) struct LcuSplitModeArray {
     pub(crate) array:
-        [[[i8; MAX_CU_CNT_IN_LCU]; BlockShape::NUM_BLOCK_SHAPE as usize]; NUM_CU_DEPTH],
+        [[[SplitMode; MAX_CU_CNT_IN_LCU]; BlockShape::NUM_BLOCK_SHAPE as usize]; NUM_CU_DEPTH],
 }
 
 impl Default for LcuSplitModeArray {
     fn default() -> Self {
         LcuSplitModeArray {
-            array: [[[0; MAX_CU_CNT_IN_LCU]; BlockShape::NUM_BLOCK_SHAPE as usize]; NUM_CU_DEPTH],
+            array: [[[SplitMode::NO_SPLIT; MAX_CU_CNT_IN_LCU];
+                BlockShape::NUM_BLOCK_SHAPE as usize]; NUM_CU_DEPTH],
         }
     }
 }
@@ -304,6 +305,179 @@ impl EvcdCtx {
         self.core.lcu_num = self.core.x_lcu + self.core.y_lcu * self.w_lcu; // Init the first lcu_num in tile
     }
 
+    fn evcd_eco_unit(
+        &mut self,
+        x: u16,
+        y: u16,
+        log2_cuw: u8,
+        log2_cuh: u8,
+        tree_cons: TREE_CONS_NEW,
+    ) -> Result<(), EvcError> {
+        Ok(())
+    }
+
+    fn evcd_eco_tree(
+        &mut self,
+        x0: u16,
+        y0: u16,
+        log2_cuw: u8,
+        log2_cuh: u8,
+        cup: u16,
+        cud: u16,
+        next_split: bool,
+        qt_depth: u8,
+        mut cu_qp_delta_code: u8,
+        mut mode_cons: MODE_CONS,
+    ) -> Result<(), EvcError> {
+        let bs = &mut self.bs;
+        let sbac = &mut self.sbac_dec;
+
+        let cuw = 1 << log2_cuw as u16;
+        let cuh = 1 << log2_cuh as u16;
+        let mut split_mode = SplitMode::NO_SPLIT;
+        if cuw > self.min_cuwh || cuh > self.min_cuwh {
+            if x0 + cuw <= self.w && y0 + cuh <= self.h {
+                if next_split {
+                    split_mode = evcd_eco_split_mode(bs, sbac, cuw, cuh)?;
+                    EVC_TRACE_COUNTER(&mut bs.tracer);
+                    EVC_TRACE(&mut bs.tracer, "x pos ");
+                    EVC_TRACE(
+                        &mut bs.tracer,
+                        self.core.x_pel
+                            + (cup % (self.max_cuwh >> MIN_CU_LOG2 as u16) << MIN_CU_LOG2 as u16),
+                    );
+                    EVC_TRACE(&mut bs.tracer, " y pos ");
+                    EVC_TRACE(
+                        &mut bs.tracer,
+                        self.core.y_pel
+                            + (cup / (self.max_cuwh >> MIN_CU_LOG2 as u16) << MIN_CU_LOG2 as u16),
+                    );
+                    EVC_TRACE(&mut bs.tracer, " width ");
+                    EVC_TRACE(&mut bs.tracer, cuw);
+                    EVC_TRACE(&mut bs.tracer, " height ");
+                    EVC_TRACE(&mut bs.tracer, cuh);
+                    EVC_TRACE(&mut bs.tracer, " depth ");
+                    EVC_TRACE(&mut bs.tracer, cud);
+                    EVC_TRACE(&mut bs.tracer, " split mode ");
+                    EVC_TRACE(&mut bs.tracer, split_mode as u8);
+                    EVC_TRACE(&mut bs.tracer, " \n");
+                } else {
+                    split_mode = SplitMode::NO_SPLIT;
+                }
+            } else {
+                split_mode = evcd_eco_split_mode(bs, sbac, cuw, cuh)?;
+                EVC_TRACE_COUNTER(&mut bs.tracer);
+                EVC_TRACE(&mut bs.tracer, "x pos ");
+                EVC_TRACE(
+                    &mut bs.tracer,
+                    self.core.x_pel
+                        + (cup % (self.max_cuwh >> MIN_CU_LOG2 as u16) << MIN_CU_LOG2 as u16),
+                );
+                EVC_TRACE(&mut bs.tracer, " y pos ");
+                EVC_TRACE(
+                    &mut bs.tracer,
+                    self.core.y_pel
+                        + (cup / (self.max_cuwh >> MIN_CU_LOG2 as u16) << MIN_CU_LOG2 as u16),
+                );
+                EVC_TRACE(&mut bs.tracer, " width ");
+                EVC_TRACE(&mut bs.tracer, cuw);
+                EVC_TRACE(&mut bs.tracer, " height ");
+                EVC_TRACE(&mut bs.tracer, cuh);
+                EVC_TRACE(&mut bs.tracer, " depth ");
+                EVC_TRACE(&mut bs.tracer, cud);
+                EVC_TRACE(&mut bs.tracer, " split mode ");
+                EVC_TRACE(&mut bs.tracer, split_mode as u8);
+                EVC_TRACE(&mut bs.tracer, " \n");
+            }
+        } else {
+            split_mode = SplitMode::NO_SPLIT;
+        }
+
+        if self.pps.cu_qp_delta_enabled_flag && self.sps.dquant_flag {
+            if split_mode == SplitMode::NO_SPLIT
+                && (log2_cuh + log2_cuw >= self.pps.cu_qp_delta_area)
+                && cu_qp_delta_code != 2
+            {
+                if log2_cuh == 7 || log2_cuw == 7 {
+                    cu_qp_delta_code = 2;
+                } else {
+                    cu_qp_delta_code = 1;
+                }
+                self.core.cu_qp_delta_is_coded = false;
+            }
+        }
+
+        evc_set_split_mode(
+            &mut self.core.split_mode,
+            split_mode,
+            cud,
+            cup,
+            cuw,
+            cuh,
+            self.max_cuwh,
+        );
+
+        if split_mode != SplitMode::NO_SPLIT {
+            let split_struct: EvcSplitStruct = evc_split_get_part_structure(
+                split_mode,
+                x0,
+                y0,
+                cuw,
+                cuh,
+                cup,
+                cud,
+                self.log2_max_cuwh - MIN_CU_LOG2 as u8,
+            );
+
+            for cur_part_num in 0..split_struct.part_count {
+                let log2_sub_cuw = split_struct.log_cuw[cur_part_num];
+                let log2_sub_cuh = split_struct.log_cuh[cur_part_num];
+                let x_pos = split_struct.x_pos[cur_part_num];
+                let y_pos = split_struct.y_pos[cur_part_num];
+
+                if x_pos < self.w && y_pos < self.h {
+                    self.evcd_eco_tree(
+                        x_pos,
+                        y_pos,
+                        log2_sub_cuw,
+                        log2_sub_cuh,
+                        split_struct.cup[cur_part_num],
+                        split_struct.cud[cur_part_num],
+                        true,
+                        split_mode.inc_qt_depth(qt_depth),
+                        cu_qp_delta_code,
+                        mode_cons,
+                    )?;
+                }
+            }
+        } else {
+            self.core.cu_qp_delta_code = cu_qp_delta_code;
+
+            let tree_type = if mode_cons == MODE_CONS::eOnlyIntra {
+                TREE_TYPE::TREE_L
+            } else {
+                TREE_TYPE::TREE_LC
+            };
+
+            if self.sh.slice_type == SliceType::EVC_ST_I {
+                mode_cons = MODE_CONS::eOnlyIntra;
+            }
+
+            self.evcd_eco_unit(
+                x0,
+                y0,
+                log2_cuw,
+                log2_cuh,
+                TREE_CONS_NEW {
+                    tree_type,
+                    mode_cons,
+                },
+            )?;
+        }
+
+        Ok(())
+    }
+
     fn decode_slice(&mut self) -> Result<(), EvcError> {
         // Initialize CABAC at each tile
         self.sbac_dec
@@ -316,8 +490,6 @@ impl EvcdCtx {
             self.update_core_loc_param();
 
             //LCU decoding with in a tile
-            let mut same_layer_split = vec![0; 4];
-            let mut split_allow = vec![0, 0, 0, 0, 0, 1];
             evc_assert_rv(
                 (self.core.lcu_num as u32) < self.f_lcu,
                 EvcError::EVC_ERR_UNEXPECTED,
@@ -327,33 +499,22 @@ impl EvcdCtx {
             for i in 0..NUM_CU_DEPTH {
                 for j in 0..BlockShape::NUM_BLOCK_SHAPE as usize {
                     for k in 0..MAX_CU_CNT_IN_LCU {
-                        self.core.split_mode.array[i][j][k] = 0;
+                        self.core.split_mode.array[i][j][k] = SplitMode::NO_SPLIT;
                     }
                 }
             }
 
-            evcd_eco_tree(
-                &mut self.bs,
-                &mut self.sbac_dec,
-                self.min_cuwh,
-                self.max_cuwh,
-                self.w,
-                self.h,
+            self.evcd_eco_tree(
                 self.core.x_pel,
                 self.core.y_pel,
                 self.log2_max_cuwh,
                 self.log2_max_cuwh,
                 0,
                 0,
-                true, /*0,
-                      SplitMode::NO_SPLIT,
-                      same_layer_split,
-                      0,
-                      split_allow,
-                      0,
-                      0,
-                      0,
-                      ModeCons::eAll,*/
+                true,
+                0,
+                0,
+                MODE_CONS::eAll,
             )?;
             // set split flags to map
             self.map_split[self.core.lcu_num as usize].clone_from(&self.core.split_mode);

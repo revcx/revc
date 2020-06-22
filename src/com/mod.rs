@@ -330,13 +330,49 @@ pub(crate) struct EvcPoc {
 /*****************************************************************************
  * for binary and triple tree structure
  *****************************************************************************/
+#[derive(PartialEq, Clone, Copy)]
 pub(crate) enum SplitMode {
     NO_SPLIT = 0,
-    SPLIT_BI_VER = 1,
-    SPLIT_BI_HOR = 2,
-    SPLIT_TRI_VER = 3,
-    SPLIT_TRI_HOR = 4,
     SPLIT_QUAD = 5,
+}
+
+impl SplitMode {
+    #[inline]
+    pub(crate) fn part_count(&self) -> usize {
+        if self == &SplitMode::NO_SPLIT {
+            0
+        } else {
+            4
+        }
+    }
+
+    #[inline]
+    pub(crate) fn part_size(&self, length: usize) -> usize {
+        if self == &SplitMode::NO_SPLIT {
+            length
+        } else {
+            length >> 1
+        }
+    }
+
+    #[inline]
+    pub(crate) fn part_size_idx(&self, length_idx: usize) -> usize {
+        if self == &SplitMode::NO_SPLIT {
+            length_idx
+        } else {
+            length_idx - 1
+        }
+    }
+
+    /* Partitioning (START) */
+    #[inline]
+    pub(crate) fn inc_qt_depth(&self, qtd: u8) -> u8 {
+        if self == &SplitMode::NO_SPLIT {
+            qtd
+        } else {
+            qtd + 1
+        }
+    }
 }
 
 pub(crate) enum SplitDir {
@@ -494,3 +530,30 @@ pub(crate) struct EvcSbacCtx {
 }
 
 pub(crate) const MAX_SUB_TB_NUM: usize = 4;
+
+#[derive(Clone, Copy, PartialEq)]
+pub(crate) enum TREE_TYPE {
+    TREE_LC = 0,
+    TREE_L = 1,
+    TREE_C = 2,
+}
+
+#[derive(Clone, Copy, PartialEq)]
+pub(crate) enum MODE_CONS {
+    eOnlyIntra,
+    eOnlyInter,
+    eAll,
+}
+
+#[derive(Clone, Copy)]
+pub(crate) struct TREE_CONS {
+    pub(crate) changed: bool,
+    pub(crate) tree_type: TREE_TYPE,
+    pub(crate) mode_cons: MODE_CONS,
+}
+
+#[derive(Clone, Copy)]
+pub(crate) struct TREE_CONS_NEW {
+    pub(crate) tree_type: TREE_TYPE,
+    pub(crate) mode_cons: MODE_CONS,
+}
