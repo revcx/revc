@@ -133,6 +133,38 @@ pub(crate) const AVAIL_UP_RI_RI: usize = (1 << AVAIL_BIT_UP_RI_RI);
 //pub(crate) const GET_AVAIL_FLAG(avail, bit)      (((avail)>>(bit)) & 0x1)
 
 /*****************************************************************************
+ * prediction mode
+ *****************************************************************************/
+#[derive(Clone, Copy, PartialEq)]
+pub(crate) enum PredMode {
+    MODE_INTRA = 0,
+    MODE_INTER = 1,
+    MODE_SKIP = 2,
+    MODE_DIR = 3,
+    MODE_SKIP_MMVD = 4,
+    MODE_DIR_MMVD = 5,
+    MODE_IBC = 6,
+}
+
+impl Default for PredMode {
+    fn default() -> Self {
+        PredMode::MODE_INTRA
+    }
+}
+
+pub(crate) enum CtxNevIdx {
+    CNID_SKIP_FLAG = 0,
+    CNID_PRED_MODE = 1,
+    CNID_MODE_CONS = 2,
+    CNID_AFFN_FLAG = 3,
+    CNID_IBC_FLAG = 4,
+    NUM_CNID = 5,
+}
+
+/*************************************************
+
+*/
+/*****************************************************************************
 * macros for CU map
 
 - [ 0: 6] : slice number (0 ~ 128)

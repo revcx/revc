@@ -67,7 +67,7 @@ pub(crate) struct EvcdCore {
     mpm_ext: [u8; 8],
     //pims: [u8; IPD_CNT], /* probable intra mode set*/
     /* prediction mode of current CU: INTRA, INTER, ... */
-    pred_mode: u8,
+    pred_mode: PredMode,
     DMVRenable: u8,
     /* log2 of cuw */
     log2_cuw: u8,
@@ -113,8 +113,8 @@ pub(crate) struct EvcdCore {
     int            mvp_idx[REFP_NUM];
     s16            mvd[REFP_NUM][MV_D];
     int            inter_dir;
-    int            bi_idx;
-    u8             ctx_flags[NUM_CNID];*/
+    int            bi_idx;*/
+    ctx_flags: [u8; CtxNevIdx::NUM_CNID as usize],
     tree_cons: TREE_CONS,
 }
 /******************************************************************************
@@ -290,6 +290,44 @@ impl EvcdCtx {
         self.core.x_scu = self.core.x_lcu << (MAX_CU_LOG2 - MIN_CU_LOG2) as u16; // set x_scu location
         self.core.y_scu = self.core.y_lcu << (MAX_CU_LOG2 - MIN_CU_LOG2) as u16; // set y_scu location
         self.core.lcu_num = self.core.x_lcu + self.core.y_lcu * self.w_lcu; // Init the first lcu_num in tile
+    }
+
+    fn evcd_eco_cu(&mut self) -> Result<(), EvcError> {
+        let core = &mut self.core;
+        let bs = &mut self.bs;
+        let sbac = &mut self.sbac_dec;
+
+        core.pred_mode = PredMode::MODE_INTRA;
+
+        let cuw = 1 << core.log2_cuw as u16;
+        let cuh = 1 << core.log2_cuh as u16;
+        core.avail_lr = evc_check_nev_avail(
+            core.x_scu,
+            core.y_scu,
+            cuw,
+            //cuh,
+            self.w_scu,
+            //self.h_scu,
+            &self.map_scu,
+        );
+
+        //evc_get_ctx_some_flags
+
+        if !evc_check_only_intra(&core.tree_cons) {
+            /* CU skip flag */
+            let cu_skip_flag = evcd_eco_cu_skip_flag(bs, sbac, &core.ctx_flags)?;
+            if cu_skip_flag != 0 {
+                core.pred_mode = PredMode::MODE_SKIP;
+            }
+        }
+
+        /* parse prediction info */
+        if core.pred_mode == PredMode::MODE_SKIP {
+        } else {
+            core.pred_mode = evcd_eco_pred_mode(bs, sbac, &core.ctx_flags, &core.tree_cons)?;
+        }
+
+        Ok(())
     }
 
     fn evcd_eco_unit(

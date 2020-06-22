@@ -262,3 +262,66 @@ pub(crate) fn evcd_eco_split_mode(
         }
     }
 }
+
+pub(crate) fn evcd_eco_cu_skip_flag(
+    bs: &mut EvcdBsr,
+    sbac: &mut EvcdSbac,
+    ctx_flags: &[u8],
+) -> Result<u32, EvcError> {
+    let ctx_flag = ctx_flags[CtxNevIdx::CNID_SKIP_FLAG as usize] as usize;
+    let mut model = sbac.ctx.skip_flag[ctx_flag];
+    let cu_skip_flag = sbac.decode_bin(bs, &mut model)?; /* cu_skip_flag */
+    sbac.ctx.skip_flag[ctx_flag] = model;
+
+    EVC_TRACE_COUNTER(&mut bs.tracer);
+    EVC_TRACE(&mut bs.tracer, "skip flag ");
+    EVC_TRACE(&mut bs.tracer, cu_skip_flag);
+    EVC_TRACE(&mut bs.tracer, " ctx ");
+    EVC_TRACE(&mut bs.tracer, ctx_flag);
+    EVC_TRACE(&mut bs.tracer, " \n");
+
+    Ok(cu_skip_flag)
+}
+
+pub(crate) fn evcd_eco_pred_mode(
+    bs: &mut EvcdBsr,
+    sbac: &mut EvcdSbac,
+    ctx_flags: &[u8],
+    tree_cons: &TREE_CONS,
+) -> Result<PredMode, EvcError> {
+    let mut pred_mode_flag = false;
+    let pred_mode_constraint = tree_cons.mode_cons; //TODO: Tim changed place
+
+    if pred_mode_constraint == MODE_CONS::eAll {
+        let ctx_flag = ctx_flags[CtxNevIdx::CNID_PRED_MODE as usize] as usize;
+        let mut model = sbac.ctx.pred_mode[ctx_flag];
+        pred_mode_flag = sbac.decode_bin(bs, &mut model)? != 0;
+        sbac.ctx.pred_mode[ctx_flag] = model;
+
+        EVC_TRACE_COUNTER(&mut bs.tracer);
+        EVC_TRACE(&mut bs.tracer, "pred mode ");
+        EVC_TRACE(
+            &mut bs.tracer,
+            if pred_mode_flag {
+                PredMode::MODE_INTRA
+            } else {
+                PredMode::MODE_INTER
+            } as u8,
+        );
+        EVC_TRACE(&mut bs.tracer, " \n");
+    }
+
+    let pred_mode = if pred_mode_constraint == MODE_CONS::eOnlyInter {
+        PredMode::MODE_INTER
+    } else if pred_mode_constraint == MODE_CONS::eOnlyIntra {
+        PredMode::MODE_INTRA
+    } else {
+        if pred_mode_flag {
+            PredMode::MODE_INTRA
+        } else {
+            PredMode::MODE_INTER
+        }
+    };
+
+    Ok(pred_mode)
+}

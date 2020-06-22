@@ -156,3 +156,15 @@ pub(crate) fn evc_check_nev_avail(
 
     return avail_lr;
 }
+
+pub(crate) fn evc_check_only_intra(tree_cons: &TREE_CONS) -> bool {
+    tree_cons.mode_cons == MODE_CONS::eOnlyIntra
+}
+
+pub(crate) fn evc_check_only_inter(tree_cons: &TREE_CONS) -> bool {
+    tree_cons.mode_cons == MODE_CONS::eOnlyInter
+}
+
+pub(crate) fn evc_check_all_preds(tree_cons: &TREE_CONS) -> bool {
+    tree_cons.mode_cons == MODE_CONS::eAll
+}
