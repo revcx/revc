@@ -73,7 +73,10 @@ pub(crate) const MAX_BEF_DATA_NUM: usize = (NUM_NEIB << 1);
 /* maximum CB count in a LCB */
 pub(crate) const MAX_CU_CNT_IN_LCU: usize = (MAX_CU_DIM / MIN_CU_DIM);
 /* pixel position to SCB position */
-//pub(crate) const PEL2SCU(pel)      :usize=                 ((pel) >> MIN_CU_LOG2);
+#[inline]
+pub(crate) fn PEL2SCU(p: usize) -> usize {
+    p >> MIN_CU_LOG2
+}
 
 pub(crate) const PIC_PAD_SIZE_L: usize = (MAX_CU_SIZE + 16);
 pub(crate) const PIC_PAD_SIZE_C: usize = (PIC_PAD_SIZE_L >> 1);
@@ -129,6 +132,98 @@ pub(crate) const AVAIL_UP_RI_RI: usize = (1 << AVAIL_BIT_UP_RI_RI);
 /* MB availability into bit flag */
 //pub(crate) const GET_AVAIL_FLAG(avail, bit)      (((avail)>>(bit)) & 0x1)
 
+/*****************************************************************************
+* macros for CU map
+
+- [ 0: 6] : slice number (0 ~ 128)
+- [ 7:14] : reserved
+- [15:15] : 1 -> intra CU, 0 -> inter CU
+- [16:22] : QP
+- [23:23] : skip mode flag
+- [24:24] : luma cbf
+- [25:25] : dmvr_flag
+- [26:26] : IBC mode flag
+- [27:30] : reserved
+- [31:31] : 0 -> no encoded/decoded CU, 1 -> encoded/decoded CU
+*****************************************************************************/
+#[derive(Default, Clone, Copy)]
+pub(crate) struct MCU(u32);
+
+impl MCU {
+    /*
+    /* set slice number to map */
+    # define MCU_SET_SN(m, sn)       (m) = (((m) & 0xFFFFFF80) | ((sn) & 0x7F))
+    /* get slice number from map */
+    # define MCU_GET_SN(m)           (int)((m) & 0x7F)
+
+    /* set intra CU flag to map */
+    # define MCU_SET_IF(m)           (m) = ((m) | (1 < < 15))
+    /* get intra CU flag from map */
+    # define MCU_GET_IF(m)           (int)(((m) > > 15) & 1)
+    /* clear intra CU flag in map */
+    # define MCU_CLR_IF(m)           (m) = ((m) & 0xFFFF7FFF)
+
+    /* set QP to map */
+    # define MCU_SET_QP(m, qp)       (m) = ((m) | ((qp) & 0x7F) < < 16)
+    /* get QP from map */
+    # define MCU_GET_QP(m)           (int)(((m) > > 16) & 0x7F)
+    # if DQP
+    # define MCU_RESET_QP(m)         (m) = ((m) & (~((127) < < 16)))
+    # endif
+
+    /* set skip mode flag */
+    # define MCU_SET_SF(m)           (m) = ((m) | (1 < < 23))
+    /* get skip mode flag */
+    # define MCU_GET_SF(m)           (int)(((m) > > 23) & 1)
+    /* clear skip mode flag */
+    # define MCU_CLR_SF(m)           (m) = ((m) & (~(1 < < 23)))
+
+    /* set luma cbf flag */
+    # define MCU_SET_CBFL(m)         (m) = ((m) | (1 < < 24))
+    /* get luma cbf flag */
+    # define MCU_GET_CBFL(m)         (int)(((m) > > 24) & 1)
+    /* clear luma cbf flag */
+    # define MCU_CLR_CBFL(m)         (m) = ((m) & (~(1 < < 24)))
+
+    # if DMVR_FLAG
+    /* set dmvr flag */
+    # define MCU_SET_DMVRF(m)         (m) = ((m) | (1 < < 25))
+    /* get dmvr flag */
+    # define MCU_GET_DMVRF(m)         (int)(((m) > > 25) & 1)
+    /* clear dmvr flag */
+    # define MCU_CLR_DMVRF(m)         (m) = ((m) & (~(1 < < 25)))
+    # endif
+    /* set ibc mode flag */
+    # define MCU_SET_IBC(m)          (m) = ((m) | (1 < < 26))
+    /* get ibc mode flag */
+    # define MCU_GET_IBC(m)          (int)(((m) > > 26) & 1)
+    /* clear ibc mode flag */
+    # define MCU_CLR_IBC(m)          (m) = ((m) & (~(1 < < 26)))
+     */
+    /* set encoded/decoded CU to map */
+    #[inline]
+    pub(crate) fn SET_COD(&mut self) {
+        self.0 = self.0 | (1 << 31);
+    }
+    /* get encoded/decoded CU flag from map */
+    #[inline]
+    pub(crate) fn GET_COD(&self) -> u32 {
+        (self.0 >> 31) & 1
+    }
+    /* clear encoded/decoded CU flag to map */
+    #[inline]
+    pub(crate) fn CLR_COD(&mut self) {
+        self.0 = self.0 & 0x7FFFFFFF;
+    }
+
+    /*
+    /* multi bit setting: intra flag, encoded/decoded flag, slice number */
+    # define MCU_SET_IF_COD_SN_QP(m, i, sn, qp) \
+    (m) = (((m) & 0xFF807F80) | ((sn) & 0x7F) | ((qp) < < 16) | ((i)< < 15) | (1 < < 31))
+
+    # define MCU_IS_COD_NIF(m)      ((((m)> > 15) & 0x10001) == 0x10000)
+     */
+}
 /*****************************************************************************
  * NALU header
  *****************************************************************************/
@@ -538,6 +633,12 @@ pub(crate) enum TREE_TYPE {
     TREE_C = 2,
 }
 
+impl Default for TREE_TYPE {
+    fn default() -> Self {
+        TREE_TYPE::TREE_LC
+    }
+}
+
 #[derive(Clone, Copy, PartialEq)]
 pub(crate) enum MODE_CONS {
     eOnlyIntra,
@@ -545,14 +646,20 @@ pub(crate) enum MODE_CONS {
     eAll,
 }
 
-#[derive(Clone, Copy)]
+impl Default for MODE_CONS {
+    fn default() -> Self {
+        MODE_CONS::eOnlyIntra
+    }
+}
+
+#[derive(Clone, Copy, Default)]
 pub(crate) struct TREE_CONS {
     pub(crate) changed: bool,
     pub(crate) tree_type: TREE_TYPE,
     pub(crate) mode_cons: MODE_CONS,
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Default)]
 pub(crate) struct TREE_CONS_NEW {
     pub(crate) tree_type: TREE_TYPE,
     pub(crate) mode_cons: MODE_CONS,

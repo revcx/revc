@@ -131,3 +131,28 @@ pub(crate) fn evc_split_get_part_structure(
 
     split_struct
 }
+
+pub(crate) fn evc_check_nev_avail(
+    x_scu: u16,
+    y_scu: u16,
+    cuw: u16,
+    //cuh: u16,
+    w_scu: u16,
+    //h_scu: u16,
+    map_scu: &[MCU],
+) -> u16 {
+    let scup = y_scu * w_scu + x_scu;
+    let scuw = cuw >> MIN_CU_LOG2 as u16;
+    let mut avail_lr = 0;
+    //let curr_scup = x_scu + y_scu * w_scu;
+
+    if x_scu > 0 && map_scu[scup as usize - 1].GET_COD() != 0 {
+        avail_lr += 1;
+    }
+
+    if x_scu + scuw < w_scu && map_scu[(scup + scuw) as usize].GET_COD() != 0 {
+        avail_lr += 2;
+    }
+
+    return avail_lr;
+}

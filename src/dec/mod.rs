@@ -115,6 +115,7 @@ pub(crate) struct EvcdCore {
     int            inter_dir;
     int            bi_idx;
     u8             ctx_flags[NUM_CNID];*/
+    tree_cons: TREE_CONS,
 }
 /******************************************************************************
  * CONTEXT used for decoding process.
@@ -163,7 +164,7 @@ pub(crate) struct EvcdCtx {
     log2_min_cuwh: u8,
     /* MAPS *******************************************************************/
     /* SCU map for CU information */
-    map_scu: Vec<u32>,
+    map_scu: Vec<MCU>,
     /* LCU split information */
     map_split: Vec<LcuSplitModeArray>,
     /* decoded motion vector for every blocks */
@@ -225,25 +226,11 @@ pub(crate) struct EvcdCtx {
 const nalu_size_field_in_bytes: usize = 4;
 
 impl EvcdCtx {
-    fn sequence_deinit(&mut self) {
-        /*evc_mfree(self.map_scu);
-        evc_mfree(self.map_split);
-        evc_mfree(self.map_ipm);
-        evc_mfree(self.map_suco);
-        evc_mfree(self.map_affine);
-        evc_mfree(self.map_cu_mode);
-        evc_mfree(self.map_ats_inter);
-        evc_mfree_fast(self.map_tidx);
-        evc_picman_deinit(&self.dpm);*/
-    }
-
     fn sequence_init(&mut self) {
         if self.sps.pic_width_in_luma_samples != self.w
             || self.sps.pic_height_in_luma_samples != self.h
         {
             /* resolution was changed */
-            self.sequence_deinit();
-
             self.w = self.sps.pic_width_in_luma_samples;
             self.h = self.sps.pic_height_in_luma_samples;
 
@@ -265,7 +252,7 @@ impl EvcdCtx {
         self.f_scu = (self.w_scu * self.h_scu) as u32;
 
         /* alloc SCU map */
-        self.map_scu = vec![0; self.f_scu as usize];
+        self.map_scu = vec![MCU::default(); self.f_scu as usize];
 
         /* alloc cu mode SCU map */
         self.map_cu_mode = vec![0; self.f_scu as usize];
@@ -287,10 +274,10 @@ impl EvcdCtx {
             + (6 * (BIT_DEPTH - 8)) as isize) as u8;
 
         /* clear maps */
-        /*evc_mset_x64a(ctx->map_scu, 0, sizeof(u32) * ctx->f_scu);
-        evc_mset_x64a(ctx->map_affine, 0, sizeof(u32) * ctx->f_scu);
-        evc_mset_x64a(ctx->map_ats_inter, 0, sizeof(u8) * ctx->f_scu);
-        evc_mset_x64a(ctx->map_cu_mode, 0, sizeof(u32) * ctx->f_scu);*/
+        /*evc_mset_x64a(self.map_scu, 0, sizeof(u32) * self.f_scu);
+        evc_mset_x64a(self.map_affine, 0, sizeof(u32) * self.f_scu);
+        evc_mset_x64a(self.map_ats_inter, 0, sizeof(u8) * self.f_scu);
+        evc_mset_x64a(self.map_cu_mode, 0, sizeof(u32) * self.f_scu);*/
 
         if self.sh.slice_type == SliceType::EVC_ST_I {
             self.last_intra_poc = self.poc.poc_val;
@@ -313,6 +300,60 @@ impl EvcdCtx {
         log2_cuh: u8,
         tree_cons: TREE_CONS_NEW,
     ) -> Result<(), EvcError> {
+        let core = &mut self.core;
+        let bs = &mut self.bs;
+        let sbac = &mut self.sbac_dec;
+
+        core.tree_cons = TREE_CONS {
+            changed: false,
+            tree_type: tree_cons.tree_type,
+            mode_cons: tree_cons.mode_cons,
+        };
+
+        core.log2_cuw = log2_cuw;
+        core.log2_cuh = log2_cuh;
+        core.x_scu = PEL2SCU(x as usize) as u16;
+        core.y_scu = PEL2SCU(y as usize) as u16;
+        core.scup = core.x_scu as u32 + core.y_scu as u32 * self.w_scu as u32;
+
+        let cuw = 1 << log2_cuw as u16;
+        let cuh = 1 << log2_cuh as u16;
+
+        EVC_TRACE_COUNTER(&mut bs.tracer);
+        EVC_TRACE(&mut bs.tracer, "poc: ");
+        EVC_TRACE(&mut bs.tracer, self.poc.poc_val);
+        EVC_TRACE(&mut bs.tracer, " x pos ");
+        EVC_TRACE(&mut bs.tracer, x);
+        EVC_TRACE(&mut bs.tracer, " y pos ");
+        EVC_TRACE(&mut bs.tracer, y);
+        EVC_TRACE(&mut bs.tracer, " width ");
+        EVC_TRACE(&mut bs.tracer, cuw);
+        EVC_TRACE(&mut bs.tracer, " height ");
+        EVC_TRACE(&mut bs.tracer, cuh);
+
+        if self.sh.slice_type != SliceType::EVC_ST_I && self.sps.sps_btt_flag {
+            EVC_TRACE(&mut bs.tracer, " tree status ");
+            EVC_TRACE(&mut bs.tracer, core.tree_cons.tree_type as u8);
+            EVC_TRACE(&mut bs.tracer, " mode status ");
+            EVC_TRACE(&mut bs.tracer, core.tree_cons.mode_cons as u8);
+        }
+        EVC_TRACE(&mut bs.tracer, " \n");
+
+        core.avail_lr = evc_check_nev_avail(
+            core.x_scu,
+            core.y_scu,
+            cuw,
+            //cuh,
+            self.w_scu,
+            //self.h_scu,
+            &self.map_scu,
+        );
+
+        // evc_get_ctx_some_flags
+
+        /* parse CU info */
+        //self.evcd_eco_cu()?;
+
         Ok(())
     }
 
@@ -329,6 +370,7 @@ impl EvcdCtx {
         mut cu_qp_delta_code: u8,
         mut mode_cons: MODE_CONS,
     ) -> Result<(), EvcError> {
+        let core = &mut self.core;
         let bs = &mut self.bs;
         let sbac = &mut self.sbac_dec;
 
@@ -343,13 +385,13 @@ impl EvcdCtx {
                     EVC_TRACE(&mut bs.tracer, "x pos ");
                     EVC_TRACE(
                         &mut bs.tracer,
-                        self.core.x_pel
+                        core.x_pel
                             + (cup % (self.max_cuwh >> MIN_CU_LOG2 as u16) << MIN_CU_LOG2 as u16),
                     );
                     EVC_TRACE(&mut bs.tracer, " y pos ");
                     EVC_TRACE(
                         &mut bs.tracer,
-                        self.core.y_pel
+                        core.y_pel
                             + (cup / (self.max_cuwh >> MIN_CU_LOG2 as u16) << MIN_CU_LOG2 as u16),
                     );
                     EVC_TRACE(&mut bs.tracer, " width ");
@@ -370,13 +412,13 @@ impl EvcdCtx {
                 EVC_TRACE(&mut bs.tracer, "x pos ");
                 EVC_TRACE(
                     &mut bs.tracer,
-                    self.core.x_pel
+                    core.x_pel
                         + (cup % (self.max_cuwh >> MIN_CU_LOG2 as u16) << MIN_CU_LOG2 as u16),
                 );
                 EVC_TRACE(&mut bs.tracer, " y pos ");
                 EVC_TRACE(
                     &mut bs.tracer,
-                    self.core.y_pel
+                    core.y_pel
                         + (cup / (self.max_cuwh >> MIN_CU_LOG2 as u16) << MIN_CU_LOG2 as u16),
                 );
                 EVC_TRACE(&mut bs.tracer, " width ");
@@ -403,12 +445,12 @@ impl EvcdCtx {
                 } else {
                     cu_qp_delta_code = 1;
                 }
-                self.core.cu_qp_delta_is_coded = false;
+                core.cu_qp_delta_is_coded = false;
             }
         }
 
         evc_set_split_mode(
-            &mut self.core.split_mode,
+            &mut core.split_mode,
             split_mode,
             cud,
             cup,
@@ -451,7 +493,7 @@ impl EvcdCtx {
                 }
             }
         } else {
-            self.core.cu_qp_delta_code = cu_qp_delta_code;
+            core.cu_qp_delta_code = cu_qp_delta_code;
 
             let tree_type = if mode_cons == MODE_CONS::eOnlyIntra {
                 TREE_TYPE::TREE_L
@@ -596,7 +638,7 @@ impl EvcdCtx {
 
             if !self.sps.tool_rpl {
                 /* initialize reference pictures */
-                //evc_picman_refp_init(&ctx->dpm, ctx->sps.max_num_ref_pics, sh->slice_type, ctx->poc.poc_val, ctx->nalu.nuh_temporal_id, ctx->last_intra_poc, ctx->refp);
+                //evc_picman_refp_init(&self.dpm, self.sps.max_num_ref_pics, sh->slice_type, self.poc.poc_val, self.nalu.nuh_temporal_id, self.last_intra_poc, self.refp);
             }
 
             if self.num_ctb == self.f_lcu {
@@ -604,8 +646,8 @@ impl EvcdCtx {
                 //self.pic = evc_picman_get_empty_pic(&self.dpm)?;
 
                 /* get available frame buffer for decoded image */
-                //ctx->map_refi = ctx->pic->map_refi;
-                //ctx->map_mv = ctx->pic->map_mv;
+                //self.map_refi = self.pic->map_refi;
+                //self.map_mv = self.pic->map_mv;
             }
 
             /* decode slice layer */
