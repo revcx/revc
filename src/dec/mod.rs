@@ -332,27 +332,29 @@ impl EvcdCtx {
                 }
             }
 
-            /*
-            self.evcd_eco_tree(
+            evcd_eco_tree(
+                &mut self.bs,
+                &mut self.sbac_dec,
+                self.min_cuwh,
+                self.max_cuwh,
+                self.w,
+                self.h,
                 self.core.x_pel,
-                self.corey_pel,
+                self.core.y_pel,
                 self.log2_max_cuwh,
                 self.log2_max_cuwh,
                 0,
                 0,
-                bs,
-                sbac,
-                1,
-                0,
-                SplitMode::NO_SPLIT,
-                same_layer_split,
-                0,
-                split_allow,
-                0,
-                0,
-                0,
-                ModeCons::eAll,
-            )?; */
+                true, /*0,
+                      SplitMode::NO_SPLIT,
+                      same_layer_split,
+                      0,
+                      split_allow,
+                      0,
+                      0,
+                      0,
+                      ModeCons::eAll,*/
+            )?;
             // set split flags to map
             self.map_split[self.core.lcu_num as usize].clone_from(&self.core.split_mode);
 

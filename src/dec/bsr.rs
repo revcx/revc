@@ -24,7 +24,7 @@ fn OPEN_TRACE() -> Option<Tracer> {
 #[cfg(feature = "trace")]
 pub(crate) fn EVC_TRACE_COUNTER(tracer: &mut Option<Tracer>) {
     if let Some((writer, counter)) = tracer {
-        writer.write_fmt(format_args!("{}\t", *counter));
+        writer.write_fmt(format_args!("{} \t", *counter));
         *counter += 1;
     }
 }

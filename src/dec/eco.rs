@@ -264,70 +264,72 @@ pub(crate) fn evcd_eco_split_mode(
 }
 
 pub(crate) fn evcd_eco_tree(
-    ctx: &mut EvcdCtx,
-    core: &mut EvcdCore,
-    x0: u16,
-    y0: u16,
-    log2_cuw: u16,
-    log2_cuh: u16,
-    cup: u16,
-    cud: u16,
     bs: &mut EvcdBsr,
     sbac: &mut EvcdSbac,
+    ctx_min_cuwh: u16,
+    ctx_max_cuwh: u16,
+    ctx_w: u16,
+    ctx_h: u16,
+    core_x_pel: u16,
+    core_y_pel: u16,
+    log2_cuw: u8,
+    log2_cuh: u8,
+    cup: u16,
+    cud: u16,
     next_split: bool,
 ) -> Result<(), EvcError> {
-    let cuw = 1 << log2_cuw;
-    let cuh = 1 << log2_cuh;
+    let cuw = 1 << log2_cuw as u16;
+    let cuh = 1 << log2_cuh as u16;
     let mut split_mode = SplitMode::NO_SPLIT;
-    if cuw > ctx.min_cuwh || cuh > ctx.min_cuwh {
-        if x0 + cuw <= ctx.w && y0 + cuh <= ctx.h {
+    if cuw > ctx_min_cuwh || cuh > ctx_min_cuwh {
+        if core_x_pel + cuw <= ctx_w && core_y_pel + cuh <= ctx_h {
             if next_split {
                 split_mode = evcd_eco_split_mode(bs, sbac, cuw, cuh)?;
                 EVC_TRACE_COUNTER(&mut bs.tracer);
                 EVC_TRACE(&mut bs.tracer, "x pos ");
                 EVC_TRACE(
                     &mut bs.tracer,
-                    core.x_pel + (cup % (ctx.max_cuwh >> MIN_CU_LOG2 as u16) << MIN_CU_LOG2 as u16),
+                    core_x_pel + (cup % (ctx_max_cuwh >> MIN_CU_LOG2 as u16) << MIN_CU_LOG2 as u16),
                 );
-                EVC_TRACE(&mut bs.tracer, "y pos ");
+                EVC_TRACE(&mut bs.tracer, " y pos ");
                 EVC_TRACE(
                     &mut bs.tracer,
-                    core.y_pel + (cup / (ctx.max_cuwh >> MIN_CU_LOG2 as u16) << MIN_CU_LOG2 as u16),
+                    core_y_pel + (cup / (ctx_max_cuwh >> MIN_CU_LOG2 as u16) << MIN_CU_LOG2 as u16),
                 );
-                EVC_TRACE(&mut bs.tracer, "width ");
+                EVC_TRACE(&mut bs.tracer, " width ");
                 EVC_TRACE(&mut bs.tracer, cuw);
-                EVC_TRACE(&mut bs.tracer, "height ");
+                EVC_TRACE(&mut bs.tracer, " height ");
                 EVC_TRACE(&mut bs.tracer, cuh);
-                EVC_TRACE(&mut bs.tracer, "depth ");
+                EVC_TRACE(&mut bs.tracer, " depth ");
                 EVC_TRACE(&mut bs.tracer, cud);
-                EVC_TRACE(&mut bs.tracer, "split mode ");
+                EVC_TRACE(&mut bs.tracer, " split mode ");
                 EVC_TRACE(&mut bs.tracer, split_mode as u8);
-                EVC_TRACE(&mut bs.tracer, "\n");
+                EVC_TRACE(&mut bs.tracer, " \n");
             } else {
                 split_mode = SplitMode::NO_SPLIT;
             }
         } else {
             split_mode = evcd_eco_split_mode(bs, sbac, cuw, cuh)?;
-            EVC_TRACE_COUNTER;
+            EVC_TRACE_COUNTER(&mut bs.tracer);
             EVC_TRACE(&mut bs.tracer, "x pos ");
             EVC_TRACE(
                 &mut bs.tracer,
-                core.x_pel + (cup % (ctx.max_cuwh >> MIN_CU_LOG2 as u16) << MIN_CU_LOG2 as u16),
+                core_x_pel + (cup % (ctx_max_cuwh >> MIN_CU_LOG2 as u16) << MIN_CU_LOG2 as u16),
             );
-            EVC_TRACE(&mut bs.tracer, "y pos ");
+            EVC_TRACE(&mut bs.tracer, " y pos ");
             EVC_TRACE(
                 &mut bs.tracer,
-                core.y_pel + (cup / (ctx.max_cuwh >> MIN_CU_LOG2 as u16) << MIN_CU_LOG2 as u16),
+                core_y_pel + (cup / (ctx_max_cuwh >> MIN_CU_LOG2 as u16) << MIN_CU_LOG2 as u16),
             );
-            EVC_TRACE(&mut bs.tracer, "width ");
+            EVC_TRACE(&mut bs.tracer, " width ");
             EVC_TRACE(&mut bs.tracer, cuw);
-            EVC_TRACE(&mut bs.tracer, "height ");
+            EVC_TRACE(&mut bs.tracer, " height ");
             EVC_TRACE(&mut bs.tracer, cuh);
-            EVC_TRACE(&mut bs.tracer, "depth ");
+            EVC_TRACE(&mut bs.tracer, " depth ");
             EVC_TRACE(&mut bs.tracer, cud);
-            EVC_TRACE(&mut bs.tracer, "split mode ");
+            EVC_TRACE(&mut bs.tracer, " split mode ");
             EVC_TRACE(&mut bs.tracer, split_mode as u8);
-            EVC_TRACE(&mut bs.tracer, "\n");
+            EVC_TRACE(&mut bs.tracer, " \n");
         }
     } else {
         split_mode = SplitMode::NO_SPLIT;

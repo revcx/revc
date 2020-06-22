@@ -24,7 +24,7 @@ impl EvcdSbac {
         self.range = 16384;
         self.value = 0;
         for i in 0..14 {
-            let t0 = bs.read1(Some("t0"))?;
+            let t0 = bs.read1(None)?;
             self.value = ((self.value << 1) | t0) & 0xFFFF;
         }
 
@@ -204,11 +204,11 @@ impl EvcdSbac {
         EVC_TRACE_COUNTER(&mut bs.tracer);
         EVC_TRACE(&mut bs.tracer, "model ");
         EVC_TRACE(&mut bs.tracer, *model);
-        EVC_TRACE(&mut bs.tracer, "range ");
+        EVC_TRACE(&mut bs.tracer, " range ");
         EVC_TRACE(&mut bs.tracer, self.range);
-        EVC_TRACE(&mut bs.tracer, "lps ");
+        EVC_TRACE(&mut bs.tracer, " lps ");
         EVC_TRACE(&mut bs.tracer, lps);
-        EVC_TRACE(&mut bs.tracer, "\n");
+        EVC_TRACE(&mut bs.tracer, " \n");
         //#endif
 
         if self.value >= self.range {
@@ -230,8 +230,7 @@ impl EvcdSbac {
 
         while self.range < 8192 {
             self.range <<= 1;
-
-            let t0 = bs.read1(Some("t0"))?;
+            let t0 = bs.read1(None)?;
             self.value = ((self.value << 1) | t0) & 0xFFFF;
         }
 
@@ -249,7 +248,7 @@ impl EvcdSbac {
         };
 
         self.range <<= 1;
-        let t0 = bs.read1(Some("t0"))?;
+        let t0 = bs.read1(None)?;
         self.value = ((self.value << 1) | t0) & 0xFFFF;
 
         Ok(bin)
@@ -259,14 +258,14 @@ impl EvcdSbac {
         self.range -= 1;
         if self.value >= self.range {
             while !bs.is_byte_aligned() {
-                let t0 = bs.read1(Some("t0"))?;
+                let t0 = bs.read1(None)?;
                 evc_assert_rv(t0 == 0, EvcError::EVC_ERR_MALFORMED_BITSTREAM)?;
             }
             Ok(1)
         } else {
             while self.range < 8192 {
                 self.range <<= 1;
-                let t0 = bs.read1(Some("t0"))?;
+                let t0 = bs.read1(None)?;
                 self.value = ((self.value << 1) | t0) & 0xFFFF;
             }
             Ok(0)
