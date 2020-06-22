@@ -329,6 +329,34 @@ impl EvcdCtx {
             if self.sh.slice_type == SliceType::EVC_ST_B {
                 core.mvp_idx[REFP_1] = evcd_eco_mvp_idx(bs, sbac, sbac_ctx)?;
             }
+
+            core.is_coef[Y_C] = false;
+            core.is_coef[U_C] = false;
+            core.is_coef[V_C] = false; //TODO: Tim why we need to duplicate code here?
+            for i in 0..N_C {
+                for j in 0..MAX_SUB_TB_NUM {
+                    core.is_coef_sub[i][j] = false;
+                }
+            }
+
+            core.qp = self.sh.qp;
+            core.qp_y = GET_LUMA_QP(core.qp as i8) as u8;
+            let qp_i_cb = EVC_CLIP3(
+                -6 * (BIT_DEPTH - 8) as i8,
+                57,
+                core.qp as i8 + self.sh.qp_u_offset,
+            );
+            let qp_i_cr = EVC_CLIP3(
+                -6 * (BIT_DEPTH - 8) as i8,
+                57,
+                core.qp as i8 + self.sh.qp_v_offset,
+            );
+
+            //TODO: fix negative array index
+            core.qp_u = (p_evc_tbl_qp_chroma_dynamic[0][qp_i_cb as usize]
+                + (6 * (BIT_DEPTH - 8)) as isize) as u8;
+            core.qp_v = (p_evc_tbl_qp_chroma_dynamic[1][qp_i_cr as usize]
+                + (6 * (BIT_DEPTH - 8)) as isize) as u8;
         } else {
             core.pred_mode =
                 evcd_eco_pred_mode(bs, sbac, sbac_ctx, &core.ctx_flags, &core.tree_cons)?;

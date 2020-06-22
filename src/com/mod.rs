@@ -132,6 +132,14 @@ pub(crate) const AVAIL_UP_RI_RI: usize = (1 << AVAIL_BIT_UP_RI_RI);
 /* MB availability into bit flag */
 //pub(crate) const GET_AVAIL_FLAG(avail, bit)      (((avail)>>(bit)) & 0x1)
 
+#[inline]
+pub(crate) fn GET_QP(qp: i8, dqp: i8) -> i8 {
+    ((qp + dqp + 52) % 52)
+}
+#[inline]
+pub(crate) fn GET_LUMA_QP(qp: i8) -> i8 {
+    (qp + 6 * (BIT_DEPTH - 8) as i8)
+}
 /*****************************************************************************
  * prediction mode
  *****************************************************************************/
