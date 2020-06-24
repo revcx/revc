@@ -168,3 +168,11 @@ pub(crate) fn evc_check_only_inter(tree_cons: &TREE_CONS) -> bool {
 pub(crate) fn evc_check_all_preds(tree_cons: &TREE_CONS) -> bool {
     tree_cons.mode_cons == MODE_CONS::eAll
 }
+
+pub(crate) fn evc_check_luma(tree_cons: &TREE_CONS) -> bool {
+    tree_cons.tree_type != TREE_TYPE::TREE_C
+}
+
+pub(crate) fn evc_check_chroma(tree_cons: &TREE_CONS) -> bool {
+    tree_cons.tree_type != TREE_TYPE::TREE_L
+}

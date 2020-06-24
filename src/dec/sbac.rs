@@ -271,6 +271,32 @@ impl EvcdSbac {
         }
     }
 
+    pub(crate) fn read_unary_sym(
+        &mut self,
+        bs: &mut EvcdBsr,
+        models: &mut [SBAC_CTX_MODEL],
+        num_ctx: u32,
+    ) -> Result<u32, EvcError> {
+        let mut symbol = self.decode_bin(bs, &mut models[0])?;
+
+        if symbol == 0 {
+            return Ok(symbol);
+        }
+
+        symbol = 0;
+        let mut t32u = 1;
+        let mut ctx_idx = 0;
+        while t32u != 0 {
+            if ctx_idx < num_ctx - 1 {
+                ctx_idx += 1;
+            }
+            t32u = self.decode_bin(bs, &mut models[ctx_idx as usize])?;
+            symbol += 1;
+        }
+
+        Ok(symbol)
+    }
+
     pub(crate) fn read_truncate_unary_sym(
         &mut self,
         bs: &mut EvcdBsr,

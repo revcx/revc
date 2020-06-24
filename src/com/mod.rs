@@ -1,4 +1,5 @@
 pub(crate) mod context;
+pub(crate) mod ipred;
 pub(crate) mod plane;
 pub(crate) mod plane_region;
 pub(crate) mod tbl;
@@ -160,6 +161,64 @@ impl Default for PredMode {
     }
 }
 
+/*****************************************************************************
+ * prediction direction
+ *****************************************************************************/
+#[derive(Clone, Copy, PartialEq)]
+pub(crate) enum PredDir {
+    /* inter pred direction, look list0 side */
+    PRED_L0 = 0,
+    /* inter pred direction, look list1 side */
+    PRED_L1 = 1,
+    /* inter pred direction, look both list0, list1 side */
+    PRED_BI = 2,
+    /* inter pred direction, look both list0, list1 side */
+    PRED_SKIP = 3,
+    /* inter pred direction, look both list0, list1 side */
+    PRED_DIR = 4,
+}
+
+impl Default for PredDir {
+    fn default() -> Self {
+        PredDir::PRED_L0
+    }
+}
+
+/*****************************************************************************
+ * intra prediction direction
+ *****************************************************************************/
+#[derive(Clone, Copy, PartialEq)]
+pub(crate) enum IntraPredDir {
+    IPD_DC_B = 0,
+    IPD_HOR_B = 1, /* Luma, Horizontal */
+    IPD_VER_B = 2, /* Luma, Vertical */
+    IPD_UL_B = 3,
+    IPD_UR_B = 4,
+    IPD_CNT_B = 5,
+    IPD_UNKNOWN,
+}
+
+impl Default for IntraPredDir {
+    fn default() -> Self {
+        IntraPredDir::IPD_DC_B
+    }
+}
+
+impl From<u8> for IntraPredDir {
+    fn from(val: u8) -> Self {
+        use self::IntraPredDir::*;
+        match val {
+            0 => IPD_DC_B,
+            1 => IPD_HOR_B,
+            2 => IPD_VER_B,
+            3 => IPD_UL_B,
+            4 => IPD_UR_B,
+            5 => IPD_CNT_B,
+            _ => IPD_UNKNOWN,
+        }
+    }
+}
+
 pub(crate) enum CtxNevIdx {
     CNID_SKIP_FLAG = 0,
     CNID_PRED_MODE = 1,
@@ -191,18 +250,27 @@ pub(crate) struct MCU(u32);
 
 impl MCU {
     /*
-    /* set slice number to map */
-    # define MCU_SET_SN(m, sn)       (m) = (((m) & 0xFFFFFF80) | ((sn) & 0x7F))
-    /* get slice number from map */
-    # define MCU_GET_SN(m)           (int)((m) & 0x7F)
-
+        /* set slice number to map */
+        # define MCU_SET_SN(m, sn)       (m) = (((m) & 0xFFFFFF80) | ((sn) & 0x7F))
+        /* get slice number from map */
+        # define MCU_GET_SN(m)           (int)((m) & 0x7F)
+    */
     /* set intra CU flag to map */
-    # define MCU_SET_IF(m)           (m) = ((m) | (1 < < 15))
+    #[inline]
+    pub(crate) fn SET_IF(&mut self) {
+        self.0 = self.0 | (1 << 15)
+    }
     /* get intra CU flag from map */
-    # define MCU_GET_IF(m)           (int)(((m) > > 15) & 1)
+    #[inline]
+    pub(crate) fn GET_IF(&self) -> u32 {
+        (self.0 >> 15) & 1
+    }
     /* clear intra CU flag in map */
-    # define MCU_CLR_IF(m)           (m) = ((m) & 0xFFFF7FFF)
-
+    #[inline]
+    pub(crate) fn CLR_IF(&mut self) {
+        self.0 = self.0 & 0xFFFF7FFF
+    }
+    /*
     /* set QP to map */
     # define MCU_SET_QP(m, qp)       (m) = ((m) | ((qp) & 0x7F) < < 16)
     /* get QP from map */

@@ -339,3 +339,50 @@ pub(crate) fn evcd_eco_mvp_idx(
 
     Ok(idx)
 }
+
+pub(crate) fn evcd_eco_direct_mode_flag(
+    bs: &mut EvcdBsr,
+    sbac: &mut EvcdSbac,
+    sbac_ctx: &mut EvcSbacCtx,
+) -> Result<PredDir, EvcError> {
+    let inter_dir = if sbac.decode_bin(bs, &mut sbac_ctx.direct_mode_flag[0])? != 0 {
+        PredDir::PRED_DIR
+    } else {
+        PredDir::PRED_L0
+    };
+
+    EVC_TRACE_COUNTER(&mut bs.tracer);
+    EVC_TRACE(&mut bs.tracer, "direct_mode_flag ");
+    EVC_TRACE(&mut bs.tracer, inter_dir as u8);
+    EVC_TRACE(&mut bs.tracer, " \n");
+
+    Ok(inter_dir)
+}
+
+pub(crate) fn evcd_eco_intra_dir_b(
+    bs: &mut EvcdBsr,
+    sbac: &mut EvcdSbac,
+    sbac_ctx: &mut EvcSbacCtx,
+    mpm: &[u8],
+) -> Result<u8, EvcError> {
+    let mut ipm = 0;
+    let t0 = sbac.read_unary_sym(bs, &mut sbac_ctx.intra_dir, 2)?;
+
+    EVC_TRACE_COUNTER(&mut bs.tracer);
+    //#if TRACE_ADDITIONAL_FLAGS
+    //    EVC_TRACE_STR("mpm list: ");
+    //#endif
+    for i in 0..IntraPredDir::IPD_CNT_B as usize {
+        if t0 == mpm[i] as u32 {
+            ipm = i;
+        }
+        //#if TRACE_ADDITIONAL_FLAGS
+        //        EVC_TRACE_INT(mpm[i]);
+        //#endif
+    }
+    EVC_TRACE(&mut bs.tracer, "ipm Y ");
+    EVC_TRACE(&mut bs.tracer, ipm);
+    EVC_TRACE(&mut bs.tracer, " \n");
+
+    Ok(ipm as u8)
+}

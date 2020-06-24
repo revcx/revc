@@ -1,4 +1,5 @@
 use super::api::*;
+use super::com::ipred::*;
 use super::com::tbl::*;
 use super::com::util::*;
 use super::com::*;
@@ -60,12 +61,12 @@ pub(crate) struct EvcdCore {
     /* Left, right availability of current CU */
     avail_lr: u16,
     /* intra prediction direction of current CU */
-    ipm: [u8; 2],
+    ipm: [IntraPredDir; 2],
     /* most probable mode for intra prediction */
-    mpm_b_list: Vec<u8>,
-    mpm: [u8; 2],
-    mpm_ext: [u8; 8],
-    //pims: [u8; IPD_CNT], /* probable intra mode set*/
+    mpm_b_list: &'static [u8],
+    //mpm: [u8; 2],
+    //mpm_ext: [u8; 8],
+    //pims: [IntraPredDir; IntraPredDir::IPD_CNT_B as usize], /* probable intra mode set*/
     /* prediction mode of current CU: INTRA, INTER, ... */
     pred_mode: PredMode,
     DMVRenable: u8,
@@ -112,7 +113,7 @@ pub(crate) struct EvcdCore {
 
     mvp_idx: [u8; REFP_NUM],
     mvd: [[i16; MV_D]; REFP_NUM],
-    inter_dir: i16,
+    inter_dir: PredDir,
     bi_idx: i16,
     ctx_flags: [u8; CtxNevIdx::NUM_CNID as usize],
     tree_cons: TREE_CONS,
@@ -173,9 +174,9 @@ pub(crate) struct EvcdCtx {
     /* decoded motion vector for every blocks */
     s16                  (* map_unrefined_mv)[REFP_NUM][MV_D];
     /* reference frame indices */
-    s8                   (* map_refi)[REFP_NUM];
+    s8                   (* map_refi)[REFP_NUM];*/
     /* intra prediction modes */
-    s8                    * map_ipm;*/
+    map_ipm: Vec<IntraPredDir>,
     /* new coding tool flag*/
     map_cu_mode: Vec<u32>,
     /**************************************************************************/
@@ -300,6 +301,15 @@ impl EvcdCtx {
         let sbac_ctx = &mut self.sbac_ctx;
 
         core.pred_mode = PredMode::MODE_INTRA;
+        core.mvp_idx[REFP_0] = 0;
+        core.mvp_idx[REFP_1] = 0;
+        core.inter_dir = PredDir::PRED_L0;
+        core.bi_idx = 0;
+        for i in 0..REFP_NUM {
+            for j in 0..MV_D {
+                core.mvd[i][j] = 0;
+            }
+        }
 
         let cuw = 1 << core.log2_cuw as u16;
         let cuh = 1 << core.log2_cuh as u16;
@@ -360,6 +370,32 @@ impl EvcdCtx {
         } else {
             core.pred_mode =
                 evcd_eco_pred_mode(bs, sbac, sbac_ctx, &core.ctx_flags, &core.tree_cons)?;
+
+            //TODO: bugfix? missing SLICE_TYPE==B
+            if core.pred_mode == PredMode::MODE_INTER {
+                core.inter_dir = evcd_eco_direct_mode_flag(bs, sbac, sbac_ctx)?;
+            //TODO
+            } else if core.pred_mode == PredMode::MODE_INTRA {
+                core.mpm_b_list = evc_get_mpm_b(
+                    core.x_scu,
+                    core.y_scu,
+                    &self.map_scu,
+                    &self.map_ipm,
+                    core.scup,
+                    self.w_scu,
+                );
+
+                let mut luma_ipm = IntraPredDir::IPD_DC_B;
+                if evc_check_luma(&core.tree_cons) {
+                    core.ipm[0] = evcd_eco_intra_dir_b(bs, sbac, sbac_ctx, core.mpm_b_list)?.into();
+                    luma_ipm = core.ipm[0];
+                } else {
+                    assert!(false);
+                }
+                if evc_check_chroma(&core.tree_cons) {
+                    core.ipm[1] = luma_ipm;
+                }
+            }
         }
 
         Ok(())
