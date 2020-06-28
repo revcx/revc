@@ -95,6 +95,8 @@ pub(crate) const PIC_PAD_SIZE_C: usize = (PIC_PAD_SIZE_L >> 1);
 /* number of MVP candidates */
 pub(crate) const MAX_NUM_MVP: usize = 4;
 
+pub(crate) const COEF_SCAN_ZIGZAG: usize = 0;
+
 /* for GOP 16 test, increase to 32 */
 /* maximum reference picture count. Originally, Max. 16 */
 /* for GOP 16 test, increase to 32 */

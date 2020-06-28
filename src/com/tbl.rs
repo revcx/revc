@@ -1,3 +1,4 @@
+use super::util::*;
 use super::*;
 
 pub(crate) static evey_tbl_mpm: [[[u8; 5]; 6]; 6] = [
@@ -85,13 +86,21 @@ pub(crate) static evc_tbl_qp_chroma_dynamic_ext: [[isize; MAX_QP_TABLE_SIZE_EXT]
     ],
 ];
 
-pub(crate) static p_evc_tbl_qp_chroma_dynamic: [[isize; MAX_QP_TABLE_SIZE]; 2] = [
-    [
-        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    ],
-    [
-        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    ],
-];
+pub(crate) const EVC_TBL_CHROMA_QP_OFFSET: i8 = 6 * (BIT_DEPTH as i8 - 8);
+
+/*
+lazy_static! {
+    pub(crate) static ref evc_scan_tbl: [[Vec<usize>; MAX_CU_LOG2 - 1]; MAX_CU_LOG2 - 1] = {
+        let mut scan_tbl = [[vec![]; MAX_CU_LOG2 - 1]; MAX_CU_LOG2 - 1];
+        for y in 0..MAX_CU_LOG2 - 1 {
+            let size_y = 1 << (y + 1);
+            for x in 0..MAX_CU_LOG2 - 1 {
+                let size_x = 1 << (x + 1);
+                scan_tbl[x][y] = vec![0; size_y * size_x];
+                init_scan(&mut scan_tbl[x][y][..], size_x as isize, size_y as isize);
+            }
+        }
+        scan_tbl
+    };
+}
+*/

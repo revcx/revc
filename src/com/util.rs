@@ -157,22 +157,78 @@ pub(crate) fn evc_check_nev_avail(
     return avail_lr;
 }
 
+#[inline]
 pub(crate) fn evc_check_only_intra(tree_cons: &TREE_CONS) -> bool {
     tree_cons.mode_cons == MODE_CONS::eOnlyIntra
 }
 
+#[inline]
 pub(crate) fn evc_check_only_inter(tree_cons: &TREE_CONS) -> bool {
     tree_cons.mode_cons == MODE_CONS::eOnlyInter
 }
 
+#[inline]
 pub(crate) fn evc_check_all_preds(tree_cons: &TREE_CONS) -> bool {
     tree_cons.mode_cons == MODE_CONS::eAll
 }
 
+#[inline]
 pub(crate) fn evc_check_luma(tree_cons: &TREE_CONS) -> bool {
     tree_cons.tree_type != TREE_TYPE::TREE_C
 }
 
+#[inline]
 pub(crate) fn evc_check_chroma(tree_cons: &TREE_CONS) -> bool {
     tree_cons.tree_type != TREE_TYPE::TREE_L
+}
+
+pub(crate) fn evc_block_copy(
+    src: &[i16],
+    src_stride: usize,
+    dst: &mut [i16],
+    dst_stride: usize,
+    log2_copy_w: u8,
+    log2_copy_h: u8,
+) {
+    for h in 0..(1 << log2_copy_h as usize) {
+        for w in 0..(1 << log2_copy_w as usize) {
+            dst[h * dst_stride + w] = src[h * src_stride + w];
+        }
+    }
+}
+
+pub(crate) fn init_scan(scan: &mut [usize], size_x: isize, size_y: isize) {
+    let mut pos = 0;
+    let num_line = size_x + size_y - 1;
+
+    /* starting point */
+    scan[pos] = 0;
+    pos += 1;
+
+    /* loop */
+    for l in 1..num_line {
+        if l % 2 != 0 {
+            /* decreasing loop */
+            let mut x = std::cmp::min(l, size_x - 1);
+            let mut y = std::cmp::max(0, l - (size_x - 1));
+
+            while x >= 0 && y < size_y {
+                scan[pos] = (y * size_x + x) as usize;
+                pos += 1;
+                x -= 1;
+                y += 1;
+            }
+        } else
+        /* increasing loop */
+        {
+            let mut y = std::cmp::min(l, size_y - 1);
+            let mut x = std::cmp::max(0, l - (size_y - 1));
+            while y >= 0 && x < size_x {
+                scan[pos] = (y * size_x + x) as usize;
+                pos += 1;
+                x += 1;
+                y -= 1;
+            }
+        }
+    }
 }

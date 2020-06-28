@@ -311,7 +311,6 @@ impl<T: Pixel> Context<T> {
         evcd_ctx.magic = EVCD_MAGIC_CODE;
 
         //TODO:
-        //evc_scan_tbl_init
         //evc_init_multi_tbl();
         //evc_init_multi_inv_tbl();
 

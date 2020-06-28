@@ -3,6 +3,7 @@ use super::sbac::EvcdSbac;
 use super::{EvcdCore, EvcdCtx};
 
 use crate::api::{EvcError, NaluType, SliceType};
+use crate::com::tbl::*;
 use crate::com::util::*;
 use crate::com::*;
 
@@ -392,7 +393,7 @@ pub(crate) fn eco_cbf(
     sbac: &mut EvcdSbac,
     sbac_ctx: &mut EvcSbacCtx,
     pred_mode: PredMode,
-    cbf: &mut [u8],
+    cbf: &mut [bool],
     b_no_cbf: bool,
     is_sub: bool,
     sub_pos: u8,
@@ -404,9 +405,9 @@ pub(crate) fn eco_cbf(
         if b_no_cbf == false && sub_pos == 0 {
             if sbac.decode_bin(bs, &mut sbac_ctx.cbf_all[0])? == 0 {
                 *cbf_all = false;
-                cbf[Y_C] = 0;
-                cbf[U_C] = 0;
-                cbf[V_C] = 0;
+                cbf[Y_C] = false;
+                cbf[U_C] = false;
+                cbf[V_C] = false;
 
                 EVC_TRACE_COUNTER(&mut bs.tracer);
                 EVC_TRACE(&mut bs.tracer, "all_cbf ");
@@ -422,22 +423,22 @@ pub(crate) fn eco_cbf(
             }
         }
 
-        cbf[U_C] = sbac.decode_bin(bs, &mut sbac_ctx.cbf_cb[0])? as u8;
+        cbf[U_C] = sbac.decode_bin(bs, &mut sbac_ctx.cbf_cb[0])? != 0;
         EVC_TRACE_COUNTER(&mut bs.tracer);
         EVC_TRACE(&mut bs.tracer, "cbf U ");
         EVC_TRACE(&mut bs.tracer, cbf[U_C]);
         EVC_TRACE(&mut bs.tracer, " \n");
 
-        cbf[V_C] = sbac.decode_bin(bs, &mut sbac_ctx.cbf_cr[0])? as u8;
+        cbf[V_C] = sbac.decode_bin(bs, &mut sbac_ctx.cbf_cr[0])? != 0;
         EVC_TRACE_COUNTER(&mut bs.tracer);
         EVC_TRACE(&mut bs.tracer, "cbf V ");
         EVC_TRACE(&mut bs.tracer, cbf[V_C]);
         EVC_TRACE(&mut bs.tracer, " \n");
 
-        if cbf[U_C] + cbf[V_C] == 0 && !is_sub {
-            cbf[Y_C] = 1;
+        if cbf[U_C] == false && cbf[V_C] == false && !is_sub {
+            cbf[Y_C] = true;
         } else {
-            cbf[Y_C] = sbac.decode_bin(bs, &mut sbac_ctx.cbf_luma[0])? as u8;
+            cbf[Y_C] = sbac.decode_bin(bs, &mut sbac_ctx.cbf_luma[0])? != 0;
             EVC_TRACE_COUNTER(&mut bs.tracer);
             EVC_TRACE(&mut bs.tracer, "cbf Y ");
             EVC_TRACE(&mut bs.tracer, cbf[Y_C]);
@@ -445,31 +446,143 @@ pub(crate) fn eco_cbf(
         }
     } else {
         if evc_check_chroma(tree_cons) {
-            cbf[U_C] = sbac.decode_bin(bs, &mut sbac_ctx.cbf_cb[0])? as u8;
+            cbf[U_C] = sbac.decode_bin(bs, &mut sbac_ctx.cbf_cb[0])? != 0;
             EVC_TRACE_COUNTER(&mut bs.tracer);
             EVC_TRACE(&mut bs.tracer, "cbf U ");
             EVC_TRACE(&mut bs.tracer, cbf[U_C]);
             EVC_TRACE(&mut bs.tracer, " \n");
 
-            cbf[V_C] = sbac.decode_bin(bs, &mut sbac_ctx.cbf_cr[0])? as u8;
+            cbf[V_C] = sbac.decode_bin(bs, &mut sbac_ctx.cbf_cr[0])? != 0;
             EVC_TRACE_COUNTER(&mut bs.tracer);
             EVC_TRACE(&mut bs.tracer, "cbf V ");
             EVC_TRACE(&mut bs.tracer, cbf[V_C]);
             EVC_TRACE(&mut bs.tracer, " \n");
         } else {
-            cbf[U_C] = 0;
-            cbf[V_C] = 0;
+            cbf[U_C] = false;
+            cbf[V_C] = false;
         }
         if evc_check_luma(tree_cons) {
-            cbf[Y_C] = sbac.decode_bin(bs, &mut sbac_ctx.cbf_luma[0])? as u8;
+            cbf[Y_C] = sbac.decode_bin(bs, &mut sbac_ctx.cbf_luma[0])? != 0;
             EVC_TRACE_COUNTER(&mut bs.tracer);
             EVC_TRACE(&mut bs.tracer, "cbf Y ");
             EVC_TRACE(&mut bs.tracer, cbf[Y_C]);
             EVC_TRACE(&mut bs.tracer, " \n");
         } else {
-            cbf[Y_C] = 0;
+            cbf[Y_C] = false;
         }
     }
+
+    Ok(())
+}
+
+pub(crate) fn evcd_eco_dqp(
+    bs: &mut EvcdBsr,
+    sbac: &mut EvcdSbac,
+    sbac_ctx: &mut EvcSbacCtx,
+) -> Result<i8, EvcError> {
+    let mut dqp = sbac.read_unary_sym(bs, &mut sbac_ctx.delta_qp, NUM_CTX_DELTA_QP as u32)? as i8;
+
+    if dqp > 0 {
+        let sign = sbac.decode_bin_ep(bs)?;
+        dqp = if sign != 0 { -dqp } else { dqp };
+    }
+
+    EVC_TRACE_COUNTER(&mut bs.tracer);
+    EVC_TRACE(&mut bs.tracer, "dqp ");
+    EVC_TRACE(&mut bs.tracer, dqp);
+    EVC_TRACE(&mut bs.tracer, " \n");
+
+    Ok(dqp)
+}
+
+pub(crate) fn evcd_eco_xcoef(
+    bs: &mut EvcdBsr,
+    sbac: &mut EvcdSbac,
+    sbac_ctx: &mut EvcSbacCtx,
+    coef: &mut [i16],
+    log2_w: u8,
+    log2_h: u8,
+    ch_type: usize,
+) -> Result<(), EvcError> {
+    evcd_eco_run_length_cc(bs, sbac, sbac_ctx, coef, log2_w, log2_h, ch_type)?;
+
+    //#if TRACE_COEFFS
+    let cuw = 1 << log2_w;
+    let cuh = 1 << log2_h;
+    EVC_TRACE_COUNTER(&mut bs.tracer);
+    EVC_TRACE(&mut bs.tracer, "Coeff for ");
+    EVC_TRACE(&mut bs.tracer, ch_type);
+    EVC_TRACE(&mut bs.tracer, " : ");
+    for i in 0..cuw * cuh {
+        if i != 0 {
+            EVC_TRACE(&mut bs.tracer, ", ");
+        }
+        EVC_TRACE(&mut bs.tracer, coef[i]);
+    }
+    EVC_TRACE(&mut bs.tracer, " \n");
+    //#endif
+
+    Ok(())
+}
+
+pub(crate) fn evcd_eco_run_length_cc(
+    bs: &mut EvcdBsr,
+    sbac: &mut EvcdSbac,
+    sbac_ctx: &mut EvcSbacCtx,
+    coef: &mut [i16],
+    log2_w: u8,
+    log2_h: u8,
+    ch_type: usize,
+) -> Result<(), EvcError> {
+    let scanp: Vec<usize> = vec![]; // &evc_scan_tbl[log2_w as usize - 1][log2_h as usize - 1][..];
+    let num_coeff = 1 << (log2_w + log2_h) as u32;
+    let mut scan_pos_offset = 0;
+    let mut prev_level = 6;
+    let mut coef_cnt = 0;
+
+    let mut last_flag = false;
+    while !last_flag {
+        let t0 = if ch_type == Y_C { 0 } else { 2 };
+
+        /* Run parsing */
+        let run = sbac.read_unary_sym(bs, &mut sbac_ctx.run[t0..], 2)?;
+        for i in scan_pos_offset..scan_pos_offset + run {
+            coef[scanp[i as usize]] = 0;
+        }
+        scan_pos_offset += run;
+
+        /* Level parsing */
+        let level = sbac.read_unary_sym(bs, &mut sbac_ctx.level[t0..], 2)? + 1;
+        prev_level = level;
+
+        /* Sign parsing */
+        let sign = sbac.decode_bin_ep(bs)?;
+        coef[scanp[scan_pos_offset as usize]] = if sign != 0 {
+            -(level as i16)
+        } else {
+            level as i16
+        };
+
+        coef_cnt += 1;
+
+        if scan_pos_offset >= num_coeff - 1 {
+            break;
+        }
+        scan_pos_offset += 1;
+
+        /* Last flag parsing */
+        let ctx_last = if ch_type == Y_C { 0 } else { 1 };
+        last_flag = sbac.decode_bin(bs, &mut sbac_ctx.last[ctx_last])? != 0;
+    }
+
+    //#if ENC_DEC_TRACE
+    EVC_TRACE(&mut bs.tracer, "coef luma ");
+    for scan_pos_offset in 0..num_coeff as usize {
+        EVC_TRACE(&mut bs.tracer, coef[scan_pos_offset]);
+        EVC_TRACE(&mut bs.tracer, " ");
+    }
+    EVC_TRACE(&mut bs.tracer, "\n");
+    //#endif
 
     Ok(())
 }

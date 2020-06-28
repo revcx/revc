@@ -284,9 +284,11 @@ impl EvcdCtx {
         self.core.x_pel = 0;
         self.core.y_pel = 0;
         self.core.qp_y = self.sh.qp + (6 * (BIT_DEPTH - 8)) as u8;
-        self.core.qp_u = (p_evc_tbl_qp_chroma_dynamic[0][self.sh.qp_u as usize]
+        self.core.qp_u = (evc_tbl_qp_chroma_dynamic_ext[0]
+            [(EVC_TBL_CHROMA_QP_OFFSET + self.sh.qp_u as i8) as usize]
             + (6 * (BIT_DEPTH - 8)) as isize) as u8;
-        self.core.qp_v = (p_evc_tbl_qp_chroma_dynamic[1][self.sh.qp_v as usize]
+        self.core.qp_v = (evc_tbl_qp_chroma_dynamic_ext[1]
+            [(EVC_TBL_CHROMA_QP_OFFSET + self.sh.qp_v as i8) as usize]
             + (6 * (BIT_DEPTH - 8)) as isize) as u8;
 
         /* clear maps */
@@ -314,14 +316,13 @@ impl EvcdCtx {
         let sbac = &mut self.sbac_dec;
         let sbac_ctx = &mut self.sbac_ctx;
 
-        let mut cbf = [0; N_C];
+        let mut cbf = [false; N_C];
         let mut b_no_cbf = false;
 
         let log2_tuw = core.log2_cuw;
         let log2_tuh = core.log2_cuh;
 
-        //s16 *coef_temp[N_C];
-        //s16 coef_temp_buf[N_C][MAX_TR_DIM];
+        let mut coef_temp_buf = [[0i16; MAX_TR_DIM]; N_C];
         let log2_w_sub = if core.log2_cuw > MAX_TR_LOG2 as u8 {
             MAX_TR_LOG2 as u8
         } else {
@@ -349,9 +350,9 @@ impl EvcdCtx {
         let mut cbf_all = true;
 
         let is_intra = if core.pred_mode == PredMode::MODE_INTRA {
-            1
+            true
         } else {
-            0
+            false
         };
 
         for i in 0..N_C {
@@ -376,105 +377,95 @@ impl EvcdCtx {
                         &core.tree_cons,
                     )?;
                 } else {
-                    cbf[Y_C] = 0;
-                    cbf[U_C] = 0;
-                    cbf[V_C] = 0;
+                    cbf[Y_C] = false;
+                    cbf[U_C] = false;
+                    cbf[V_C] = false;
                 }
-                /*
-                               int dqp;
-                               int qp_i_cb, qp_i_cr;
-                               if(ctx->pps.cu_qp_delta_enabled_flag && (((!(ctx->sps.dquant_flag) || (core->cu_qp_delta_code == 1 && !core->cu_qp_delta_is_coded))
-                                   && (cbf[Y_C] || cbf[U_C] || cbf[V_C])) || (core->cu_qp_delta_code == 2 && !core->cu_qp_delta_is_coded)))
-                               {
-                                   dqp = evcd_eco_dqp(bs);
-                                   core->qp = GET_QP(ctx->tile[core->tile_num].qp_prev_eco, dqp);
-                                   core->qp_y = GET_LUMA_QP(core->qp);
-                                   core->cu_qp_delta_is_coded = 1;
-                                   ctx->tile[core->tile_num].qp_prev_eco = core->qp;
-                               }
-                               else
-                               {
-                                   dqp = 0;
-                                   core->qp = GET_QP(ctx->tile[core->tile_num].qp_prev_eco, dqp);
-                                   core->qp_y = GET_LUMA_QP(core->qp);
-                               }
 
-                               qp_i_cb = EVC_CLIP3(-6 * (BIT_DEPTH - 8), 57, core->qp + ctx->sh.qp_u_offset);
-                               qp_i_cr = EVC_CLIP3(-6 * (BIT_DEPTH - 8), 57, core->qp + ctx->sh.qp_v_offset);
-                               core->qp_u = p_evc_tbl_qp_chroma_dynamic[0][qp_i_cb] + 6 * (BIT_DEPTH - 8);
-                               core->qp_v = p_evc_tbl_qp_chroma_dynamic[1][qp_i_cr] + 6 * (BIT_DEPTH - 8);
+                let mut dqp = 0;
+                //int qp_i_cb, qp_i_cr;
+                if self.pps.cu_qp_delta_enabled_flag
+                    && (((!(self.sps.dquant_flag)
+                        || (core.cu_qp_delta_code == 1 && !core.cu_qp_delta_is_coded))
+                        && (cbf[Y_C] || cbf[U_C] || cbf[V_C]))
+                        || (core.cu_qp_delta_code == 2 && !core.cu_qp_delta_is_coded))
+                {
+                    dqp = evcd_eco_dqp(bs, sbac, sbac_ctx)?;
+                    core.qp = GET_QP(core.qp as i8, dqp) as u8; //GET_QP(ctx->tile[core->tile_num].qp_prev_eco, dqp);
+                    core.qp_y = GET_LUMA_QP(core.qp as i8) as u8;
+                    core.cu_qp_delta_is_coded = true;
+                //ctx->tile[core->tile_num].qp_prev_eco = core->qp;
+                } else {
+                    dqp = 0;
+                    //core.qp = //GET_QP(ctx->tile[core->tile_num].qp_prev_eco, dqp);
+                    core.qp_y = GET_LUMA_QP(core.qp as i8) as u8;
+                }
 
-                               if (ctx->sps.tool_ats && cbf[Y_C] && (core->log2_cuw <= 5 && core->log2_cuh <= 5) && is_intra)
-                               {
-                                   evc_assert(!evcd_check_only_inter(ctx, core));
+                let qp_i_cb = EVC_CLIP3(
+                    -6 * (BIT_DEPTH as i8 - 8),
+                    57,
+                    (core.qp as i8 + self.sh.qp_u_offset) as i8,
+                );
+                let qp_i_cr = EVC_CLIP3(
+                    -6 * (BIT_DEPTH as i8 - 8),
+                    57,
+                    (core.qp as i8 + self.sh.qp_v_offset) as i8,
+                );
+                core.qp_u = (evc_tbl_qp_chroma_dynamic_ext[0]
+                    [(EVC_TBL_CHROMA_QP_OFFSET + qp_i_cb) as usize]
+                    + (6 * (BIT_DEPTH - 8)) as isize) as u8;
+                core.qp_v = (evc_tbl_qp_chroma_dynamic_ext[1]
+                    [(EVC_TBL_CHROMA_QP_OFFSET + qp_i_cr) as usize]
+                    + (6 * (BIT_DEPTH - 8)) as isize) as u8;
 
-                                   ats_intra_cu_on = evcd_eco_ats_intra_cu(bs, sbac);
+                for c in 0..N_C {
+                    if cbf[c] {
+                        let chroma = if c > 0 { 1 } else { 0 };
+                        let pos_sub_x = i * (1 << (log2_w_sub - chroma));
+                        let pos_sub_y = j * (1 << (log2_h_sub - chroma)) * (stride >> chroma);
 
-                                   ats_mode_idx = 0;
-                                   if (ats_intra_cu_on)
-                                   {
-                                       u8 ats_intra_mode_h = evcd_eco_ats_mode_h(bs, sbac);
-                                       u8 ats_intra_mode_v = evcd_eco_ats_mode_v(bs, sbac);
+                        let coef_temp = if is_sub {
+                            evc_block_copy(
+                                &core.coef.data[c][(pos_sub_x + pos_sub_y) as usize..],
+                                (stride >> chroma) as usize,
+                                &mut coef_temp_buf[c][..],
+                                (sub_stride >> chroma) as usize,
+                                log2_w_sub - chroma,
+                                log2_h_sub - chroma,
+                            );
+                            &mut coef_temp_buf[c][..]
+                        } else {
+                            &mut core.coef.data[c][..]
+                        };
 
-                                       ats_mode_idx = ((ats_intra_mode_h << 1) | ats_intra_mode_v);
-                                   }
-                               }
-                               else
-                               {
-                                   ats_intra_cu_on = 0;
-                                   ats_mode_idx = 0;
-                               }
-                               core->ats_intra_cu = ats_intra_cu_on;
-                               core->ats_intra_mode_h = (ats_mode_idx >> 1);
-                               core->ats_intra_mode_v = (ats_mode_idx & 1);
+                        evcd_eco_xcoef(
+                            bs,
+                            sbac,
+                            sbac_ctx,
+                            coef_temp,
+                            log2_w_sub - chroma,
+                            log2_h_sub - chroma,
+                            c,
+                        )?;
 
-                               if (ats_inter_avail && (cbf[Y_C] || cbf[U_C] || cbf[V_C]))
-                               {
-                                   evc_assert(!evcd_check_only_intra(ctx, core));
+                        core.is_coef_sub[c][((j << 1) | i) as usize] = true;
+                        tmp_coef[c] += 1;
 
-                                   eco_ats_inter_info(bs, sbac, core->log2_cuw, core->log2_cuh, &core->ats_inter_info, ats_inter_avail);
-                               }
-                               else
-                               {
-                                   assert(core->ats_inter_info == 0);
-                               }
-
-                               for (c = 0; c < N_C; c++)
-                               {
-                                   if (cbf[c])
-                                   {
-                                       int pos_sub_x = i * (1 << (log2_w_sub - !!c));
-                                       int pos_sub_y = j * (1 << (log2_h_sub - !!c)) * (stride >> (!!c));
-
-                                       if (is_sub)
-                                       {
-                                           evc_block_copy(core->coef[c] + pos_sub_x + pos_sub_y, stride >> (!!c), coef_temp_buf[c], sub_stride >> (!!c), log2_w_sub - (!!c), log2_h_sub - (!!c));
-                                           coef_temp[c] = coef_temp_buf[c];
-                                       }
-                                       else
-                                       {
-                                           coef_temp[c] = core->coef[c];
-                                       }
-
-                                       evcd_eco_xcoef(bs, sbac, coef_temp[c], log2_w_sub - (!!c), log2_h_sub - (!!c), c, core->ats_inter_info, core->pred_mode == MODE_INTRA, ctx->sps.tool_adcc);
-
-                                       evc_assert_rv(ret == EVC_OK, ret);
-
-                                       core->is_coef_sub[c][(j << 1) | i] = 1;
-                                       tmp_coef[c] += 1;
-
-                                       if (is_sub)
-                                       {
-                                           evc_block_copy(coef_temp_buf[c], sub_stride >> (!!c), core->coef[c] + pos_sub_x + pos_sub_y, stride >> (!!c), log2_w_sub - (!!c), log2_h_sub - (!!c));
-                                       }
-                                   }
-                                   else
-                                   {
-                                       core->is_coef_sub[c][(j << 1) | i] = 0;
-                                       tmp_coef[c] += 0;
-                                   }
-                               }
-                */
+                        if is_sub {
+                            evc_block_copy(
+                                &coef_temp_buf[c],
+                                (sub_stride >> chroma) as usize,
+                                &mut core.coef.data[c][(pos_sub_x + pos_sub_y) as usize..],
+                                (stride >> chroma) as usize,
+                                log2_w_sub - chroma,
+                                log2_h_sub - chroma,
+                            );
+                        }
+                    } else {
+                        core.is_coef_sub[c][((j << 1) | i) as usize] = false;
+                        tmp_coef[c] += 0;
+                    }
+                }
             }
         }
         for c in 0..N_C {
@@ -553,9 +544,11 @@ impl EvcdCtx {
             );
 
             //TODO: fix negative array index
-            core.qp_u = (p_evc_tbl_qp_chroma_dynamic[0][qp_i_cb as usize]
+            core.qp_u = (evc_tbl_qp_chroma_dynamic_ext[0]
+                [(EVC_TBL_CHROMA_QP_OFFSET + qp_i_cb) as usize]
                 + (6 * (BIT_DEPTH - 8)) as isize) as u8;
-            core.qp_v = (p_evc_tbl_qp_chroma_dynamic[1][qp_i_cr as usize]
+            core.qp_v = (evc_tbl_qp_chroma_dynamic_ext[1]
+                [(EVC_TBL_CHROMA_QP_OFFSET + qp_i_cr) as usize]
                 + (6 * (BIT_DEPTH - 8)) as isize) as u8;
         } else {
             core.pred_mode =
@@ -593,7 +586,7 @@ impl EvcdCtx {
                 core.mv[REFP_1][MV_X] = 0;
                 core.mv[REFP_1][MV_Y] = 0;
             } else {
-                evc_assert_rv(false, EvcError::EVC_ERR_MALFORMED_BITSTREAM);
+                evc_assert_rv(false, EvcError::EVC_ERR_MALFORMED_BITSTREAM)?;
             }
 
             /* clear coefficient buffer */
