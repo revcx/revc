@@ -201,18 +201,18 @@ impl Default for PredDir {
  *****************************************************************************/
 #[derive(Clone, Copy, PartialEq)]
 pub(crate) enum IntraPredDir {
+    IPD_UNKNOWN = -1,
     IPD_DC_B = 0,
     IPD_HOR_B = 1, /* Luma, Horizontal */
     IPD_VER_B = 2, /* Luma, Vertical */
     IPD_UL_B = 3,
     IPD_UR_B = 4,
     IPD_CNT_B = 5,
-    IPD_UNKNOWN,
 }
 
 impl Default for IntraPredDir {
     fn default() -> Self {
-        IntraPredDir::IPD_DC_B
+        IntraPredDir::IPD_UNKNOWN
     }
 }
 

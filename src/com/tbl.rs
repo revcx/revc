@@ -90,14 +90,13 @@ pub(crate) const EVC_TBL_CHROMA_QP_OFFSET: i8 = 6 * (BIT_DEPTH as i8 - 8);
 
 lazy_static! {
     pub(crate) static ref evc_scan_tbl: [Box<[u16]>; MAX_CU_LOG2 - 1] = {
-        let mut scan_tbl: [Box<[u16]>; MAX_CU_LOG2 - 1] = [
-            init_scan(2),
-            init_scan(4),
-            init_scan(8),
-            init_scan(16),
-            init_scan(32),
-            init_scan(64),
-        ];
-        scan_tbl
+        [
+            scan_tbl(2),
+            scan_tbl(4),
+            scan_tbl(8),
+            scan_tbl(16),
+            scan_tbl(32),
+            scan_tbl(64),
+        ]
     };
 }

@@ -132,6 +132,30 @@ pub(crate) struct EvcdCore {
     ctx_flags: [u8; CtxNevIdx::NUM_CNID as usize],
     tree_cons: TREE_CONS,
 }
+
+impl EvcdCore {
+    fn set_map_scu(
+        &self,
+        x_scu: u16,
+        y_scu: u16,
+        cuw: u16,
+        cuh: u16,
+        w_scu: u16,
+        map_scu: &mut [MCU],
+        map_ipm: &mut [IntraPredDir],
+    ) {
+        for j in 0..cuh {
+            for i in 0..cuw {
+                map_scu[((y_scu + j) * w_scu + x_scu + i) as usize].SET_COD();
+                if self.pred_mode == PredMode::MODE_INTRA {
+                    map_scu[((y_scu + j) * w_scu + x_scu + i) as usize].SET_IF();
+                    map_ipm[((y_scu + j) * w_scu + x_scu + i) as usize] = self.ipm[0];
+                }
+            }
+        }
+    }
+}
+
 /******************************************************************************
  * CONTEXT used for decoding process.
  *
@@ -274,7 +298,16 @@ impl EvcdCtx {
         self.map_cu_mode = vec![0; self.f_scu as usize];
 
         /* alloc map for CU split flag */
-        self.map_split = vec![LcuSplitMode::default(); self.f_lcu as usize];
+        self.map_split = vec![
+            LcuSplitMode::default();
+            self.f_lcu as usize
+                * NUM_CU_DEPTH
+                * BlockShape::NUM_BLOCK_SHAPE as usize
+                * MAX_CU_CNT_IN_LCU
+        ];
+
+        /* alloc map for intra prediction mode */
+        self.map_ipm = vec![IntraPredDir::default(); self.f_scu as usize];
     }
 
     fn slice_init(&mut self) {
@@ -292,10 +325,10 @@ impl EvcdCtx {
             + (6 * (BIT_DEPTH - 8)) as i8) as u8;
 
         /* clear maps */
-        /*evc_mset_x64a(self.map_scu, 0, sizeof(u32) * self.f_scu);
-        evc_mset_x64a(self.map_affine, 0, sizeof(u32) * self.f_scu);
-        evc_mset_x64a(self.map_ats_inter, 0, sizeof(u8) * self.f_scu);
-        evc_mset_x64a(self.map_cu_mode, 0, sizeof(u32) * self.f_scu);*/
+        for i in 0..self.f_scu as usize {
+            self.map_scu[i] = MCU::default();
+            self.map_cu_mode[i] = 0;
+        }
 
         if self.sh.slice_type == SliceType::EVC_ST_I {
             self.last_intra_poc = self.poc.poc_val;
@@ -472,6 +505,20 @@ impl EvcdCtx {
             core.is_coef[c] = if tmp_coef[c] != 0 { true } else { false };
         }
 
+        // set cod for current CU in map_scu
+        let cuw = 1 << core.log2_cuw as u16;
+        let cuh = 1 << core.log2_cuh as u16;
+        core.set_map_scu(
+            core.x_scu,
+            core.y_scu,
+            cuw,
+            cuh,
+            self.w_scu,
+            //self.h_scu,
+            &mut self.map_scu,
+            &mut self.map_ipm,
+        );
+
         Ok(())
     }
 
@@ -645,7 +692,7 @@ impl EvcdCtx {
         EVC_TRACE(&mut bs.tracer, cuh);
         EVC_TRACE(&mut bs.tracer, " \n");
 
-        core.avail_lr = evc_check_nev_avail(
+        /*core.avail_lr = evc_check_nev_avail(
             core.x_scu,
             core.y_scu,
             cuw,
@@ -653,9 +700,7 @@ impl EvcdCtx {
             self.w_scu,
             //self.h_scu,
             &self.map_scu,
-        );
-
-        // evc_get_ctx_some_flags
+        );*/
 
         /* parse CU info */
         self.evcd_eco_cu()?;

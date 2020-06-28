@@ -150,7 +150,7 @@ pub(crate) fn evc_check_nev_avail(
         avail_lr += 1;
     }
 
-    if x_scu + scuw < w_scu && map_scu[(scup + scuw) as usize].GET_COD() != 0 {
+    if y_scu > 0 && x_scu + scuw < w_scu && map_scu[(scup + scuw) as usize].GET_COD() != 0 {
         avail_lr += 2;
     }
 
@@ -197,7 +197,7 @@ pub(crate) fn evc_block_copy(
     }
 }
 
-pub(crate) fn init_scan(size: i16) -> Box<[u16]> {
+pub(crate) fn scan_tbl(size: i16) -> Box<[u16]> {
     let mut pos = 0;
     let num_line = size + size - 1;
     let mut scan = vec![0; (size * size) as usize].into_boxed_slice();
