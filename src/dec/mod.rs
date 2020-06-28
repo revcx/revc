@@ -138,18 +138,19 @@ impl EvcdCore {
         &self,
         x_scu: u16,
         y_scu: u16,
-        cuw: u16,
-        cuh: u16,
+        cuw_scu: u16,
+        cuh_scu: u16,
         w_scu: u16,
         map_scu: &mut [MCU],
         map_ipm: &mut [IntraPredDir],
     ) {
-        for j in 0..cuh {
-            for i in 0..cuw {
-                map_scu[((y_scu + j) * w_scu + x_scu + i) as usize].SET_COD();
+        for j in 0..cuh_scu {
+            for i in 0..cuw_scu {
+                let pos = ((y_scu + j) * w_scu + x_scu + i) as usize;
+                map_scu[pos].SET_COD();
                 if self.pred_mode == PredMode::MODE_INTRA {
-                    map_scu[((y_scu + j) * w_scu + x_scu + i) as usize].SET_IF();
-                    map_ipm[((y_scu + j) * w_scu + x_scu + i) as usize] = self.ipm[0];
+                    map_scu[pos].SET_IF();
+                    map_ipm[pos] = self.ipm[0];
                 }
             }
         }
@@ -511,8 +512,8 @@ impl EvcdCtx {
         core.set_map_scu(
             core.x_scu,
             core.y_scu,
-            cuw,
-            cuh,
+            cuw >> MIN_CU_LOG2 as u16,
+            cuh >> MIN_CU_LOG2 as u16,
             self.w_scu,
             //self.h_scu,
             &mut self.map_scu,
