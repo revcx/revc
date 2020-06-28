@@ -439,13 +439,6 @@ impl EvcdCtx {
         EVC_TRACE(&mut bs.tracer, cuw);
         EVC_TRACE(&mut bs.tracer, " height ");
         EVC_TRACE(&mut bs.tracer, cuh);
-
-        if self.sh.slice_type != SliceType::EVC_ST_I && self.sps.sps_btt_flag {
-            EVC_TRACE(&mut bs.tracer, " tree status ");
-            EVC_TRACE(&mut bs.tracer, core.tree_cons.tree_type as u8);
-            EVC_TRACE(&mut bs.tracer, " mode status ");
-            EVC_TRACE(&mut bs.tracer, core.tree_cons.mode_cons as u8);
-        }
         EVC_TRACE(&mut bs.tracer, " \n");
 
         core.avail_lr = evc_check_nev_avail(
@@ -461,7 +454,7 @@ impl EvcdCtx {
         // evc_get_ctx_some_flags
 
         /* parse CU info */
-        //self.evcd_eco_cu()?;
+        self.evcd_eco_cu()?;
 
         Ok(())
     }
