@@ -73,7 +73,7 @@ pub(crate) static evc_tbl_log2: [u8; 257] = [
 ];
 
 // ChromaQP offset for U and V components
-pub(crate) static evc_tbl_qp_chroma_dynamic_ext: [[isize; MAX_QP_TABLE_SIZE_EXT]; 2] = [
+pub(crate) static evc_tbl_qp_chroma_dynamic_ext: [[i8; MAX_QP_TABLE_SIZE_EXT]; 2] = [
     [
         -12, -11, -10, -9, -8, -7, -6, -5, -4, -3, -2, -1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -88,19 +88,16 @@ pub(crate) static evc_tbl_qp_chroma_dynamic_ext: [[isize; MAX_QP_TABLE_SIZE_EXT]
 
 pub(crate) const EVC_TBL_CHROMA_QP_OFFSET: i8 = 6 * (BIT_DEPTH as i8 - 8);
 
-/*
 lazy_static! {
-    pub(crate) static ref evc_scan_tbl: [[Vec<usize>; MAX_CU_LOG2 - 1]; MAX_CU_LOG2 - 1] = {
-        let mut scan_tbl = [[vec![]; MAX_CU_LOG2 - 1]; MAX_CU_LOG2 - 1];
-        for y in 0..MAX_CU_LOG2 - 1 {
-            let size_y = 1 << (y + 1);
-            for x in 0..MAX_CU_LOG2 - 1 {
-                let size_x = 1 << (x + 1);
-                scan_tbl[x][y] = vec![0; size_y * size_x];
-                init_scan(&mut scan_tbl[x][y][..], size_x as isize, size_y as isize);
-            }
-        }
+    pub(crate) static ref evc_scan_tbl: [Box<[u16]>; MAX_CU_LOG2 - 1] = {
+        let mut scan_tbl: [Box<[u16]>; MAX_CU_LOG2 - 1] = [
+            init_scan(2),
+            init_scan(4),
+            init_scan(8),
+            init_scan(16),
+            init_scan(32),
+            init_scan(64),
+        ];
         scan_tbl
     };
 }
-*/

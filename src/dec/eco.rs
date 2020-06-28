@@ -534,7 +534,7 @@ pub(crate) fn evcd_eco_run_length_cc(
     log2_h: u8,
     ch_type: usize,
 ) -> Result<(), EvcError> {
-    let scanp: Vec<usize> = vec![]; // &evc_scan_tbl[log2_w as usize - 1][log2_h as usize - 1][..];
+    let scanp = &evc_scan_tbl[log2_w as usize - 1][..];
     let num_coeff = 1 << (log2_w + log2_h) as u32;
     let mut scan_pos_offset = 0;
     let mut prev_level = 6;
@@ -547,7 +547,7 @@ pub(crate) fn evcd_eco_run_length_cc(
         /* Run parsing */
         let run = sbac.read_unary_sym(bs, &mut sbac_ctx.run[t0..], 2)?;
         for i in scan_pos_offset..scan_pos_offset + run {
-            coef[scanp[i as usize]] = 0;
+            coef[scanp[i as usize] as usize] = 0;
         }
         scan_pos_offset += run;
 
@@ -557,7 +557,7 @@ pub(crate) fn evcd_eco_run_length_cc(
 
         /* Sign parsing */
         let sign = sbac.decode_bin_ep(bs)?;
-        coef[scanp[scan_pos_offset as usize]] = if sign != 0 {
+        coef[scanp[scan_pos_offset as usize] as usize] = if sign != 0 {
             -(level as i16)
         } else {
             level as i16

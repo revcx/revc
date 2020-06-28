@@ -286,10 +286,10 @@ impl EvcdCtx {
         self.core.qp_y = self.sh.qp + (6 * (BIT_DEPTH - 8)) as u8;
         self.core.qp_u = (evc_tbl_qp_chroma_dynamic_ext[0]
             [(EVC_TBL_CHROMA_QP_OFFSET + self.sh.qp_u as i8) as usize]
-            + (6 * (BIT_DEPTH - 8)) as isize) as u8;
+            + (6 * (BIT_DEPTH - 8)) as i8) as u8;
         self.core.qp_v = (evc_tbl_qp_chroma_dynamic_ext[1]
             [(EVC_TBL_CHROMA_QP_OFFSET + self.sh.qp_v as i8) as usize]
-            + (6 * (BIT_DEPTH - 8)) as isize) as u8;
+            + (6 * (BIT_DEPTH - 8)) as i8) as u8;
 
         /* clear maps */
         /*evc_mset_x64a(self.map_scu, 0, sizeof(u32) * self.f_scu);
@@ -413,10 +413,10 @@ impl EvcdCtx {
                 );
                 core.qp_u = (evc_tbl_qp_chroma_dynamic_ext[0]
                     [(EVC_TBL_CHROMA_QP_OFFSET + qp_i_cb) as usize]
-                    + (6 * (BIT_DEPTH - 8)) as isize) as u8;
+                    + (6 * (BIT_DEPTH - 8)) as i8) as u8;
                 core.qp_v = (evc_tbl_qp_chroma_dynamic_ext[1]
                     [(EVC_TBL_CHROMA_QP_OFFSET + qp_i_cr) as usize]
-                    + (6 * (BIT_DEPTH - 8)) as isize) as u8;
+                    + (6 * (BIT_DEPTH - 8)) as i8) as u8;
 
                 for c in 0..N_C {
                     if cbf[c] {
@@ -546,10 +546,10 @@ impl EvcdCtx {
             //TODO: fix negative array index
             core.qp_u = (evc_tbl_qp_chroma_dynamic_ext[0]
                 [(EVC_TBL_CHROMA_QP_OFFSET + qp_i_cb) as usize]
-                + (6 * (BIT_DEPTH - 8)) as isize) as u8;
+                + (6 * (BIT_DEPTH - 8)) as i8) as u8;
             core.qp_v = (evc_tbl_qp_chroma_dynamic_ext[1]
                 [(EVC_TBL_CHROMA_QP_OFFSET + qp_i_cr) as usize]
-                + (6 * (BIT_DEPTH - 8)) as isize) as u8;
+                + (6 * (BIT_DEPTH - 8)) as i8) as u8;
         } else {
             core.pred_mode =
                 evcd_eco_pred_mode(bs, sbac, sbac_ctx, &core.ctx_flags, &core.tree_cons)?;

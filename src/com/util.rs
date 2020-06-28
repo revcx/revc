@@ -197,10 +197,10 @@ pub(crate) fn evc_block_copy(
     }
 }
 
-pub(crate) fn init_scan(scan: &mut [usize], size_x: isize, size_y: isize) {
+pub(crate) fn init_scan(size: i16) -> Box<[u16]> {
     let mut pos = 0;
-    let num_line = size_x + size_y - 1;
-
+    let num_line = size + size - 1;
+    let mut scan = vec![0; (size * size) as usize].into_boxed_slice();
     /* starting point */
     scan[pos] = 0;
     pos += 1;
@@ -209,11 +209,11 @@ pub(crate) fn init_scan(scan: &mut [usize], size_x: isize, size_y: isize) {
     for l in 1..num_line {
         if l % 2 != 0 {
             /* decreasing loop */
-            let mut x = std::cmp::min(l, size_x - 1);
-            let mut y = std::cmp::max(0, l - (size_x - 1));
+            let mut x = std::cmp::min(l, size - 1);
+            let mut y = std::cmp::max(0, l - (size - 1));
 
-            while x >= 0 && y < size_y {
-                scan[pos] = (y * size_x + x) as usize;
+            while x >= 0 && y < size {
+                scan[pos] = (y * size + x) as u16;
                 pos += 1;
                 x -= 1;
                 y += 1;
@@ -221,14 +221,16 @@ pub(crate) fn init_scan(scan: &mut [usize], size_x: isize, size_y: isize) {
         } else
         /* increasing loop */
         {
-            let mut y = std::cmp::min(l, size_y - 1);
-            let mut x = std::cmp::max(0, l - (size_y - 1));
-            while y >= 0 && x < size_x {
-                scan[pos] = (y * size_x + x) as usize;
+            let mut y = std::cmp::min(l, size - 1);
+            let mut x = std::cmp::max(0, l - (size - 1));
+            while y >= 0 && x < size {
+                scan[pos] = (y * size + x) as u16;
                 pos += 1;
                 x += 1;
                 y -= 1;
             }
         }
     }
+
+    scan
 }
