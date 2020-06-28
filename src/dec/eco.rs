@@ -426,13 +426,13 @@ pub(crate) fn eco_cbf(
         cbf[U_C] = sbac.decode_bin(bs, &mut sbac_ctx.cbf_cb[0])? != 0;
         EVC_TRACE_COUNTER(&mut bs.tracer);
         EVC_TRACE(&mut bs.tracer, "cbf U ");
-        EVC_TRACE(&mut bs.tracer, cbf[U_C]);
+        EVC_TRACE(&mut bs.tracer, cbf[U_C] as u8);
         EVC_TRACE(&mut bs.tracer, " \n");
 
         cbf[V_C] = sbac.decode_bin(bs, &mut sbac_ctx.cbf_cr[0])? != 0;
         EVC_TRACE_COUNTER(&mut bs.tracer);
         EVC_TRACE(&mut bs.tracer, "cbf V ");
-        EVC_TRACE(&mut bs.tracer, cbf[V_C]);
+        EVC_TRACE(&mut bs.tracer, cbf[V_C] as u8);
         EVC_TRACE(&mut bs.tracer, " \n");
 
         if cbf[U_C] == false && cbf[V_C] == false && !is_sub {
@@ -441,7 +441,7 @@ pub(crate) fn eco_cbf(
             cbf[Y_C] = sbac.decode_bin(bs, &mut sbac_ctx.cbf_luma[0])? != 0;
             EVC_TRACE_COUNTER(&mut bs.tracer);
             EVC_TRACE(&mut bs.tracer, "cbf Y ");
-            EVC_TRACE(&mut bs.tracer, cbf[Y_C]);
+            EVC_TRACE(&mut bs.tracer, cbf[Y_C] as u8);
             EVC_TRACE(&mut bs.tracer, " \n");
         }
     } else {
@@ -449,13 +449,13 @@ pub(crate) fn eco_cbf(
             cbf[U_C] = sbac.decode_bin(bs, &mut sbac_ctx.cbf_cb[0])? != 0;
             EVC_TRACE_COUNTER(&mut bs.tracer);
             EVC_TRACE(&mut bs.tracer, "cbf U ");
-            EVC_TRACE(&mut bs.tracer, cbf[U_C]);
+            EVC_TRACE(&mut bs.tracer, cbf[U_C] as u8);
             EVC_TRACE(&mut bs.tracer, " \n");
 
             cbf[V_C] = sbac.decode_bin(bs, &mut sbac_ctx.cbf_cr[0])? != 0;
             EVC_TRACE_COUNTER(&mut bs.tracer);
             EVC_TRACE(&mut bs.tracer, "cbf V ");
-            EVC_TRACE(&mut bs.tracer, cbf[V_C]);
+            EVC_TRACE(&mut bs.tracer, cbf[V_C] as u8);
             EVC_TRACE(&mut bs.tracer, " \n");
         } else {
             cbf[U_C] = false;
@@ -465,7 +465,7 @@ pub(crate) fn eco_cbf(
             cbf[Y_C] = sbac.decode_bin(bs, &mut sbac_ctx.cbf_luma[0])? != 0;
             EVC_TRACE_COUNTER(&mut bs.tracer);
             EVC_TRACE(&mut bs.tracer, "cbf Y ");
-            EVC_TRACE(&mut bs.tracer, cbf[Y_C]);
+            EVC_TRACE(&mut bs.tracer, cbf[Y_C] as u8);
             EVC_TRACE(&mut bs.tracer, " \n");
         } else {
             cbf[Y_C] = false;
@@ -515,7 +515,7 @@ pub(crate) fn evcd_eco_xcoef(
     EVC_TRACE(&mut bs.tracer, " : ");
     for i in 0..cuw * cuh {
         if i != 0 {
-            EVC_TRACE(&mut bs.tracer, ", ");
+            EVC_TRACE(&mut bs.tracer, " , ");
         }
         EVC_TRACE(&mut bs.tracer, coef[i]);
     }
