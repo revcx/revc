@@ -386,3 +386,90 @@ pub(crate) fn evcd_eco_intra_dir_b(
 
     Ok(ipm as u8)
 }
+
+pub(crate) fn eco_cbf(
+    bs: &mut EvcdBsr,
+    sbac: &mut EvcdSbac,
+    sbac_ctx: &mut EvcSbacCtx,
+    pred_mode: PredMode,
+    cbf: &mut [u8],
+    b_no_cbf: bool,
+    is_sub: bool,
+    sub_pos: u8,
+    cbf_all: &mut bool,
+    tree_cons: &TREE_CONS,
+) -> Result<(), EvcError> {
+    /* decode allcbf */
+    if pred_mode != PredMode::MODE_INTRA && tree_cons.tree_type == TREE_TYPE::TREE_LC {
+        if b_no_cbf == false && sub_pos == 0 {
+            if sbac.decode_bin(bs, &mut sbac_ctx.cbf_all[0])? == 0 {
+                *cbf_all = false;
+                cbf[Y_C] = 0;
+                cbf[U_C] = 0;
+                cbf[V_C] = 0;
+
+                EVC_TRACE_COUNTER(&mut bs.tracer);
+                EVC_TRACE(&mut bs.tracer, "all_cbf ");
+                EVC_TRACE(&mut bs.tracer, 0);
+                EVC_TRACE(&mut bs.tracer, " \n");
+
+                return Ok(());
+            } else {
+                EVC_TRACE_COUNTER(&mut bs.tracer);
+                EVC_TRACE(&mut bs.tracer, "all_cbf ");
+                EVC_TRACE(&mut bs.tracer, 1);
+                EVC_TRACE(&mut bs.tracer, " \n");
+            }
+        }
+
+        cbf[U_C] = sbac.decode_bin(bs, &mut sbac_ctx.cbf_cb[0])? as u8;
+        EVC_TRACE_COUNTER(&mut bs.tracer);
+        EVC_TRACE(&mut bs.tracer, "cbf U ");
+        EVC_TRACE(&mut bs.tracer, cbf[U_C]);
+        EVC_TRACE(&mut bs.tracer, " \n");
+
+        cbf[V_C] = sbac.decode_bin(bs, &mut sbac_ctx.cbf_cr[0])? as u8;
+        EVC_TRACE_COUNTER(&mut bs.tracer);
+        EVC_TRACE(&mut bs.tracer, "cbf V ");
+        EVC_TRACE(&mut bs.tracer, cbf[V_C]);
+        EVC_TRACE(&mut bs.tracer, " \n");
+
+        if cbf[U_C] + cbf[V_C] == 0 && !is_sub {
+            cbf[Y_C] = 1;
+        } else {
+            cbf[Y_C] = sbac.decode_bin(bs, &mut sbac_ctx.cbf_luma[0])? as u8;
+            EVC_TRACE_COUNTER(&mut bs.tracer);
+            EVC_TRACE(&mut bs.tracer, "cbf Y ");
+            EVC_TRACE(&mut bs.tracer, cbf[Y_C]);
+            EVC_TRACE(&mut bs.tracer, " \n");
+        }
+    } else {
+        if evc_check_chroma(tree_cons) {
+            cbf[U_C] = sbac.decode_bin(bs, &mut sbac_ctx.cbf_cb[0])? as u8;
+            EVC_TRACE_COUNTER(&mut bs.tracer);
+            EVC_TRACE(&mut bs.tracer, "cbf U ");
+            EVC_TRACE(&mut bs.tracer, cbf[U_C]);
+            EVC_TRACE(&mut bs.tracer, " \n");
+
+            cbf[V_C] = sbac.decode_bin(bs, &mut sbac_ctx.cbf_cr[0])? as u8;
+            EVC_TRACE_COUNTER(&mut bs.tracer);
+            EVC_TRACE(&mut bs.tracer, "cbf V ");
+            EVC_TRACE(&mut bs.tracer, cbf[V_C]);
+            EVC_TRACE(&mut bs.tracer, " \n");
+        } else {
+            cbf[U_C] = 0;
+            cbf[V_C] = 0;
+        }
+        if evc_check_luma(tree_cons) {
+            cbf[Y_C] = sbac.decode_bin(bs, &mut sbac_ctx.cbf_luma[0])? as u8;
+            EVC_TRACE_COUNTER(&mut bs.tracer);
+            EVC_TRACE(&mut bs.tracer, "cbf Y ");
+            EVC_TRACE(&mut bs.tracer, cbf[Y_C]);
+            EVC_TRACE(&mut bs.tracer, " \n");
+        } else {
+            cbf[Y_C] = 0;
+        }
+    }
+
+    Ok(())
+}

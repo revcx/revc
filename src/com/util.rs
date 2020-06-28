@@ -1,7 +1,7 @@
 use super::tbl::*;
 use super::*;
 
-use crate::dec::LcuSplitModeArray;
+use crate::dec::LcuSplitMode;
 use std::cmp::*;
 
 /* clipping within min and max */
@@ -43,7 +43,7 @@ pub(crate) fn evc_poc_derivation(sps: &EvcSps, tid: u8, poc: &mut EvcPoc) {
 }
 
 pub(crate) fn evc_set_split_mode(
-    split_mode_buf: &mut LcuSplitModeArray,
+    split_mode_buf: &mut LcuSplitMode,
     split_mode: SplitMode,
     cud: u16,
     cup: u16,
@@ -57,7 +57,7 @@ pub(crate) fn evc_set_split_mode(
     let shape = BlockShape::SQUARE as u8 + (CONV_LOG2(cuw as usize) - CONV_LOG2(cuh as usize));
 
     if cuw >= 8 || cuh >= 8 {
-        split_mode_buf.array[cud as usize][shape as usize][pos as usize] = split_mode;
+        split_mode_buf.data[cud as usize][shape as usize][pos as usize] = split_mode;
     }
 }
 

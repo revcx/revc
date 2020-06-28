@@ -41,6 +41,16 @@ pub(crate) const REFP_0: usize = 0;
 pub(crate) const REFP_1: usize = 1;
 pub(crate) const REFP_NUM: usize = 2;
 
+/*****************************************************************************
+ * reference index
+ *****************************************************************************/
+pub(crate) const REFI_INVALID: i8 = (-1);
+
+#[inline]
+pub(crate) fn REFI_IS_VALID(refi: i8) -> bool {
+    refi >= 0
+}
+
 /* X direction motion vector indicator */
 pub(crate) const MV_X: usize = 0;
 /* Y direction motion vector indicator */

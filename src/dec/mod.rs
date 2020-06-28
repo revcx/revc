@@ -16,19 +16,33 @@ use sbac::*;
 pub(crate) const EVCD_MAGIC_CODE: u32 = 0x45565944; /* EVYD */
 
 #[derive(Clone)]
-pub(crate) struct LcuSplitModeArray {
-    pub(crate) array:
+pub(crate) struct LcuSplitMode {
+    pub(crate) data:
         [[[SplitMode; MAX_CU_CNT_IN_LCU]; BlockShape::NUM_BLOCK_SHAPE as usize]; NUM_CU_DEPTH],
 }
 
-impl Default for LcuSplitModeArray {
+impl Default for LcuSplitMode {
     fn default() -> Self {
-        LcuSplitModeArray {
-            array: [[[SplitMode::NO_SPLIT; MAX_CU_CNT_IN_LCU];
-                BlockShape::NUM_BLOCK_SHAPE as usize]; NUM_CU_DEPTH],
+        LcuSplitMode {
+            data: [[[SplitMode::NO_SPLIT; MAX_CU_CNT_IN_LCU]; BlockShape::NUM_BLOCK_SHAPE as usize];
+                NUM_CU_DEPTH],
         }
     }
 }
+
+#[derive(Clone)]
+pub(crate) struct CUBuffer<T: Default + Copy> {
+    pub(crate) data: [[T; MAX_CU_DIM]; N_C],
+}
+
+impl<T: Default + Copy> Default for CUBuffer<T> {
+    fn default() -> Self {
+        CUBuffer {
+            data: [[T::default(); MAX_CU_DIM]; N_C],
+        }
+    }
+}
+
 /*****************************************************************************
  * CORE information used for decoding process.
  *
@@ -38,10 +52,10 @@ impl Default for LcuSplitModeArray {
 pub(crate) struct EvcdCore {
     /************** current CU **************/
     /* coefficient buffer of current CU */
-    //coef: [[i16; MAX_CU_DIM]; N_C], //[N_C][MAX_CU_DIM]
+    coef: CUBuffer<i16>, //[[i16; MAX_CU_DIM]; N_C], //[N_C][MAX_CU_DIM]
     /* pred buffer of current CU */
     /* [1] is used for bi-pred. */
-    //pred: [[[pel; MAX_CU_DIM]; N_C]; 2], //[2][N_C][MAX_CU_DIM]
+    pred: CUBuffer<pel>, //[[[pel; MAX_CU_DIM]; N_C]; 2], //[2][N_C][MAX_CU_DIM]
 
     /* neighbor pixel buffer for intra prediction */
     //nb: [[[pel; MAX_CU_SIZE * 3]; N_REF]; N_C],
@@ -100,7 +114,7 @@ pub(crate) struct EvcdCore {
     /* top pel position of current LCU */
     y_pel: u16,
     /* split mode map for current LCU */
-    split_mode: LcuSplitModeArray,
+    split_mode: LcuSplitMode,
 
     /* platform specific data, if needed */
     //void          *pf;
@@ -168,7 +182,7 @@ pub(crate) struct EvcdCtx {
     /* SCU map for CU information */
     map_scu: Vec<MCU>,
     /* LCU split information */
-    map_split: Vec<LcuSplitModeArray>,
+    map_split: Vec<LcuSplitMode>,
     /* decoded motion vector for every blocks */
     /*s16                  (* map_mv)[REFP_NUM][MV_D];
     /* decoded motion vector for every blocks */
@@ -260,7 +274,7 @@ impl EvcdCtx {
         self.map_cu_mode = vec![0; self.f_scu as usize];
 
         /* alloc map for CU split flag */
-        self.map_split = vec![LcuSplitModeArray::default(); self.f_lcu as usize];
+        self.map_split = vec![LcuSplitMode::default(); self.f_lcu as usize];
     }
 
     fn slice_init(&mut self) {
@@ -292,6 +306,182 @@ impl EvcdCtx {
         self.core.x_scu = self.core.x_lcu << (MAX_CU_LOG2 - MIN_CU_LOG2) as u16; // set x_scu location
         self.core.y_scu = self.core.y_lcu << (MAX_CU_LOG2 - MIN_CU_LOG2) as u16; // set y_scu location
         self.core.lcu_num = self.core.x_lcu + self.core.y_lcu * self.w_lcu; // Init the first lcu_num in tile
+    }
+
+    fn evcd_eco_coef(&mut self) -> Result<(), EvcError> {
+        let core = &mut self.core;
+        let bs = &mut self.bs;
+        let sbac = &mut self.sbac_dec;
+        let sbac_ctx = &mut self.sbac_ctx;
+
+        let mut cbf = [0; N_C];
+        let mut b_no_cbf = false;
+
+        let log2_tuw = core.log2_cuw;
+        let log2_tuh = core.log2_cuh;
+
+        //s16 *coef_temp[N_C];
+        //s16 coef_temp_buf[N_C][MAX_TR_DIM];
+        let log2_w_sub = if core.log2_cuw > MAX_TR_LOG2 as u8 {
+            MAX_TR_LOG2 as u8
+        } else {
+            core.log2_cuw
+        };
+        let log2_h_sub = if core.log2_cuh > MAX_TR_LOG2 as u8 {
+            MAX_TR_LOG2 as u8
+        } else {
+            core.log2_cuh
+        };
+        let loop_w = if core.log2_cuw > MAX_TR_LOG2 as u8 {
+            1 << (core.log2_cuw - MAX_TR_LOG2 as u8)
+        } else {
+            1
+        };
+        let loop_h = if core.log2_cuh > MAX_TR_LOG2 as u8 {
+            1 << (core.log2_cuh - MAX_TR_LOG2 as u8)
+        } else {
+            1
+        };
+        let stride = (1 << core.log2_cuw);
+        let sub_stride = (1 << log2_w_sub);
+        let mut tmp_coef = [0; N_C];
+        let is_sub = if loop_h + loop_w > 2 { true } else { false };
+        let mut cbf_all = true;
+
+        let is_intra = if core.pred_mode == PredMode::MODE_INTRA {
+            1
+        } else {
+            0
+        };
+
+        for i in 0..N_C {
+            for j in 0..MAX_SUB_TB_NUM {
+                core.is_coef_sub[i][j] = false;
+            }
+        }
+
+        for j in 0..loop_h {
+            for i in 0..loop_w {
+                if cbf_all {
+                    eco_cbf(
+                        bs,
+                        sbac,
+                        sbac_ctx,
+                        core.pred_mode,
+                        &mut cbf,
+                        b_no_cbf,
+                        is_sub,
+                        j + i,
+                        &mut cbf_all,
+                        &core.tree_cons,
+                    )?;
+                } else {
+                    cbf[Y_C] = 0;
+                    cbf[U_C] = 0;
+                    cbf[V_C] = 0;
+                }
+                /*
+                               int dqp;
+                               int qp_i_cb, qp_i_cr;
+                               if(ctx->pps.cu_qp_delta_enabled_flag && (((!(ctx->sps.dquant_flag) || (core->cu_qp_delta_code == 1 && !core->cu_qp_delta_is_coded))
+                                   && (cbf[Y_C] || cbf[U_C] || cbf[V_C])) || (core->cu_qp_delta_code == 2 && !core->cu_qp_delta_is_coded)))
+                               {
+                                   dqp = evcd_eco_dqp(bs);
+                                   core->qp = GET_QP(ctx->tile[core->tile_num].qp_prev_eco, dqp);
+                                   core->qp_y = GET_LUMA_QP(core->qp);
+                                   core->cu_qp_delta_is_coded = 1;
+                                   ctx->tile[core->tile_num].qp_prev_eco = core->qp;
+                               }
+                               else
+                               {
+                                   dqp = 0;
+                                   core->qp = GET_QP(ctx->tile[core->tile_num].qp_prev_eco, dqp);
+                                   core->qp_y = GET_LUMA_QP(core->qp);
+                               }
+
+                               qp_i_cb = EVC_CLIP3(-6 * (BIT_DEPTH - 8), 57, core->qp + ctx->sh.qp_u_offset);
+                               qp_i_cr = EVC_CLIP3(-6 * (BIT_DEPTH - 8), 57, core->qp + ctx->sh.qp_v_offset);
+                               core->qp_u = p_evc_tbl_qp_chroma_dynamic[0][qp_i_cb] + 6 * (BIT_DEPTH - 8);
+                               core->qp_v = p_evc_tbl_qp_chroma_dynamic[1][qp_i_cr] + 6 * (BIT_DEPTH - 8);
+
+                               if (ctx->sps.tool_ats && cbf[Y_C] && (core->log2_cuw <= 5 && core->log2_cuh <= 5) && is_intra)
+                               {
+                                   evc_assert(!evcd_check_only_inter(ctx, core));
+
+                                   ats_intra_cu_on = evcd_eco_ats_intra_cu(bs, sbac);
+
+                                   ats_mode_idx = 0;
+                                   if (ats_intra_cu_on)
+                                   {
+                                       u8 ats_intra_mode_h = evcd_eco_ats_mode_h(bs, sbac);
+                                       u8 ats_intra_mode_v = evcd_eco_ats_mode_v(bs, sbac);
+
+                                       ats_mode_idx = ((ats_intra_mode_h << 1) | ats_intra_mode_v);
+                                   }
+                               }
+                               else
+                               {
+                                   ats_intra_cu_on = 0;
+                                   ats_mode_idx = 0;
+                               }
+                               core->ats_intra_cu = ats_intra_cu_on;
+                               core->ats_intra_mode_h = (ats_mode_idx >> 1);
+                               core->ats_intra_mode_v = (ats_mode_idx & 1);
+
+                               if (ats_inter_avail && (cbf[Y_C] || cbf[U_C] || cbf[V_C]))
+                               {
+                                   evc_assert(!evcd_check_only_intra(ctx, core));
+
+                                   eco_ats_inter_info(bs, sbac, core->log2_cuw, core->log2_cuh, &core->ats_inter_info, ats_inter_avail);
+                               }
+                               else
+                               {
+                                   assert(core->ats_inter_info == 0);
+                               }
+
+                               for (c = 0; c < N_C; c++)
+                               {
+                                   if (cbf[c])
+                                   {
+                                       int pos_sub_x = i * (1 << (log2_w_sub - !!c));
+                                       int pos_sub_y = j * (1 << (log2_h_sub - !!c)) * (stride >> (!!c));
+
+                                       if (is_sub)
+                                       {
+                                           evc_block_copy(core->coef[c] + pos_sub_x + pos_sub_y, stride >> (!!c), coef_temp_buf[c], sub_stride >> (!!c), log2_w_sub - (!!c), log2_h_sub - (!!c));
+                                           coef_temp[c] = coef_temp_buf[c];
+                                       }
+                                       else
+                                       {
+                                           coef_temp[c] = core->coef[c];
+                                       }
+
+                                       evcd_eco_xcoef(bs, sbac, coef_temp[c], log2_w_sub - (!!c), log2_h_sub - (!!c), c, core->ats_inter_info, core->pred_mode == MODE_INTRA, ctx->sps.tool_adcc);
+
+                                       evc_assert_rv(ret == EVC_OK, ret);
+
+                                       core->is_coef_sub[c][(j << 1) | i] = 1;
+                                       tmp_coef[c] += 1;
+
+                                       if (is_sub)
+                                       {
+                                           evc_block_copy(coef_temp_buf[c], sub_stride >> (!!c), core->coef[c] + pos_sub_x + pos_sub_y, stride >> (!!c), log2_w_sub - (!!c), log2_h_sub - (!!c));
+                                       }
+                                   }
+                                   else
+                                   {
+                                       core->is_coef_sub[c][(j << 1) | i] = 0;
+                                       tmp_coef[c] += 0;
+                                   }
+                               }
+                */
+            }
+        }
+        for c in 0..N_C {
+            core.is_coef[c] = if tmp_coef[c] != 0 { true } else { false };
+        }
+
+        Ok(())
     }
 
     fn evcd_eco_cu(&mut self) -> Result<(), EvcError> {
@@ -395,7 +585,28 @@ impl EvcdCtx {
                 if evc_check_chroma(&core.tree_cons) {
                     core.ipm[1] = luma_ipm;
                 }
+
+                core.refi[REFP_0] = REFI_INVALID;
+                core.refi[REFP_1] = REFI_INVALID;
+                core.mv[REFP_0][MV_X] = 0;
+                core.mv[REFP_0][MV_Y] = 0;
+                core.mv[REFP_1][MV_X] = 0;
+                core.mv[REFP_1][MV_Y] = 0;
+            } else {
+                evc_assert_rv(false, EvcError::EVC_ERR_MALFORMED_BITSTREAM);
             }
+
+            /* clear coefficient buffer */
+            for i in 0..(cuw * cuh) as usize {
+                core.coef.data[Y_C][i] = 0;
+            }
+            for i in 0..((cuw >> 1) * (cuh >> 1)) as usize {
+                core.coef.data[U_C][i] = 0;
+                core.coef.data[V_C][i] = 0;
+            }
+
+            /* parse coefficients */
+            self.evcd_eco_coef()?;
         }
 
         Ok(())
@@ -648,7 +859,7 @@ impl EvcdCtx {
             for i in 0..NUM_CU_DEPTH {
                 for j in 0..BlockShape::NUM_BLOCK_SHAPE as usize {
                     for k in 0..MAX_CU_CNT_IN_LCU {
-                        self.core.split_mode.array[i][j][k] = SplitMode::NO_SPLIT;
+                        self.core.split_mode.data[i][j][k] = SplitMode::NO_SPLIT;
                     }
                 }
             }
