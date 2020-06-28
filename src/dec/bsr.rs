@@ -122,7 +122,7 @@ impl EvcdBsr {
 
         assert_ne!(byte, 0);
 
-        let remained = (self.buf.len() as isize - self.cur as isize) + 1;
+        let remained = (self.buf.len() as isize - self.cur as isize);
         if byte > remained {
             byte = remained;
         }
