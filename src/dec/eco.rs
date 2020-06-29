@@ -341,15 +341,97 @@ pub(crate) fn evcd_eco_mvp_idx(
     Ok(idx)
 }
 
+pub(crate) fn evcd_eco_abs_mvd(
+    bs: &mut EvcdBsr,
+    sbac: &mut EvcdSbac,
+    model: &mut SBAC_CTX_MODEL,
+) -> Result<u32, EvcError> {
+    let mut val = 0;
+
+    let mut code = sbac.decode_bin(bs, model)?; /* use one model */
+
+    if code == 0 {
+        let mut len = 0;
+        while (code & 1) == 0 {
+            if len == 0 {
+                code = sbac.decode_bin(bs, model)?;
+            } else {
+                code = sbac.decode_bin_ep(bs)?;
+            }
+            len += 1;
+        }
+        val = (1 << len) - 1;
+
+        while len != 0 {
+            if len == 0 {
+                code = sbac.decode_bin(bs, model)?;
+            } else {
+                code = sbac.decode_bin_ep(bs)?;
+            }
+            val += (code << (--len));
+        }
+    }
+
+    Ok(val)
+}
+
+pub(crate) fn evcd_eco_get_mvd(
+    bs: &mut EvcdBsr,
+    sbac: &mut EvcdSbac,
+    sbac_ctx: &mut EvcSbacCtx,
+    mvd: &mut [i16],
+) -> Result<(), EvcError> {
+    /* MV_X */
+    let mut t16 = evcd_eco_abs_mvd(bs, sbac, &mut sbac_ctx.mvd[0])? as i16;
+
+    if t16 == 0 {
+        mvd[MV_X] = 0;
+    } else {
+        /* sign */
+        let sign = sbac.decode_bin_ep(bs)?;
+
+        if sign != 0 {
+            mvd[MV_X] = -t16;
+        } else {
+            mvd[MV_X] = t16;
+        }
+    }
+
+    /* MV_Y */
+    t16 = evcd_eco_abs_mvd(bs, sbac, &mut sbac_ctx.mvd[0])? as i16;
+
+    if t16 == 0 {
+        mvd[MV_Y] = 0;
+    } else {
+        /* sign */
+        let sign = sbac.decode_bin_ep(bs)?;
+
+        if sign != 0 {
+            mvd[MV_Y] = -t16;
+        } else {
+            mvd[MV_Y] = t16;
+        }
+    }
+
+    EVC_TRACE_COUNTER(&mut bs.tracer);
+    EVC_TRACE(&mut bs.tracer, "mvd x ");
+    EVC_TRACE(&mut bs.tracer, mvd[MV_X]);
+    EVC_TRACE(&mut bs.tracer, " mvd y ");
+    EVC_TRACE(&mut bs.tracer, mvd[MV_Y]);
+    EVC_TRACE(&mut bs.tracer, " \n");
+
+    Ok(())
+}
+
 pub(crate) fn evcd_eco_direct_mode_flag(
     bs: &mut EvcdBsr,
     sbac: &mut EvcdSbac,
     sbac_ctx: &mut EvcSbacCtx,
-) -> Result<PredDir, EvcError> {
+) -> Result<InterPredDir, EvcError> {
     let inter_dir = if sbac.decode_bin(bs, &mut sbac_ctx.direct_mode_flag[0])? != 0 {
-        PredDir::PRED_DIR
+        InterPredDir::PRED_DIR
     } else {
-        PredDir::PRED_L0
+        InterPredDir::PRED_L0
     };
 
     EVC_TRACE_COUNTER(&mut bs.tracer);
@@ -358,6 +440,62 @@ pub(crate) fn evcd_eco_direct_mode_flag(
     EVC_TRACE(&mut bs.tracer, " \n");
 
     Ok(inter_dir)
+}
+
+pub(crate) fn evcd_eco_inter_pred_idc(
+    bs: &mut EvcdBsr,
+    sbac: &mut EvcdSbac,
+    sbac_ctx: &mut EvcSbacCtx,
+    slice_type: SliceType,
+) -> Result<InterPredDir, EvcError> {
+    let mut tmp = true;
+    if check_bi_applicability(slice_type) {
+        tmp = sbac.decode_bin(bs, &mut sbac_ctx.inter_dir[0])? != 0;
+    }
+
+    let inter_dir = if !tmp {
+        InterPredDir::PRED_BI
+    } else {
+        tmp = sbac.decode_bin(bs, &mut sbac_ctx.inter_dir[1])? != 0;
+        if tmp {
+            InterPredDir::PRED_L1
+        } else {
+            InterPredDir::PRED_L0
+        }
+    };
+
+    EVC_TRACE_COUNTER(&mut bs.tracer);
+    EVC_TRACE(&mut bs.tracer, "inter dir ");
+    EVC_TRACE(&mut bs.tracer, inter_dir as u8);
+    EVC_TRACE(&mut bs.tracer, " \n");
+
+    Ok(inter_dir)
+}
+
+pub(crate) fn evcd_eco_refi(
+    bs: &mut EvcdBsr,
+    sbac: &mut EvcdSbac,
+    sbac_ctx: &mut EvcSbacCtx,
+    num_refp: u8,
+) -> Result<u8, EvcError> {
+    let mut ref_num = 0;
+    if num_refp > 1 {
+        if sbac.decode_bin(bs, &mut sbac_ctx.refi[0])? != 0 {
+            ref_num += 1;
+            if num_refp > 2 && sbac.decode_bin(bs, &mut sbac_ctx.refi[1])? != 0 {
+                ref_num += 1;
+                while ref_num < num_refp - 1 {
+                    if sbac.decode_bin_ep(bs)? == 0 {
+                        break;
+                    }
+                    ref_num += 1;
+                }
+                return Ok(ref_num);
+            }
+        }
+    }
+
+    Ok(ref_num)
 }
 
 pub(crate) fn evcd_eco_intra_dir_b(

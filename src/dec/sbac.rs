@@ -304,8 +304,9 @@ impl EvcdSbac {
         num_ctx: u32,
         max_num: u32,
     ) -> Result<u32, EvcError> {
+        let mut ctx_idx = 0;
         if max_num > 1 {
-            for ctx_idx in 0..max_num - 1 {
+            while ctx_idx < max_num - 1 {
                 let symbol = self.decode_bin(
                     bs,
                     &mut models[if ctx_idx > num_ctx - 1 {
@@ -315,11 +316,12 @@ impl EvcdSbac {
                     } as usize],
                 )?;
                 if symbol == 0 {
-                    return Ok(ctx_idx);
+                    break;
                 }
+                ctx_idx += 1;
             }
         }
 
-        Ok(0)
+        Ok(ctx_idx)
     }
 }

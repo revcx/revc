@@ -177,7 +177,7 @@ impl Default for PredMode {
  * prediction direction
  *****************************************************************************/
 #[derive(Clone, Copy, PartialEq)]
-pub(crate) enum PredDir {
+pub(crate) enum InterPredDir {
     /* inter pred direction, look list0 side */
     PRED_L0 = 0,
     /* inter pred direction, look list1 side */
@@ -190,9 +190,9 @@ pub(crate) enum PredDir {
     PRED_DIR = 4,
 }
 
-impl Default for PredDir {
+impl Default for InterPredDir {
     fn default() -> Self {
-        PredDir::PRED_L0
+        InterPredDir::PRED_L0
     }
 }
 
@@ -783,4 +783,89 @@ pub(crate) struct TREE_CONS {
 pub(crate) struct TREE_CONS_NEW {
     pub(crate) tree_type: TREE_TYPE,
     pub(crate) mode_cons: MODE_CONS,
+}
+
+/* picture store structure */
+#[derive(Default)]
+pub(crate) struct EvcPic {
+    /*
+    /* Address of Y buffer (include padding) */
+    pel             *buf_y;
+    /* Address of U buffer (include padding) */
+    pel             *buf_u;
+    /* Address of V buffer (include padding) */
+    pel             *buf_v;
+    /* Start address of Y component (except padding) */
+    pel             *y;
+    /* Start address of U component (except padding)  */
+    pel             *u;
+    /* Start address of V component (except padding)  */
+    pel             *v;
+    /* Stride of luma picture */
+    int              s_l;
+    /* Stride of chroma picture */
+    int              s_c;
+    /* Width of luma picture */
+    int              w_l;
+    /* Height of luma picture */
+    int              h_l;
+    /* Width of chroma picture */
+    int              w_c;
+    /* Height of chroma picture */
+    int              h_c;
+    /* padding size of luma */
+    int              pad_l;
+    /* padding size of chroma */
+    int              pad_c;
+    /* image buffer */
+    EVC_IMGB       * imgb;
+    /* presentation temporal reference of this picture */
+    u32              poc;
+    /* 0: not used for reference buffer, reference picture type */
+    u8               is_ref;
+    /* needed for output? */
+    u8               need_for_out;
+    /* scalable layer id */
+    u8               temporal_id;
+    s16            (*map_mv)[REFP_NUM][MV_D];
+#if DMVR_LAG
+    s16            (*map_unrefined_mv)[REFP_NUM][MV_D];
+#endif
+    s8             (*map_refi)[REFP_NUM];
+    u32              list_poc[MAX_NUM_REF_PICS];
+    u8               m_alfCtuEnableFlag[3][510]; //510 = 30*17 -> class A1 resolution with CU ~ 128
+    int              pic_deblock_alpha_offset;
+    int              pic_deblock_beta_offset;
+    int              pic_qp_u_offset;
+    int              pic_qp_v_offset;
+    u8               digest[N_C][16];
+    */}
+
+/*****************************************************************************
+ * picture manager for DPB in decoder and RPB in encoder
+ *****************************************************************************/
+#[derive(Default)]
+pub(crate) struct EvcPm {
+    /* picture store (including reference and non-reference) */
+    pic: [Box<EvcPic>; MAX_PB_SIZE],
+    /* address of reference pictures */
+    pic_ref: [Box<EvcPic>; MAX_NUM_REF_PICS],
+    /* maximum reference picture count */
+    max_num_ref_pics: u8,
+    /* current count of available reference pictures in PB */
+    cur_num_ref_pics: u8,
+    /* number of reference pictures */
+    pub(crate) num_refp: [u8; REFP_NUM],
+    /* next output POC */
+    poc_next_output: u32,
+    /* POC increment */
+    poc_increase: u8,
+    /* max number of picture buffer */
+    max_pb_size: u8,
+    /* current picture buffer size */
+    cur_pb_size: u8,
+    /* address of leased picture for current decoding/encoding buffer */
+    pic_lease: Box<EvcPic>,
+    /* picture buffer allocator */
+    //PICBUF_ALLOCATOR pa;
 }

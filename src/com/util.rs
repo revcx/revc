@@ -234,3 +234,12 @@ pub(crate) fn scan_tbl(size: i16) -> Box<[u16]> {
 
     scan
 }
+
+#[inline]
+pub(crate) fn check_bi_applicability(slice_type: SliceType) -> bool {
+    if slice_type == SliceType::EVC_ST_B {
+        true
+    } else {
+        false
+    }
+}

@@ -127,7 +127,7 @@ pub(crate) struct EvcdCore {
 
     mvp_idx: [u8; REFP_NUM],
     mvd: [[i16; MV_D]; REFP_NUM],
-    inter_dir: PredDir,
+    inter_dir: InterPredDir,
     bi_idx: i16,
     ctx_flags: [u8; CtxNevIdx::NUM_CNID as usize],
     tree_cons: TREE_CONS,
@@ -178,7 +178,7 @@ pub(crate) struct EvcdCtx {
     /* current slice header */
     sh: EvcSh,
     /* decoded picture buffer management */
-    // EVC_PM                  dpm;
+    dpm: EvcPm,
     /* create descriptor */
     //EVCD_CDSC               cdsc;
     /* sequence parameter set */
@@ -532,7 +532,7 @@ impl EvcdCtx {
         core.pred_mode = PredMode::MODE_INTRA;
         core.mvp_idx[REFP_0] = 0;
         core.mvp_idx[REFP_1] = 0;
-        core.inter_dir = PredDir::PRED_L0;
+        core.inter_dir = InterPredDir::PRED_L0;
         core.bi_idx = 0;
         for i in 0..REFP_NUM {
             for j in 0..MV_D {
@@ -605,7 +605,26 @@ impl EvcdCtx {
             //TODO: bugfix? missing SLICE_TYPE==B
             if core.pred_mode == PredMode::MODE_INTER {
                 core.inter_dir = evcd_eco_direct_mode_flag(bs, sbac, sbac_ctx)?;
-            //TODO
+
+                if core.inter_dir != InterPredDir::PRED_DIR {
+                    /* inter_pred_idc */
+                    core.inter_dir =
+                        evcd_eco_inter_pred_idc(bs, sbac, sbac_ctx, self.sh.slice_type)?;
+
+                    for inter_dir_idx in 0..2 {
+                        /* 0: forward, 1: backward */
+                        if (((core.inter_dir as usize + 1) >> inter_dir_idx) & 1) != 0 {
+                            core.refi[inter_dir_idx] = evcd_eco_refi(
+                                bs,
+                                sbac,
+                                sbac_ctx,
+                                self.dpm.num_refp[inter_dir_idx],
+                            )? as i8;
+                            core.mvp_idx[inter_dir_idx] = evcd_eco_mvp_idx(bs, sbac, sbac_ctx)?;
+                            evcd_eco_get_mvd(bs, sbac, sbac_ctx, &mut core.mvd[inter_dir_idx])?;
+                        }
+                    }
+                }
             } else if core.pred_mode == PredMode::MODE_INTRA {
                 core.mpm_b_list = evc_get_mpm_b(
                     core.x_scu,
