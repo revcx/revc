@@ -368,7 +368,8 @@ pub(crate) fn evcd_eco_abs_mvd(
             } else {
                 code = sbac.decode_bin_ep(bs)?;
             }
-            val += (code << (--len));
+            len -= 1;
+            val += code << len;
         }
     }
 
