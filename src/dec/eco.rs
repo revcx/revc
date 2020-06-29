@@ -479,6 +479,13 @@ pub(crate) fn evcd_eco_refi(
     sbac_ctx: &mut EvcSbacCtx,
     num_refp: u8,
 ) -> Result<u8, EvcError> {
+    //#if 1 //yuliu debug
+    EVC_TRACE_COUNTER(&mut bs.tracer);
+    EVC_TRACE(&mut bs.tracer, "num_refp: ");
+    EVC_TRACE(&mut bs.tracer, num_refp);
+    EVC_TRACE(&mut bs.tracer, " \n");
+    //#endif
+
     let mut ref_num = 0;
     if num_refp > 1 {
         if sbac.decode_bin(bs, &mut sbac_ctx.refi[0])? != 0 {

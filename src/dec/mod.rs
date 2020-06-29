@@ -1,5 +1,6 @@
 use super::api::*;
 use super::com::ipred::*;
+use super::com::picman::*;
 use super::com::tbl::*;
 use super::com::util::*;
 use super::com::*;
@@ -252,7 +253,7 @@ pub(crate) struct EvcdCtx {
     /* bitstream has an error? */
     bs_err: u8,
     /* reference picture (0: foward, 1: backward) */
-    //EVC_REFP                refp[MAX_NUM_REF_PICS][REFP_NUM];
+    refp: [[EvcRefP; REFP_NUM]; MAX_NUM_REF_PICS],
     /* flag for picture signature enabling */
     use_pic_sign: u8,
     /* picture signature (MD5 digest 128bits) for each component */
@@ -267,7 +268,7 @@ pub(crate) struct EvcdCtx {
 const nalu_size_field_in_bytes: usize = 4;
 
 impl EvcdCtx {
-    fn sequence_init(&mut self) {
+    fn sequence_init(&mut self) -> Result<(), EvcError> {
         if self.sps.pic_width_in_luma_samples != self.w
             || self.sps.pic_height_in_luma_samples != self.h
         {
@@ -309,6 +310,14 @@ impl EvcdCtx {
 
         /* alloc map for intra prediction mode */
         self.map_ipm = vec![IntraPredDir::default(); self.f_scu as usize];
+
+        self.dpm.evc_picman_init(
+            MAX_PB_SIZE as u8,
+            MAX_NUM_REF_PICS as u8,
+            //PICBUF_ALLOCATOR * pa
+        )?;
+
+        Ok(())
     }
 
     fn slice_init(&mut self) {
@@ -602,8 +611,8 @@ impl EvcdCtx {
             core.pred_mode =
                 evcd_eco_pred_mode(bs, sbac, sbac_ctx, &core.ctx_flags, &core.tree_cons)?;
 
-            //TODO: bugfix? missing SLICE_TYPE==B
             if core.pred_mode == PredMode::MODE_INTER {
+                //TODO: bugfix? missing SLICE_TYPE==B for direct_mode_flag?
                 core.inter_dir = evcd_eco_direct_mode_flag(bs, sbac, sbac_ctx)?;
 
                 if core.inter_dir != InterPredDir::PRED_DIR {
@@ -971,7 +980,7 @@ impl EvcdCtx {
         if nalu_type == NaluType::EVC_SPS_NUT {
             evcd_eco_sps(&mut self.bs, &mut self.sps)?;
 
-            self.sequence_init();
+            self.sequence_init()?;
         } else if nalu_type == NaluType::EVC_PPS_NUT {
             evcd_eco_pps(&mut self.bs, &self.sps, &mut self.pps)?;
         } else if nalu_type < NaluType::EVC_SPS_NUT {
@@ -1012,10 +1021,15 @@ impl EvcdCtx {
                 self.slice_num += 1;
             }
 
-            if !self.sps.tool_rpl {
-                /* initialize reference pictures */
-                //evc_picman_refp_init(&self.dpm, self.sps.max_num_ref_pics, sh->slice_type, self.poc.poc_val, self.nalu.nuh_temporal_id, self.last_intra_poc, self.refp);
-            }
+            /* initialize reference pictures */
+            self.dpm.evc_picman_refp_init(
+                self.sps.max_num_ref_pics,
+                self.sh.slice_type,
+                self.poc.poc_val as u32,
+                self.nalu.nuh_temporal_id,
+                self.last_intra_poc,
+                &self.refp,
+            );
 
             if self.num_ctb == self.f_lcu {
                 /* get available frame buffer for decoded image */
