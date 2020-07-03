@@ -9,7 +9,7 @@ use std::fmt;
 
 const FRAME_MARGIN: usize = 16 + SUBPEL_FILTER_SIZE;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct Frame<T: Pixel> {
     pub planes: [Plane<T>; 3],
     pub chroma_sampling: ChromaSampling,

@@ -158,6 +158,9 @@ pub trait Pixel:
 {
 }
 
+pub type pel = u16;
+//pub type double_pel = i32;
+
 impl Pixel for u8 {}
 impl Pixel for u16 {}
 

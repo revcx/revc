@@ -17,7 +17,7 @@ pub enum PlaneType {
 }
 
 /// Plane-specific configuration.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct PlaneConfig {
     pub stride: usize,
     pub alloc_height: usize,
@@ -47,6 +47,13 @@ pub struct PlaneData<T: Pixel> {
 
 unsafe impl<T: Pixel + Send> Send for PlaneData<T> {}
 unsafe impl<T: Pixel + Sync> Sync for PlaneData<T> {}
+
+impl<T: Pixel> Default for PlaneData<T> {
+    fn default() -> Self {
+        let pd = unsafe { Self::new_uninitialized(0) };
+        pd
+    }
+}
 
 impl<T: Pixel> Clone for PlaneData<T> {
     fn clone(&self) -> Self {
@@ -128,7 +135,7 @@ impl<T: Pixel> PlaneData<T> {
     }
 }
 
-#[derive(Clone, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq, Default)]
 pub struct Plane<T: Pixel> {
     pub data: PlaneData<T>,
     pub cfg: PlaneConfig,

@@ -1,76 +1,48 @@
 use super::*;
+use crate::api::frame::*;
+use crate::api::util::*;
 
 /* picture store structure */
 #[derive(Default)]
 pub(crate) struct EvcPic {
-    /*
-    /* Address of Y buffer (include padding) */
-    pel             *buf_y;
-    /* Address of U buffer (include padding) */
-    pel             *buf_u;
-    /* Address of V buffer (include padding) */
-    pel             *buf_v;
-    /* Start address of Y component (except padding) */
-    pel             *y;
-    /* Start address of U component (except padding)  */
-    pel             *u;
-    /* Start address of V component (except padding)  */
-    pel             *v;
-    /* Stride of luma picture */
-    int              s_l;
-    /* Stride of chroma picture */
-    int              s_c;
-    /* Width of luma picture */
-    int              w_l;
-    /* Height of luma picture */
-    int              h_l;
-    /* Width of chroma picture */
-    int              w_c;
-    /* Height of chroma picture */
-    int              h_c;
-    /* padding size of luma */
-    int              pad_l;
-    /* padding size of chroma */
-    int              pad_c;
-    /* image buffer */
-    EVC_IMGB       * imgb;
-    /* presentation temporal reference of this picture */
+    pub(crate) frame: Frame<pel>,
 
-     */
-    poc: u32,
+    /* presentation temporal reference of this picture */
+    pub(crate) poc: u32,
     /* 0: not used for reference buffer, reference picture type */
-    is_ref: bool,
+    pub(crate) is_ref: bool,
     /* needed for output? */
-    need_for_out: bool,
+    pub(crate) need_for_out: bool,
     /* scalable layer id */
-    temporal_id: u8,
+    pub(crate) temporal_id: u8,
     /*
         s16            (*map_mv)[REFP_NUM][MV_D];
     #if DMVR_LAG
         s16            (*map_unrefined_mv)[REFP_NUM][MV_D];
     #endif
         s8             (*map_refi)[REFP_NUM];
-        u32              list_poc[MAX_NUM_REF_PICS];
-        u8               m_alfCtuEnableFlag[3][510]; //510 = 30*17 -> class A1 resolution with CU ~ 128
-        int              pic_deblock_alpha_offset;
-        int              pic_deblock_beta_offset;
-        int              pic_qp_u_offset;
-        int              pic_qp_v_offset;
-        u8               digest[N_C][16];
         */
+    pub(crate) list_poc: [u32; MAX_NUM_REF_PICS],
+
+    pub(crate) pic_deblock_alpha_offset: i8,
+    pub(crate) pic_deblock_beta_offset: i8,
+    pub(crate) pic_qp_u_offset: i8,
+    pub(crate) pic_qp_v_offset: i8,
+    pub(crate) digest: [[u8; 16]; N_C],
 }
 
 /* reference picture structure */
 #[derive(Default)]
 pub(crate) struct EvcRefP {
     /* address of reference picture */
-/*EVC_PIC        * pic;
-/* POC of reference picture */
-             poc: u32,
-s16            (*map_mv)[REFP_NUM][MV_D];
-s16            (*map_unrefined_mv)[REFP_NUM][MV_D];
-s8             (*map_refi)[REFP_NUM];
-u32             *list_poc;*/}
+    pub(crate) pic: Box<EvcPic>,
+    /* POC of reference picture */
+    pub(crate) poc: u32,
+    /*s16            (*map_mv)[REFP_NUM][MV_D];
+    s16            (*map_unrefined_mv)[REFP_NUM][MV_D];
+    s8             (*map_refi)[REFP_NUM];
+    u32             *list_poc;*/
+}
 
 /*****************************************************************************
  * picture manager for DPB in decoder and RPB in encoder
@@ -78,25 +50,25 @@ u32             *list_poc;*/}
 #[derive(Default)]
 pub(crate) struct EvcPm {
     /* picture store (including reference and non-reference) */
-    pic: [Box<EvcPic>; MAX_PB_SIZE],
+    pub(crate) pic: [Box<EvcPic>; MAX_PB_SIZE],
     /* address of reference pictures */
-    pic_ref: [Box<EvcPic>; MAX_NUM_REF_PICS],
+    pub(crate) pic_ref: [Box<EvcPic>; MAX_NUM_REF_PICS],
     /* maximum reference picture count */
-    max_num_ref_pics: u8,
+    pub(crate) max_num_ref_pics: u8,
     /* current count of available reference pictures in PB */
-    cur_num_ref_pics: u8,
+    pub(crate) cur_num_ref_pics: u8,
     /* number of reference pictures */
     pub(crate) num_refp: [u8; REFP_NUM],
     /* next output POC */
-    poc_next_output: u32,
+    pub(crate) poc_next_output: u32,
     /* POC increment */
-    poc_increase: u8,
+    pub(crate) poc_increase: u8,
     /* max number of picture buffer */
-    max_pb_size: u8,
+    pub(crate) max_pb_size: u8,
     /* current picture buffer size */
-    cur_pb_size: u8,
+    pub(crate) cur_pb_size: u8,
     /* address of leased picture for current decoding/encoding buffer */
-    pic_lease: Box<EvcPic>,
+    pub(crate) pic_lease: Box<EvcPic>,
     /* picture buffer allocator */
     //PICBUF_ALLOCATOR pa;
 }

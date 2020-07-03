@@ -11,8 +11,6 @@ use crate::api::*;
 /*****************************************************************************
  * types
  *****************************************************************************/
-pub(crate) type pel = i16;
-pub(crate) type double_pel = i32;
 
 #[inline]
 pub(crate) fn evc_assert_rv(x: bool, r: EvcError) -> Result<(), EvcError> {

@@ -60,7 +60,8 @@ pub enum NaluType {
     EVC_SPS_NUT = 24,
     EVC_PPS_NUT = 25,
     EVC_APS_NUT = 26,
-    EVC_SEI_NUT = 27,
+    EVC_FD_NUT = 27,
+    EVC_SEI_NUT = 28,
     EVC_UNKNOWN_NUT,
 }
 
@@ -73,6 +74,7 @@ impl fmt::Display for NaluType {
             EVC_SPS_NUT => write!(f, "Sequence Parameter Se"),
             EVC_PPS_NUT => write!(f, "Picture Parameter Set"),
             EVC_APS_NUT => write!(f, "Adaptation Parameter Set"),
+            EVC_FD_NUT => write!(f, "Filler Data"),
             EVC_SEI_NUT => write!(f, "Supplemental Enhancement Information"),
             EVC_UNKNOWN_NUT => write!(f, "Unknown"),
         }
@@ -88,7 +90,8 @@ impl From<u8> for NaluType {
             24 => EVC_SPS_NUT,
             25 => EVC_PPS_NUT,
             26 => EVC_APS_NUT,
-            27 => EVC_SEI_NUT,
+            27 => EVC_FD_NUT,
+            28 => EVC_SEI_NUT,
             _ => EVC_UNKNOWN_NUT,
         }
     }
