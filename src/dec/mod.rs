@@ -1029,7 +1029,7 @@ impl EvcdCtx {
                 self.poc.poc_val as u32,
                 self.nalu.nuh_temporal_id,
                 self.last_intra_poc,
-                &self.refp,
+                &mut self.refp,
             );
 
             if self.num_ctb == self.f_lcu {
