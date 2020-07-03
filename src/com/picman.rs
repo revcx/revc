@@ -100,6 +100,99 @@ impl EvcPm {
         cnt
     }
 
+    fn picman_move_pic(pic: &mut [Option<Rc<RefCell<EvcPic>>>], from: usize, to: usize) {
+        for i in from..to {
+            pic.swap(i, i + 1);
+        }
+    }
+
+    fn pic_marking_no_rpl(&mut self, ref_pic_gap_length: u32) {
+        // mark all pics with layer id > 0 as unused for reference
+        /* this is coding order */
+        self.pic
+            .iter()
+            .scan(-1, |i, pic| {
+                *i += 1;
+                if let Some(p) = pic {
+                    let mut p = p.borrow_mut();
+                    if p.is_ref
+                        && (p.temporal_id > 0
+                            || (*i > 0
+                                && ref_pic_gap_length > 0
+                                && p.poc % ref_pic_gap_length != 0))
+                    {
+                        p.is_ref = false;
+                    }
+                }
+
+                Some(pic)
+            })
+            .collect::<Vec<&Option<Rc<RefCell<EvcPic>>>>>();
+
+        let tbm = self
+            .pic
+            .iter()
+            .map(|x| x.is_some() && x.as_ref().unwrap().borrow().is_ref)
+            .collect::<Vec<bool>>();
+
+        assert_eq!(tbm.len(), MAX_PB_SIZE);
+        for i in 0..tbm.len() {
+            if tbm[i] {
+                EvcPm::picman_move_pic(&mut self.pic, i, MAX_PB_SIZE - 1);
+            }
+        }
+
+        let cur_num_ref_pics = self.pic.iter().fold(0, |acc, x| {
+            acc + if x.is_some() && x.as_ref().unwrap().borrow().is_ref {
+                1
+            } else {
+                0
+            }
+        });
+
+        // TODO: change to signalled num ref pics
+        if cur_num_ref_pics >= MAX_NUM_ACTIVE_REF_FRAME {
+            self.pic
+                .iter()
+                .scan(cur_num_ref_pics, |i, pic| {
+                    if *i < MAX_NUM_ACTIVE_REF_FRAME {
+                        None
+                    } else {
+                        if let Some(p) = pic {
+                            let mut p = p.borrow_mut();
+                            if p.is_ref {
+                                p.is_ref = false;
+                                *i -= 1;
+                            }
+                        }
+                        Some(pic)
+                    }
+                })
+                .collect::<Vec<&Option<Rc<RefCell<EvcPic>>>>>();
+
+            let tbm = self
+                .pic
+                .iter()
+                .map(|x| x.is_some() && x.as_ref().unwrap().borrow().is_ref)
+                .collect::<Vec<bool>>();
+
+            assert_eq!(tbm.len(), MAX_PB_SIZE);
+            for i in 0..tbm.len() {
+                if tbm[i] {
+                    EvcPm::picman_move_pic(&mut self.pic, i, MAX_PB_SIZE - 1);
+                }
+            }
+        }
+
+        self.cur_num_ref_pics = self.pic.iter().fold(0, |acc, x| {
+            acc + if x.is_some() && x.as_ref().unwrap().borrow().is_ref {
+                1
+            } else {
+                0
+            }
+        });
+    }
+
     pub(crate) fn evc_picman_init(
         &mut self,
         max_pb_size: u8,
