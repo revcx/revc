@@ -425,28 +425,34 @@ impl<T: Pixel> EvcPm<T> {
         }
 
         if let Some(pic) = pic {
-            let mut p = pic.borrow_mut();
-            if !ref_pic {
-                p.is_ref = false;
-            } else {
-                p.is_ref = true;
-            }
+            let mut is_ref = {
+                let mut p = pic.borrow_mut();
+                if !ref_pic {
+                    p.is_ref = false;
+                } else {
+                    p.is_ref = true;
+                }
 
-            p.temporal_id = temporal_id;
-            p.poc = poc;
-            p.need_for_out = need_for_output;
+                p.temporal_id = temporal_id;
+                p.poc = poc;
+                p.need_for_out = need_for_output;
+                p.is_ref
+            };
 
             /* put picture into listed RPB */
-            if p.is_ref {
+            if is_ref {
                 self.picman_set_pic_to_pb(Rc::clone(pic), refp, self.cur_num_ref_pics as isize);
                 self.cur_num_ref_pics += 1;
             } else {
                 self.picman_set_pic_to_pb(Rc::clone(pic), refp, -1);
             }
+        }
 
-            if self.pic_lease.is_some() && self.pic_lease.as_ref().unwrap().borrow().poc == p.poc {
-                self.pic_lease = None;
-            }
+        if self.pic_lease.is_some()
+            && pic.is_some()
+            && self.pic_lease.as_ref().unwrap().borrow().poc == pic.as_ref().unwrap().borrow().poc
+        {
+            self.pic_lease = None;
         }
     }
 

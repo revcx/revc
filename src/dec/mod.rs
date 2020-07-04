@@ -1149,7 +1149,7 @@ impl<T: Pixel> EvcdCtx<T> {
 
             if self.num_ctb == self.f_lcu {
                 /* get available frame buffer for decoded image */
-                //self.pic = self.dpm.evc_picman_get_empty_pic()?;
+                self.pic = self.dpm.evc_picman_get_empty_pic()?;
 
                 /* get available frame buffer for decoded image */
                 //self.map_refi = self.pic->map_refi;
