@@ -104,7 +104,8 @@ pub(crate) const COEF_SCAN_ZIGZAG: usize = 0;
 pub(crate) const EXTRA_FRAME: usize = MAX_NUM_ACTIVE_REF_FRAME;
 
 /* maximum picture buffer size */
-pub(crate) const MAX_PB_SIZE: usize = (MAX_NUM_REF_PICS + EXTRA_FRAME);
+pub(crate) const DRA_FRAME: usize = 1;
+pub(crate) const MAX_PB_SIZE: usize = MAX_NUM_REF_PICS + EXTRA_FRAME + DRA_FRAME;
 
 pub(crate) const MAX_NUM_TILES_ROW: usize = 22;
 pub(crate) const MAX_NUM_TILES_COL: usize = 20;

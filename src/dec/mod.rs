@@ -427,6 +427,9 @@ impl<T: Pixel> EvcdCtx<T> {
         /* alloc map for intra prediction mode */
         self.map_ipm = vec![IntraPredDir::default(); self.f_scu as usize];
 
+        /* initialize reference picture manager */
+        self.ref_pic_gap_length = (1 << self.sps.log2_ref_pic_gap_length) as u32;
+
         self.dpm.evc_picman_init(
             MAX_PB_SIZE as u8,
             MAX_NUM_REF_PICS as u8,
