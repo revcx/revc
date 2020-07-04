@@ -1081,6 +1081,35 @@ impl<T: Pixel> EvcdCtx<T> {
         Ok(())
     }
 
+    fn make_stat(&mut self, btype: NaluType) -> EvcdStat {
+        let mut stat = EvcdStat {
+            nalu_type: btype,
+            stype: SliceType::EVC_ST_I,
+            fnum: -1,
+            read: nalu_size_field_in_bytes + self.bs.get_read_byte() as usize,
+            ..Default::default()
+        };
+
+        if btype < NaluType::EVC_SPS_NUT {
+            stat.fnum = self.pic_cnt as isize;
+            stat.stype = self.sh.slice_type;
+
+            /* increase decoded picture count */
+            self.pic_cnt += 1;
+            stat.poc = self.poc.poc_val as isize;
+            stat.tid = self.nalu.nuh_temporal_id as isize;
+
+            for i in 0..2 {
+                stat.refpic_num[i] = self.dpm.num_refp[i];
+                for j in 0..stat.refpic_num[i] as usize {
+                    stat.refpic[i][j] = self.refp[j][i].poc as isize;
+                }
+            }
+        }
+
+        stat
+    }
+
     pub(crate) fn decode_nalu(&mut self, pkt: &mut Packet) -> Result<EvcdStat, EvcError> {
         let data = pkt.data.take();
         let buf = if let Some(b) = data {
@@ -1189,13 +1218,12 @@ impl<T: Pixel> EvcdCtx<T> {
             return Err(EvcError::EVC_ERR_MALFORMED_BITSTREAM);
         }
 
-        Ok(EvcdStat {
-            read: nalu_size_field_in_bytes + self.bs.get_read_byte() as usize,
-            nalu_type,
-            stype: self.sh.slice_type,
-            fnum: -1,
-            ..Default::default()
-        })
+        let mut stat = self.make_stat(nalu_type);
+        //if self.num_ctb > 0 {
+        stat.fnum = -1;
+        //}
+
+        Ok(stat)
     }
 
     pub(crate) fn pull_frm(&mut self) -> Result<Frame<T>, EvcError> {
