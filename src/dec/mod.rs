@@ -1,3 +1,4 @@
+use super::api::frame::*;
 use super::api::util::*;
 use super::api::*;
 use super::com::ipred::*;
@@ -5,6 +6,9 @@ use super::com::picman::*;
 use super::com::tbl::*;
 use super::com::util::*;
 use super::com::*;
+
+use std::cell::RefCell;
+use std::rc::Rc;
 
 mod bsr;
 mod eco;
@@ -164,8 +168,8 @@ impl EvcdCore {
  *
  * All have to be stored are in this structure.
  *****************************************************************************/
-#[derive(Default)]
-pub(crate) struct EvcdCtx {
+//#[derive(Default)]
+pub(crate) struct EvcdCtx<T: Pixel> {
     /* magic code */
     pub(crate) magic: u32,
 
@@ -180,7 +184,7 @@ pub(crate) struct EvcdCtx {
     /* current slice header */
     sh: EvcSh,
     /* decoded picture buffer management */
-    dpm: EvcPm,
+    dpm: EvcPm<T>,
     /* create descriptor */
     //EVCD_CDSC               cdsc;
     /* sequence parameter set */
@@ -188,7 +192,7 @@ pub(crate) struct EvcdCtx {
     /* picture parameter set */
     pps: EvcPps,
     /* current decoded (decoding) picture buffer */
-    //EVC_PIC               * pic;
+    pic: Option<Rc<RefCell<EvcPic<T>>>>,
     /* SBAC */
     sbac_dec: EvcdSbac,
     sbac_ctx: EvcSbacCtx,
@@ -250,11 +254,11 @@ pub(crate) struct EvcdCtx {
     /* flag whether current picture is refecened picture or not */
     slice_ref_flag: bool,
     /* distance between ref pics in addition to closest ref ref pic in LD*/
-    ref_pic_gap_length: isize,
+    ref_pic_gap_length: u32,
     /* bitstream has an error? */
     bs_err: u8,
     /* reference picture (0: foward, 1: backward) */
-    refp: [[EvcRefP; REFP_NUM]; MAX_NUM_REF_PICS],
+    refp: Vec<Vec<EvcRefP<T>>>, //[[EvcRefP<T>; REFP_NUM]; MAX_NUM_REF_PICS],
     /* flag for picture signature enabling */
     use_pic_sign: u8,
     /* picture signature (MD5 digest 128bits) for each component */
@@ -268,7 +272,118 @@ pub(crate) struct EvcdCtx {
 
 const nalu_size_field_in_bytes: usize = 4;
 
-impl EvcdCtx {
+impl<T: Pixel> EvcdCtx<T> {
+    pub(crate) fn new() -> Self {
+        let mut refp = vec![];
+        for j in 0..MAX_NUM_REF_PICS {
+            let mut refp1d = vec![]; //[[EvcRefP::new(); REFP_NUM]; MAX_NUM_REF_PICS];
+            for i in 0..REFP_NUM {
+                refp1d.push(EvcRefP::new());
+            }
+            refp.push(refp1d);
+        }
+
+        EvcdCtx {
+            magic: 0,
+
+            /* EVCD identifier */
+            //EVCD                    id;
+            /* CORE information used for fast operation */
+            core: EvcdCore::default(),
+            /* current decoding bitstream */
+            bs: EvcdBsr::default(),
+            /* current nalu header */
+            nalu: EvcNalu::default(),
+            /* current slice header */
+            sh: EvcSh::default(),
+            /* decoded picture buffer management */
+            dpm: EvcPm::new(),
+            /* create descriptor */
+            //EVCD_CDSC               cdsc;
+            /* sequence parameter set */
+            sps: EvcSps::default(),
+            /* picture parameter set */
+            pps: EvcPps::default(),
+            /* current decoded (decoding) picture buffer */
+            pic: None,
+            /* SBAC */
+            sbac_dec: EvcdSbac::default(),
+            sbac_ctx: EvcSbacCtx::default(),
+            /* decoding picture width */
+            w: 0,
+            /* decoding picture height */
+            h: 0,
+            /* maximum CU width and height */
+            max_cuwh: 0,
+            /* log2 of maximum CU width and height */
+            log2_max_cuwh: 0,
+
+            /* minimum CU width and height */
+            min_cuwh: 0,
+            /* log2 of minimum CU width and height */
+            log2_min_cuwh: 0,
+            /* MAPS *******************************************************************/
+            /* SCU map for CU information */
+            map_scu: vec![],
+            /* LCU split information */
+            map_split: vec![],
+            /* decoded motion vector for every blocks */
+            /*s16                  (* map_mv)[REFP_NUM][MV_D];
+            /* decoded motion vector for every blocks */
+            s16                  (* map_unrefined_mv)[REFP_NUM][MV_D];
+            /* reference frame indices */
+            s8                   (* map_refi)[REFP_NUM];*/
+            /* intra prediction modes */
+            map_ipm: vec![],
+            /* new coding tool flag*/
+            map_cu_mode: vec![],
+            /**************************************************************************/
+            /* current slice number, which is increased whenever decoding a slice.
+            when receiving a slice for new picture, this value is set to zero.
+            this value can be used for distinguishing b/w slices */
+            slice_num: 0,
+            /* last coded intra picture's picture order count */
+            last_intra_poc: 0,
+            /* picture width in LCU unit */
+            w_lcu: 0,
+            /* picture height in LCU unit */
+            h_lcu: 0,
+            /* picture size in LCU unit (= w_lcu * h_lcu) */
+            f_lcu: 0,
+            /* picture width in SCU unit */
+            w_scu: 0,
+            /* picture height in SCU unit */
+            h_scu: 0,
+            /* picture size in SCU unit (= w_scu * h_scu) */
+            f_scu: 0,
+            /* the picture order count value */
+            poc: EvcPoc::default(),
+            /* the picture order count of the previous Tid0 picture */
+            prev_pic_order_cnt_val: 0,
+            /* the decoding order count of the previous picture */
+            prev_doc_offset: 0,
+            /* the number of currently decoded pictures */
+            pic_cnt: 0,
+            /* flag whether current picture is refecened picture or not */
+            slice_ref_flag: false,
+            /* distance between ref pics in addition to closest ref ref pic in LD*/
+            ref_pic_gap_length: 0,
+            /* bitstream has an error? */
+            bs_err: 0,
+            /* reference picture (0: foward, 1: backward) */
+            refp,
+            /* flag for picture signature enabling */
+            use_pic_sign: 0,
+            /* picture signature (MD5 digest 128bits) for each component */
+            pic_sign: [[0; 16]; N_C],
+            /* flag to indicate picture signature existing or not */
+            pic_sign_exist: 0,
+            /* flag to indicate opl decoder output */
+            use_opl: 0,
+            num_ctb: 0,
+        }
+    }
+
     fn sequence_init(&mut self) -> Result<(), EvcError> {
         if self.sps.pic_width_in_luma_samples != self.w
             || self.sps.pic_height_in_luma_samples != self.h
@@ -1034,7 +1149,7 @@ impl EvcdCtx {
 
             if self.num_ctb == self.f_lcu {
                 /* get available frame buffer for decoded image */
-                //self.pic = evc_picman_get_empty_pic(&self.dpm)?;
+                //self.pic = self.dpm.evc_picman_get_empty_pic()?;
 
                 /* get available frame buffer for decoded image */
                 //self.map_refi = self.pic->map_refi;
@@ -1043,6 +1158,29 @@ impl EvcdCtx {
 
             /* decode slice layer */
             self.decode_slice()?;
+
+            /* deblocking filter */
+            if self.sh.deblocking_filter_on {
+                //TODO
+            }
+
+            if self.num_ctb == 0 {
+                /* expand pixels to padding area */
+                //TODO
+
+                /* put decoded picture to DPB */
+                self.dpm.evc_picman_put_pic(
+                    &self.pic,
+                    self.nalu.nal_unit_type == NaluType::EVC_IDR_NUT,
+                    self.poc.poc_val as u32,
+                    self.nalu.nuh_temporal_id,
+                    true,
+                    &mut self.refp,
+                    self.slice_ref_flag,
+                    self.sps.tool_rpl,
+                    self.ref_pic_gap_length,
+                );
+            }
         } else if nalu_type == NaluType::EVC_SEI_NUT {
         } else {
             return Err(EvcError::EVC_ERR_MALFORMED_BITSTREAM);
@@ -1055,5 +1193,11 @@ impl EvcdCtx {
             fnum: -1,
             ..Default::default()
         })
+    }
+
+    pub(crate) fn pull_frm(&mut self) -> Result<Frame<T>, EvcError> {
+        let pic = self.dpm.evc_picman_out_pic()?;
+        //if let Some(p) = &pic {}
+        Err(EvcError::EVC_ERR_UNEXPECTED)
     }
 }

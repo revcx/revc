@@ -305,12 +305,12 @@ pub struct Context<T: Pixel> {
     pub(crate) frame: Option<Frame<T>>,
     pub(crate) packet: Option<Packet>,
 
-    evcd_ctx: EvcdCtx,
+    evcd_ctx: EvcdCtx<T>,
 }
 
 impl<T: Pixel> Context<T> {
     pub fn new(cfg: &Config) -> Self {
-        let mut evcd_ctx = EvcdCtx::default();
+        let mut evcd_ctx = EvcdCtx::new();
         evcd_ctx.magic = EVCD_MAGIC_CODE;
 
         //TODO:
@@ -329,6 +329,6 @@ impl<T: Pixel> Context<T> {
     }
 
     pub fn pull(&mut self) -> Result<Frame<T>, EvcError> {
-        Err(EvcError::EVC_ERR_UNEXPECTED)
+        self.evcd_ctx.pull_frm()
     }
 }

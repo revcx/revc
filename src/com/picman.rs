@@ -7,9 +7,9 @@ use std::cmp::Ordering;
 use std::rc::Rc;
 
 /* picture store structure */
-#[derive(Default)]
-pub(crate) struct EvcPic {
-    pub(crate) frame: Frame<pel>,
+//#[derive(Default)]
+pub(crate) struct EvcPic<T: Pixel> {
+    pub(crate) frame: Frame<T>,
 
     /* presentation temporal reference of this picture */
     pub(crate) poc: u32,
@@ -35,11 +35,29 @@ pub(crate) struct EvcPic {
     pub(crate) digest: [[u8; 16]; N_C],
 }
 
+impl<T: Pixel> EvcPic<T> {
+    fn new(width: usize, height: usize, chroma_sampling: ChromaSampling) -> Self {
+        EvcPic {
+            frame: Frame::new(width, height, chroma_sampling),
+            poc: 0,
+            is_ref: false,
+            need_for_out: false,
+            temporal_id: 0,
+            list_poc: [0; MAX_NUM_REF_PICS],
+            pic_deblock_alpha_offset: 0,
+            pic_deblock_beta_offset: 0,
+            pic_qp_u_offset: 0,
+            pic_qp_v_offset: 0,
+            digest: [[0; 16]; N_C],
+        }
+    }
+}
+
 /* reference picture structure */
-#[derive(Default)]
-pub(crate) struct EvcRefP {
+//#[derive(Default)]
+pub(crate) struct EvcRefP<T: Pixel> {
     /* address of reference picture */
-    pub(crate) pic: Option<Rc<RefCell<EvcPic>>>,
+    pub(crate) pic: Option<Rc<RefCell<EvcPic<T>>>>,
     /* POC of reference picture */
     pub(crate) poc: u32,
     /*s16            (*map_mv)[REFP_NUM][MV_D];
@@ -48,8 +66,12 @@ pub(crate) struct EvcRefP {
     u32             *list_poc;*/
 }
 
-impl EvcRefP {
-    fn set_refp(&mut self, pic_ref: Rc<RefCell<EvcPic>>) {
+impl<T: Pixel> EvcRefP<T> {
+    pub(crate) fn new() -> Self {
+        EvcRefP { pic: None, poc: 0 }
+    }
+
+    fn set_refp(&mut self, pic_ref: Rc<RefCell<EvcPic<T>>>) {
         /*refp->map_mv   = pic_ref->map_mv;
         refp->map_unrefined_mv = pic_ref->map_mv;
         refp->map_refi = pic_ref->map_refi;
@@ -58,7 +80,7 @@ impl EvcRefP {
         self.pic = Some(pic_ref);
     }
 
-    fn copy_refp(&mut self, refp_src: &EvcRefP) {
+    fn copy_refp(&mut self, refp_src: &EvcRefP<T>) {
         /*
             refp_dst->map_mv   = refp_src->map_mv;
         #if DMVR_LAG
@@ -79,12 +101,12 @@ impl EvcRefP {
 /*****************************************************************************
  * picture manager for DPB in decoder and RPB in encoder
  *****************************************************************************/
-#[derive(Default)]
-pub(crate) struct EvcPm {
+//#[derive(Default)]
+pub(crate) struct EvcPm<T: Pixel> {
     /* picture store (including reference and non-reference) */
-    pub(crate) pic: [Option<Rc<RefCell<EvcPic>>>; MAX_PB_SIZE],
+    pub(crate) pic: Vec<Option<Rc<RefCell<EvcPic<T>>>>>, //[Option<Rc<RefCell<EvcPic<T>>>>; MAX_PB_SIZE],
     /* address of reference pictures */
-    pub(crate) pic_ref: [Option<Rc<RefCell<EvcPic>>>; MAX_NUM_REF_PICS],
+    pub(crate) pic_ref: Vec<Option<Rc<RefCell<EvcPic<T>>>>>, //[Option<Rc<RefCell<EvcPic<T>>>>; MAX_NUM_REF_PICS],
     /* maximum reference picture count */
     pub(crate) max_num_ref_pics: u8,
     /* current count of available reference pictures in PB */
@@ -100,12 +122,36 @@ pub(crate) struct EvcPm {
     /* current picture buffer size */
     pub(crate) cur_pb_size: u8,
     /* address of leased picture for current decoding/encoding buffer */
-    pub(crate) pic_lease: Option<Rc<RefCell<EvcPic>>>,
+    pub(crate) pic_lease: Option<Rc<RefCell<EvcPic<T>>>>,
     /* picture buffer allocator */
     //PICBUF_ALLOCATOR pa;
 }
 
-impl EvcPm {
+impl<T: Pixel> EvcPm<T> {
+    pub(crate) fn new() -> Self {
+        let mut pic = vec![];
+        for i in 0..MAX_PB_SIZE {
+            pic.push(None);
+        }
+        let mut pic_ref = vec![];
+        for i in 0..MAX_NUM_REF_PICS {
+            pic_ref.push(None);
+        }
+
+        EvcPm {
+            pic,     //[None; MAX_PB_SIZE],
+            pic_ref, //[None; MAX_NUM_REF_PICS],
+            max_num_ref_pics: 0,
+            cur_num_ref_pics: 0,
+            num_refp: [0; REFP_NUM],
+            poc_next_output: 0,
+            poc_increase: 0,
+            max_pb_size: 0,
+            cur_pb_size: 0,
+            pic_lease: None,
+        }
+    }
+
     fn picman_get_num_allocated_pics(&self) -> u8 {
         let mut cnt = 0;
         for i in 0..MAX_PB_SIZE {
@@ -117,7 +163,7 @@ impl EvcPm {
         cnt
     }
 
-    fn picman_move_pic(pic: &mut [Option<Rc<RefCell<EvcPic>>>], from: usize, to: usize) {
+    fn picman_move_pic(pic: &mut [Option<Rc<RefCell<EvcPic<T>>>>], from: usize, to: usize) {
         for i in from..to {
             pic.swap(i, i + 1);
         }
@@ -144,7 +190,7 @@ impl EvcPm {
 
                 Some(pic)
             })
-            .collect::<Vec<&Option<Rc<RefCell<EvcPic>>>>>();
+            .collect::<Vec<&Option<Rc<RefCell<EvcPic<T>>>>>>();
 
         let tbm = self
             .pic
@@ -185,7 +231,7 @@ impl EvcPm {
                         Some(pic)
                     }
                 })
-                .collect::<Vec<&Option<Rc<RefCell<EvcPic>>>>>();
+                .collect::<Vec<&Option<Rc<RefCell<EvcPic<T>>>>>>();
 
             let tbm = self
                 .pic
@@ -240,7 +286,7 @@ impl EvcPm {
         self.pic_ref[0..cnt].sort_by_key(|k| -(k.as_ref().unwrap().borrow().poc as i32));
     }
 
-    fn picman_remove_pic_from_pb(&mut self, pos: usize) -> Option<Rc<RefCell<EvcPic>>> {
+    fn picman_remove_pic_from_pb(&mut self, pos: usize) -> Option<Rc<RefCell<EvcPic<T>>>> {
         let pic_rem = self.pic[pos].take();
 
         /* fill empty pic buffer */
@@ -256,8 +302,8 @@ impl EvcPm {
 
     fn picman_set_pic_to_pb(
         &mut self,
-        pic: Rc<RefCell<EvcPic>>,
-        refp: &mut [[EvcRefP; REFP_NUM]; MAX_NUM_REF_PICS],
+        pic: Rc<RefCell<EvcPic<T>>>,
+        refp: &mut Vec<Vec<EvcRefP<T>>>,
         pos: isize,
     ) {
         for i in 0..self.num_refp[REFP_0] as usize {
@@ -306,10 +352,10 @@ impl EvcPm {
     }
 
     pub(crate) fn check_copy_refp(
-        refp: &mut [[EvcRefP; REFP_NUM]; MAX_NUM_REF_PICS],
+        refp: &mut [[EvcRefP<T>; REFP_NUM]; MAX_NUM_REF_PICS],
         cnt: usize,
         lidx: usize,
-        refp_src: &EvcRefP,
+        refp_src: &EvcRefP<T>,
     ) -> Result<(), EvcError> {
         for i in 0..cnt {
             if refp[i][lidx].poc == refp_src.poc {
@@ -321,12 +367,14 @@ impl EvcPm {
         Ok(())
     }
 
-    pub(crate) fn evc_picman_get_empty_pic(&mut self) -> Result<Rc<RefCell<EvcPic>>, EvcError> {
+    pub(crate) fn evc_picman_get_empty_pic(
+        &mut self,
+    ) -> Result<Option<Rc<RefCell<EvcPic<T>>>>, EvcError> {
         /* try to find empty picture buffer in list */
         if let Ok(pos) = self.picman_get_empty_pic_from_list() {
             self.pic_lease = self.picman_remove_pic_from_pb(pos);
             if let Some(pic) = &self.pic_lease {
-                return Ok(Rc::clone(pic));
+                return Ok(Some(Rc::clone(pic)));
             }
         }
         /* else if available, allocate picture buffer */
@@ -336,9 +384,14 @@ impl EvcPm {
             /* create picture buffer */
             //pic = pm->pa.fn_alloc(&pm->pa, &ret);
             //evc_assert_gv(pic != NULL, ret, EVC_ERR_OUT_OF_MEMORY, ERR);
-            self.pic_lease = Some(Rc::new(RefCell::new(EvcPic::default())));
+            //TODO: add width, height, CS
+            self.pic_lease = Some(Rc::new(RefCell::new(EvcPic::new(
+                0,
+                0,
+                ChromaSampling::Cs400,
+            ))));
             if let Some(pic) = &self.pic_lease {
-                return Ok(Rc::clone(pic));
+                return Ok(Some(Rc::clone(pic)));
             }
         }
 
@@ -350,12 +403,12 @@ impl EvcPm {
 
     pub(crate) fn evc_picman_put_pic(
         &mut self,
-        pic: &Option<Rc<RefCell<EvcPic>>>,
+        pic: &Option<Rc<RefCell<EvcPic<T>>>>,
         is_idr: bool,
         poc: u32,
         temporal_id: u8,
         need_for_output: bool,
-        refp: &mut [[EvcRefP; REFP_NUM]; MAX_NUM_REF_PICS],
+        refp: &mut Vec<Vec<EvcRefP<T>>>,
         ref_pic: bool,
         tool_rpl: bool,
         ref_pic_gap_length: u32,
@@ -397,7 +450,9 @@ impl EvcPm {
         }
     }
 
-    pub(crate) fn evc_picman_out_pic(&mut self) -> Result<Option<Rc<RefCell<EvcPic>>>, EvcError> {
+    pub(crate) fn evc_picman_out_pic(
+        &mut self,
+    ) -> Result<Option<Rc<RefCell<EvcPic<T>>>>, EvcError> {
         let mut any_need_for_out = false;
         for i in 0..MAX_PB_SIZE {
             if let Some(pic) = &self.pic[i] {
@@ -446,7 +501,7 @@ impl EvcPm {
         poc: u32,
         layer_id: u8,
         last_intra: i32,
-        refp: &mut [[EvcRefP; REFP_NUM]; MAX_NUM_REF_PICS],
+        refp: &mut Vec<Vec<EvcRefP<T>>>,
     ) -> Result<(), EvcError> {
         if slice_type == SliceType::EVC_ST_I {
             return Ok(());
