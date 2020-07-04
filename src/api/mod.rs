@@ -18,13 +18,13 @@ use crate::dec::*;
  * return values and error code
  *****************************************************************************/
 /* no more frames, but it is OK */
-const EVC_OK_NO_MORE_FRM: usize = 205;
+pub const EVC_OK_NO_MORE_FRM: usize = 205;
 /* progress success, but output is not available temporarily */
-const EVC_OK_OUT_NOT_AVAILABLE: usize = 204;
+pub const EVC_OK_OUT_NOT_AVAILABLE: usize = 204;
 /* frame dimension (width or height) has been changed */
-const EVC_OK_DIM_CHANGED: usize = (203);
+pub const EVC_OK_DIM_CHANGED: usize = (203);
 /* decoding success, but output frame has been delayed */
-const EVC_OK_FRM_DELAYED: usize = (202);
+pub const EVC_OK_FRM_DELAYED: usize = (202);
 /* not matched CRC value */
 pub const EVC_ERR_BAD_CRC: usize = (201);
 /* CRC value presented but ignored at decoder*/

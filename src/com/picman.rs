@@ -57,6 +57,23 @@ impl EvcRefP {
         self.poc = pic_ref.borrow().poc;
         self.pic = Some(pic_ref);
     }
+
+    fn copy_refp(&mut self, refp_src: &EvcRefP) {
+        /*
+            refp_dst->map_mv   = refp_src->map_mv;
+        #if DMVR_LAG
+            refp_dst->map_unrefined_mv = refp_src->map_mv;
+        #endif
+            refp_dst->map_refi = refp_src->map_refi;
+            refp_dst->list_poc = refp_src->list_poc;*/
+
+        self.poc = refp_src.poc;
+        self.pic = if let Some(pic) = &refp_src.pic {
+            Some(Rc::clone(pic))
+        } else {
+            None
+        };
+    }
 }
 
 /*****************************************************************************
@@ -89,7 +106,7 @@ pub(crate) struct EvcPm {
 }
 
 impl EvcPm {
-    fn picman_get_num_allocated_pics(&self) -> i32 {
+    fn picman_get_num_allocated_pics(&self) -> u8 {
         let mut cnt = 0;
         for i in 0..MAX_PB_SIZE {
             /* this is coding order */
@@ -193,22 +210,14 @@ impl EvcPm {
         });
     }
 
-    pub(crate) fn evc_picman_init(
-        &mut self,
-        max_pb_size: u8,
-        max_num_ref_pics: u8,
-        //PICBUF_ALLOCATOR * pa
-    ) -> Result<(), EvcError> {
-        if max_num_ref_pics > MAX_NUM_REF_PICS as u8 || max_pb_size > MAX_PB_SIZE as u8 {
-            return Err(EvcError::EVC_ERR_UNSUPPORTED);
+    fn picman_flush_pb(&mut self) {
+        /* mark all frames unused */
+        for i in 0..MAX_PB_SIZE {
+            if let Some(pic) = &self.pic[i] {
+                pic.borrow_mut().is_ref = false;
+            }
         }
-        self.max_num_ref_pics = max_num_ref_pics;
-        self.max_pb_size = max_pb_size;
-        self.poc_increase = 1;
-        self.pic_lease = None;
-
-        //evc_mcpy(&pm->pa, pa, sizeof(PICBUF_ALLOCATOR));
-        Ok(())
+        self.cur_num_ref_pics = 0;
     }
 
     fn picman_update_pic_ref(&mut self) {
@@ -229,6 +238,205 @@ impl EvcPm {
 
         /* descending order sort based on POC */
         self.pic_ref[0..cnt].sort_by_key(|k| -(k.as_ref().unwrap().borrow().poc as i32));
+    }
+
+    fn picman_remove_pic_from_pb(&mut self, pos: usize) -> Option<Rc<RefCell<EvcPic>>> {
+        let pic_rem = self.pic[pos].take();
+
+        /* fill empty pic buffer */
+        for i in pos..MAX_PB_SIZE - 1 {
+            self.pic.swap(i, i + 1);
+        }
+        self.pic[MAX_PB_SIZE - 1] = None;
+
+        self.cur_pb_size -= 1;
+
+        return pic_rem;
+    }
+
+    fn picman_set_pic_to_pb(
+        &mut self,
+        pic: Rc<RefCell<EvcPic>>,
+        refp: &mut [[EvcRefP; REFP_NUM]; MAX_NUM_REF_PICS],
+        pos: isize,
+    ) {
+        for i in 0..self.num_refp[REFP_0] as usize {
+            pic.borrow_mut().list_poc[i] = refp[i][REFP_0].poc;
+        }
+        if pos >= 0 {
+            assert!(self.pic[pos as usize].is_none());
+            self.pic[pos as usize] = Some(pic);
+        } else
+        /* pos < 0 */
+        {
+            /* search empty pic buffer position */
+            let mut i = (MAX_PB_SIZE - 1) as isize;
+            while i >= 0 {
+                if self.pic[i as usize].is_none() {
+                    self.pic[i as usize] = Some(pic);
+                    break;
+                }
+            }
+            if i < 0 {
+                print!("i={}\n", i);
+                assert!(i >= 0);
+            }
+        }
+        self.cur_pb_size += 1;
+    }
+
+    fn picman_get_empty_pic_from_list(&self) -> Result<usize, EvcError> {
+        for i in 0..MAX_PB_SIZE {
+            if let Some(pic) = &self.pic[i] {
+                let p = pic.borrow();
+                if !p.is_ref && !p.need_for_out {
+                    //imgb = pic -> imgb;
+                    //evc_assert(imgb != NULL);
+
+                    /* check reference count */
+                    //if (1 == imgb -> getref(imgb))
+                    {
+                        return Ok(i); /* this is empty buffer */
+                    }
+                }
+            }
+        }
+
+        Err(EvcError::EVC_ERR)
+    }
+
+    pub(crate) fn check_copy_refp(
+        refp: &mut [[EvcRefP; REFP_NUM]; MAX_NUM_REF_PICS],
+        cnt: usize,
+        lidx: usize,
+        refp_src: &EvcRefP,
+    ) -> Result<(), EvcError> {
+        for i in 0..cnt {
+            if refp[i][lidx].poc == refp_src.poc {
+                return Err(EvcError::EVC_ERR);
+            }
+        }
+        refp[cnt][lidx].copy_refp(refp_src);
+
+        Ok(())
+    }
+
+    pub(crate) fn evc_picman_get_empty_pic(&mut self) -> Result<Rc<RefCell<EvcPic>>, EvcError> {
+        /* try to find empty picture buffer in list */
+        if let Ok(pos) = self.picman_get_empty_pic_from_list() {
+            self.pic_lease = self.picman_remove_pic_from_pb(pos);
+            if let Some(pic) = &self.pic_lease {
+                return Ok(Rc::clone(pic));
+            }
+        }
+        /* else if available, allocate picture buffer */
+        self.cur_pb_size = self.picman_get_num_allocated_pics();
+
+        if self.cur_pb_size < self.max_pb_size {
+            /* create picture buffer */
+            //pic = pm->pa.fn_alloc(&pm->pa, &ret);
+            //evc_assert_gv(pic != NULL, ret, EVC_ERR_OUT_OF_MEMORY, ERR);
+            self.pic_lease = Some(Rc::new(RefCell::new(EvcPic::default())));
+            if let Some(pic) = &self.pic_lease {
+                return Ok(Rc::clone(pic));
+            }
+        }
+
+        Err(EvcError::EVC_ERR_UNKNOWN)
+    }
+
+    /*This is the implementation of reference picture marking based on RPL*/
+    pub(crate) fn evc_picman_refpic_marking(&mut self, sh: &EvcSh, poc_val: u32) {}
+
+    pub(crate) fn evc_picman_put_pic(
+        &mut self,
+        pic: &Option<Rc<RefCell<EvcPic>>>,
+        is_idr: bool,
+        poc: u32,
+        temporal_id: u8,
+        need_for_output: bool,
+        refp: &mut [[EvcRefP; REFP_NUM]; MAX_NUM_REF_PICS],
+        ref_pic: bool,
+        tool_rpl: bool,
+        ref_pic_gap_length: u32,
+    ) {
+        /* manage RPB */
+        if is_idr {
+            self.picman_flush_pb();
+        }
+        //Perform picture marking if RPL approach is not used
+        else if !tool_rpl {
+            if temporal_id == 0 {
+                self.pic_marking_no_rpl(ref_pic_gap_length);
+            }
+        }
+
+        if let Some(pic) = pic {
+            let mut p = pic.borrow_mut();
+            if !ref_pic {
+                p.is_ref = false;
+            } else {
+                p.is_ref = true;
+            }
+
+            p.temporal_id = temporal_id;
+            p.poc = poc;
+            p.need_for_out = need_for_output;
+
+            /* put picture into listed RPB */
+            if p.is_ref {
+                self.picman_set_pic_to_pb(Rc::clone(pic), refp, self.cur_num_ref_pics as isize);
+                self.cur_num_ref_pics += 1;
+            } else {
+                self.picman_set_pic_to_pb(Rc::clone(pic), refp, -1);
+            }
+
+            if self.pic_lease.is_some() && self.pic_lease.as_ref().unwrap().borrow().poc == p.poc {
+                self.pic_lease = None;
+            }
+        }
+    }
+
+    pub(crate) fn evc_picman_out_pic(&mut self) -> Result<Option<Rc<RefCell<EvcPic>>>, EvcError> {
+        let mut any_need_for_out = false;
+        for i in 0..MAX_PB_SIZE {
+            if let Some(pic) = &self.pic[i] {
+                let mut ps = pic.borrow_mut();
+                if ps.need_for_out {
+                    any_need_for_out = true;
+
+                    if ps.poc <= self.poc_next_output {
+                        ps.need_for_out = false;
+                        self.poc_next_output = ps.poc + self.poc_increase as u32;
+
+                        return Ok(Some(Rc::clone(pic)));
+                    }
+                }
+            }
+        }
+        if !any_need_for_out {
+            Err(EvcError::EVC_ERR_UNEXPECTED)
+        } else {
+            Ok(None)
+        }
+    }
+
+    pub(crate) fn evc_picman_init(
+        &mut self,
+        max_pb_size: u8,
+        max_num_ref_pics: u8,
+        //PICBUF_ALLOCATOR * pa
+    ) -> Result<(), EvcError> {
+        if max_num_ref_pics > MAX_NUM_REF_PICS as u8 || max_pb_size > MAX_PB_SIZE as u8 {
+            return Err(EvcError::EVC_ERR_UNSUPPORTED);
+        }
+        self.max_num_ref_pics = max_num_ref_pics;
+        self.max_pb_size = max_pb_size;
+        self.poc_increase = 1;
+        self.pic_lease = None;
+
+        //evc_mcpy(&pm->pa, pa, sizeof(PICBUF_ALLOCATOR));
+        Ok(())
     }
 
     pub(crate) fn evc_picman_refp_init(
