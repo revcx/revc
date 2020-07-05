@@ -714,12 +714,12 @@ pub(crate) fn evcd_eco_run_length_cc(
     }
 
     //#if ENC_DEC_TRACE
-    EVC_TRACE(&mut bs.tracer, "coef luma ");
+    /*EVC_TRACE(&mut bs.tracer, "coef luma ");
     for scan_pos_offset in 0..num_coeff as usize {
         EVC_TRACE(&mut bs.tracer, coef[scan_pos_offset]);
         EVC_TRACE(&mut bs.tracer, " ");
     }
-    EVC_TRACE(&mut bs.tracer, "\n");
+    EVC_TRACE(&mut bs.tracer, "\n");*/
     //#endif
 
     Ok(())
