@@ -555,7 +555,7 @@ impl<T: Pixel> EvcPm<T> {
         } else
         /* SLICE_B */
         {
-            let mut next_layer_id = std::cmp::max(layer_id - 1, 0);
+            let mut next_layer_id = std::cmp::max(layer_id, 1) - 1;
             i = 0;
             cnt = 0;
             while i < self.cur_num_ref_pics as i8 && cnt < max_num_ref_pics as usize {
@@ -568,7 +568,7 @@ impl<T: Pixel> EvcPm<T> {
                     if pr.poc < poc && pr.temporal_id <= next_layer_id {
                         refp[cnt][REFP_0].set_refp(Rc::clone(pic_ref));
                         cnt += 1;
-                        next_layer_id = std::cmp::max(pr.temporal_id - 1, 0);
+                        next_layer_id = std::cmp::max(pr.temporal_id, 1) - 1;
                     }
                     i += 1;
                 } else {
@@ -578,7 +578,7 @@ impl<T: Pixel> EvcPm<T> {
         }
 
         if cnt < max_num_ref_pics as usize && slice_type == SliceType::EVC_ST_B {
-            let mut next_layer_id = std::cmp::max(layer_id - 1, 0);
+            let mut next_layer_id = std::cmp::max(layer_id, 1) - 1;
             i = self.cur_num_ref_pics as i8 - 1;
             while i >= 0 && cnt < max_num_ref_pics as usize {
                 if let Some(pic_ref) = &self.pic_ref[i as usize] {
@@ -590,7 +590,7 @@ impl<T: Pixel> EvcPm<T> {
                     if pr.poc > poc && pr.temporal_id <= next_layer_id {
                         refp[cnt][REFP_0].set_refp(Rc::clone(pic_ref));
                         cnt += 1;
-                        next_layer_id = std::cmp::max(pr.temporal_id - 1, 0);
+                        next_layer_id = std::cmp::max(pr.temporal_id, 1) - 1;
                     }
                     i -= 1;
                 } else {
@@ -604,7 +604,7 @@ impl<T: Pixel> EvcPm<T> {
 
         /* backward */
         if slice_type == SliceType::EVC_ST_B {
-            let mut next_layer_id = std::cmp::max(layer_id - 1, 0);
+            let mut next_layer_id = std::cmp::max(layer_id, 1) - 1;
             i = self.cur_num_ref_pics as i8 - 1;
             cnt = 0;
             while i >= 0 && cnt < max_num_ref_pics as usize {
@@ -617,7 +617,7 @@ impl<T: Pixel> EvcPm<T> {
                     if pr.poc > poc && pr.temporal_id <= next_layer_id {
                         refp[cnt][REFP_1].set_refp(Rc::clone(pic_ref));
                         cnt += 1;
-                        next_layer_id = std::cmp::max(pr.temporal_id - 1, 0);
+                        next_layer_id = std::cmp::max(pr.temporal_id, 1) - 1;
                     }
                     i -= 1;
                 } else {
@@ -626,7 +626,7 @@ impl<T: Pixel> EvcPm<T> {
             }
 
             if cnt < max_num_ref_pics as usize {
-                next_layer_id = std::cmp::max(layer_id - 1, 0);
+                next_layer_id = std::cmp::max(layer_id, 1) - 1;
                 i = 0;
                 while i < self.cur_num_ref_pics as i8 && cnt < max_num_ref_pics as usize {
                     if let Some(pic_ref) = &self.pic_ref[i as usize] {
@@ -638,7 +638,7 @@ impl<T: Pixel> EvcPm<T> {
                         if pr.poc < poc && pr.temporal_id <= next_layer_id {
                             refp[cnt][REFP_1].set_refp(Rc::clone(pic_ref));
                             cnt += 1;
-                            next_layer_id = std::cmp::max(pr.temporal_id - 1, 0);
+                            next_layer_id = std::cmp::max(pr.temporal_id, 1) - 1;
                         }
                         i += 1;
                     } else {
