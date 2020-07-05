@@ -37,7 +37,9 @@ pub(crate) fn evc_poc_derivation(sps: &EvcSps, tid: u8, poc: &mut EvcPoc) {
             expected_tid = 1 + (doc_offset as f32).log2() as u8;
         }
     }
-    let poc_offset: i32 = sub_gop_length * ((2 * doc_offset + 1) / (1 << tid as i32) - 2);
+    let poc_offset: i32 = (sub_gop_length as f32
+        * ((2.0 * doc_offset as f32 + 1.0) / (1 << tid as i32) as f32 - 2.0))
+        as i32;
     poc.poc_val = poc.prev_poc_val as i32 + poc_offset;
     poc.prev_doc_offset = doc_offset;
 }

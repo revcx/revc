@@ -299,6 +299,7 @@ impl<T: Pixel> EvcPm<T> {
                     self.pic[i as usize] = Some(pic);
                     break;
                 }
+                i -= 1;
             }
             if i < 0 {
                 print!("i={}\n", i);
