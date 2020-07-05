@@ -200,6 +200,7 @@ impl EvcdSbac {
         self.range -= lps;
 
         //#if TRACE_BIN
+        /*
         EVC_TRACE_COUNTER(&mut bs.tracer);
         EVC_TRACE(&mut bs.tracer, "model ");
         EVC_TRACE(&mut bs.tracer, *model);
@@ -208,6 +209,7 @@ impl EvcdSbac {
         EVC_TRACE(&mut bs.tracer, " lps ");
         EVC_TRACE(&mut bs.tracer, lps);
         EVC_TRACE(&mut bs.tracer, " \n");
+         */
         //#endif
 
         if self.value >= self.range {
