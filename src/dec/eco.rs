@@ -652,21 +652,13 @@ pub(crate) fn evcd_eco_xcoef(
 ) -> Result<(), EvcError> {
     evcd_eco_run_length_cc(bs, sbac, sbac_ctx, coef, log2_w, log2_h, ch_type)?;
 
-    //#if TRACE_COEFFS
-    let cuw = 1 << log2_w;
-    let cuh = 1 << log2_h;
-    EVC_TRACE_COUNTER(&mut bs.tracer);
-    EVC_TRACE(&mut bs.tracer, "Coeff for ");
-    EVC_TRACE(&mut bs.tracer, ch_type);
-    EVC_TRACE(&mut bs.tracer, " : ");
-    for i in 0..cuw * cuh {
-        if i != 0 {
-            EVC_TRACE(&mut bs.tracer, " , ");
-        }
-        EVC_TRACE(&mut bs.tracer, coef[i]);
-    }
-    EVC_TRACE(&mut bs.tracer, " \n");
-    //#endif
+    TRACE_COEFFS(
+        &mut bs.tracer,
+        ch_type,
+        1 << log2_w as usize,
+        1 << log2_h as usize,
+        coef,
+    );
 
     Ok(())
 }

@@ -43,6 +43,27 @@ pub(crate) fn EVC_TRACE_INT_HEX(tracer: &mut Option<Tracer>, val: isize) {
     }
 }
 
+#[cfg(feature = "trace_coeffs")]
+pub(crate) fn TRACE_COEFFS(
+    tracer: &mut Option<Tracer>,
+    ch_type: usize,
+    cuw: usize,
+    cuh: usize,
+    coef: &[i16],
+) {
+    EVC_TRACE_COUNTER(tracer);
+    EVC_TRACE(tracer, "Coeff for ");
+    EVC_TRACE(tracer, ch_type);
+    EVC_TRACE(tracer, " : ");
+    for i in 0..cuw * cuh {
+        if i != 0 {
+            EVC_TRACE(tracer, " , ");
+        }
+        EVC_TRACE(tracer, coef[i]);
+    }
+    EVC_TRACE(tracer, " \n");
+}
+
 #[cfg(feature = "trace_bin")]
 pub(crate) fn TRACE_BIN(tracer: &mut Option<Tracer>, model: u16, range: u32, lps: u32) {
     EVC_TRACE_COUNTER(tracer);
@@ -69,6 +90,16 @@ pub(crate) fn EVC_TRACE<T: Display>(writer: &mut Option<Tracer>, name: T) {}
 
 #[cfg(not(feature = "trace"))]
 pub(crate) fn EVC_TRACE_INT_HEX(tracer: &mut Option<Tracer>, val: isize) {}
+
+#[cfg(not(feature = "trace_coeffs"))]
+pub(crate) fn TRACE_COEFFS(
+    tracer: &mut Option<Tracer>,
+    ch_type: usize,
+    cuw: usize,
+    cuh: usize,
+    coef: &[i16],
+) {
+}
 
 #[cfg(not(feature = "trace_bin"))]
 pub(crate) fn TRACE_BIN(tracer: &mut Option<Tracer>, model: u16, range: u32, lps: u32) {}
