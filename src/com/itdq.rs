@@ -88,3 +88,15 @@ pub(crate) fn evc_sub_block_itdq(
         }
     }
 }
+
+fn evc_itdq(coef: &[i16], log2_w: usize, log2_h: usize, scale: i16) {
+    let log2_size = (log2_w + log2_h) >> 1;
+    let ns_shift = if (log2_w + log2_h) & 1 != 0 { 8 } else { 0 };
+
+    let tr_shift = MAX_TX_DYNAMIC_RANGE - BIT_DEPTH - log2_size;
+    let shift = QUANT_IQUANT_SHIFT - QUANT_SHIFT - tr_shift + ns_shift;
+    let offset = if shift == 0 { 0 } else { 1 << (shift - 1) };
+
+    // evc_dquant(coef, log2_w, log2_h, scale, offset, shift);
+    // evc_itrans(coef, log2_w, log2_h, iqt_flag);
+}

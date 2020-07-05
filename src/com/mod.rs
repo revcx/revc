@@ -690,6 +690,11 @@ pub(crate) const NUM_CTX_GTX_LUMA: usize = 13;
 pub(crate) const NUM_CTX_GTX_CHROMA: usize = 5;
 pub(crate) const NUM_CTX_GTX: usize = (NUM_CTX_GTX_LUMA + NUM_CTX_GTX_CHROMA); /* number of context models for gtA/B flag */
 
+/* Maximum transform dynamic range (excluding sign bit) */
+pub(crate) const MAX_TX_DYNAMIC_RANGE: usize = 15;
+pub(crate) const QUANT_SHIFT: usize = 14;
+pub(crate) const QUANT_IQUANT_SHIFT: usize = 20;
+
 /* context models for arithemetic coding */
 #[derive(Default)]
 pub(crate) struct EvcSbacCtx {
