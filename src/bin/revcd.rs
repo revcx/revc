@@ -94,7 +94,7 @@ enum EvcdState {
     STATE_BUMPING,
 }
 
-fn print_stat(stat: EvcdStat, bs_cnt: usize) {
+fn print_stat(stat: &EvcdStat, bs_cnt: usize) {
     eprint!("[{:4}] NALU --> ", bs_cnt);
     if stat.nalu_type < NaluType::EVC_SPS_NUT {
         eprint!("{}-slice", stat.stype);
@@ -181,6 +181,12 @@ fn main() -> io::Result<()> {
             } else {
                 match cli.demuxer.read() {
                     Ok(mut pkt) => {
+                        let bs_size = if let Some(data) = &pkt.data {
+                            data.len()
+                        } else {
+                            0
+                        };
+
                         let ret = ctx.decode(&mut pkt);
                         match ret {
                             Ok(stat) => {
@@ -188,8 +194,15 @@ fn main() -> io::Result<()> {
                                     state = EvcdState::STATE_PULLING;
                                 }
                                 if (cli.verbose) {
-                                    print_stat(stat, bs_cnt);
+                                    print_stat(&stat, bs_cnt);
                                 }
+                                if stat.read - NALU_SIZE_FIELD_IN_BYTES != bs_size {
+                                    eprint!(
+                                        "\t=> different reading of bitstream (in:{}, read:{})\n",
+                                        bs_size, stat.read
+                                    );
+                                }
+
                                 bs_cnt += 1;
                             }
                             Err(err) => {

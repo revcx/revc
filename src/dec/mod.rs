@@ -270,8 +270,6 @@ pub(crate) struct EvcdCtx<T: Pixel> {
     num_ctb: u32,
 }
 
-const nalu_size_field_in_bytes: usize = 4;
-
 impl<T: Pixel> EvcdCtx<T> {
     pub(crate) fn new() -> Self {
         let mut refp = vec![];
@@ -1086,7 +1084,7 @@ impl<T: Pixel> EvcdCtx<T> {
             nalu_type: btype,
             stype: SliceType::EVC_ST_I,
             fnum: -1,
-            read: nalu_size_field_in_bytes + self.bs.get_read_byte() as usize,
+            read: NALU_SIZE_FIELD_IN_BYTES + self.bs.get_read_byte() as usize,
             ..Default::default()
         };
 

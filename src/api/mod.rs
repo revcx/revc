@@ -52,6 +52,8 @@ impl Default for EvcError {
     }
 }
 
+pub const NALU_SIZE_FIELD_IN_BYTES: usize = 4;
+
 #[allow(dead_code, non_camel_case_types)]
 #[derive(Debug, FromPrimitive, ToPrimitive, PartialEq, PartialOrd, Clone, Copy)]
 pub enum NaluType {
