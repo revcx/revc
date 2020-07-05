@@ -99,6 +99,24 @@ lazy_static! {
             scan_tbl(64),
         ]
     };
-
-    //pub(crate) static ref evc_tbl_inv_tr: [Box<[i16]>;]
+    pub(crate) static ref evc_tbl_tr: [Box<[i16]>; MAX_CU_LOG2 - 1] = {
+        [
+            evc_init_multi_tbl(2),
+            evc_init_multi_tbl(4),
+            evc_init_multi_tbl(8),
+            evc_init_multi_tbl(16),
+            evc_init_multi_tbl(32),
+            evc_init_multi_tbl(64),
+        ]
+    };
+    pub(crate) static ref evc_tbl_inv_tr: [Box<[i16]>; MAX_CU_LOG2 - 1] = {
+        [
+            evc_init_multi_inv_tbl(2),
+            evc_init_multi_inv_tbl(4),
+            evc_init_multi_inv_tbl(8),
+            evc_init_multi_inv_tbl(16),
+            evc_init_multi_inv_tbl(32),
+            evc_init_multi_inv_tbl(64),
+        ]
+    };
 }

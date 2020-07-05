@@ -199,6 +199,15 @@ pub(crate) fn evc_block_copy(
     }
 }
 
+#[inline]
+pub(crate) fn check_bi_applicability(slice_type: SliceType) -> bool {
+    if slice_type == SliceType::EVC_ST_B {
+        true
+    } else {
+        false
+    }
+}
+
 pub(crate) fn scan_tbl(size: i16) -> Box<[u16]> {
     let mut pos = 0;
     let num_line = size + size - 1;
@@ -237,11 +246,36 @@ pub(crate) fn scan_tbl(size: i16) -> Box<[u16]> {
     scan
 }
 
-#[inline]
-pub(crate) fn check_bi_applicability(slice_type: SliceType) -> bool {
-    if slice_type == SliceType::EVC_ST_B {
-        true
-    } else {
-        false
+pub(crate) fn evc_init_multi_tbl(c: usize) -> Box<[i16]> {
+    let mut tm = vec![0i16; c * c].into_boxed_slice();
+    let s = (c as f64).sqrt() * 64.0;
+
+    for k in 0..c {
+        for n in 0..c {
+            /* DCT-VIII */
+            let a = std::f64::consts::PI * (k as f64 + 0.5) * (n as f64 + 0.5) / (c as f64 + 0.5);
+            let b = 2.0 / (c as f64 + 0.5);
+            let v = a.cos() * b.sqrt();
+            tm[k * c + n] = (s * v + if v > 0.0 { 0.5 } else { -0.5 }) as i16;
+        }
     }
+
+    tm
+}
+
+pub(crate) fn evc_init_multi_inv_tbl(c: usize) -> Box<[i16]> {
+    let mut tm = vec![0i16; c * c].into_boxed_slice();
+    let s = (c as f64).sqrt() * 64.0;
+
+    for k in 0..c {
+        for n in 0..c {
+            /* DCT-VIII */
+            let a = std::f64::consts::PI * (k as f64 + 0.5) * (n as f64 + 0.5) / (c as f64 + 0.5);
+            let b = 2.0 / (c as f64 + 0.5);
+            let v = a.cos() * b.sqrt();
+            tm[n * c + k] = (s * v + if v > 0.0 { 0.5 } else { -0.5 }) as i16;
+        }
+    }
+
+    tm
 }
