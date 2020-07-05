@@ -171,7 +171,7 @@ impl EvcdCore {
 //#[derive(Default)]
 pub(crate) struct EvcdCtx<T: Pixel> {
     /* magic code */
-    pub(crate) magic: u32,
+    magic: u32,
 
     /* EVCD identifier */
     //EVCD                    id;
@@ -197,9 +197,9 @@ pub(crate) struct EvcdCtx<T: Pixel> {
     sbac_dec: EvcdSbac,
     sbac_ctx: EvcSbacCtx,
     /* decoding picture width */
-    pub(crate) w: u16,
+    w: u16,
     /* decoding picture height */
-    pub(crate) h: u16,
+    h: u16,
     /* maximum CU width and height */
     max_cuwh: u16,
     /* log2 of maximum CU width and height */
@@ -282,7 +282,7 @@ impl<T: Pixel> EvcdCtx<T> {
         }
 
         EvcdCtx {
-            magic: 0,
+            magic: EVCD_MAGIC_CODE,
 
             /* EVCD identifier */
             //EVCD                    id;
@@ -798,6 +798,8 @@ impl<T: Pixel> EvcdCtx<T> {
         Ok(())
     }
 
+    fn evcd_itdq(&mut self) {}
+
     fn evcd_eco_unit(
         &mut self,
         x: u16,
@@ -806,50 +808,48 @@ impl<T: Pixel> EvcdCtx<T> {
         log2_cuh: u8,
         tree_cons: TREE_CONS_NEW,
     ) -> Result<(), EvcError> {
-        let core = &mut self.core;
-        let bs = &mut self.bs;
-        let sbac = &mut self.sbac_dec;
+        //entropy decoding
+        {
+            let core = &mut self.core;
+            let bs = &mut self.bs;
+            let sbac = &mut self.sbac_dec;
 
-        core.tree_cons = TREE_CONS {
-            changed: false,
-            tree_type: tree_cons.tree_type,
-            mode_cons: tree_cons.mode_cons,
-        };
+            core.tree_cons = TREE_CONS {
+                changed: false,
+                tree_type: tree_cons.tree_type,
+                mode_cons: tree_cons.mode_cons,
+            };
 
-        core.log2_cuw = log2_cuw;
-        core.log2_cuh = log2_cuh;
-        core.x_scu = PEL2SCU(x as usize) as u16;
-        core.y_scu = PEL2SCU(y as usize) as u16;
-        core.scup = core.x_scu as u32 + core.y_scu as u32 * self.w_scu as u32;
+            core.log2_cuw = log2_cuw;
+            core.log2_cuh = log2_cuh;
+            core.x_scu = PEL2SCU(x as usize) as u16;
+            core.y_scu = PEL2SCU(y as usize) as u16;
+            core.scup = core.x_scu as u32 + core.y_scu as u32 * self.w_scu as u32;
 
-        let cuw = 1 << log2_cuw as u16;
-        let cuh = 1 << log2_cuh as u16;
+            let cuw = 1 << log2_cuw as u16;
+            let cuh = 1 << log2_cuh as u16;
 
-        EVC_TRACE_COUNTER(&mut bs.tracer);
-        EVC_TRACE(&mut bs.tracer, "poc: ");
-        EVC_TRACE(&mut bs.tracer, self.poc.poc_val);
-        EVC_TRACE(&mut bs.tracer, " x pos ");
-        EVC_TRACE(&mut bs.tracer, x);
-        EVC_TRACE(&mut bs.tracer, " y pos ");
-        EVC_TRACE(&mut bs.tracer, y);
-        EVC_TRACE(&mut bs.tracer, " width ");
-        EVC_TRACE(&mut bs.tracer, cuw);
-        EVC_TRACE(&mut bs.tracer, " height ");
-        EVC_TRACE(&mut bs.tracer, cuh);
-        EVC_TRACE(&mut bs.tracer, " \n");
+            EVC_TRACE_COUNTER(&mut bs.tracer);
+            EVC_TRACE(&mut bs.tracer, "poc: ");
+            EVC_TRACE(&mut bs.tracer, self.poc.poc_val);
+            EVC_TRACE(&mut bs.tracer, " x pos ");
+            EVC_TRACE(&mut bs.tracer, x);
+            EVC_TRACE(&mut bs.tracer, " y pos ");
+            EVC_TRACE(&mut bs.tracer, y);
+            EVC_TRACE(&mut bs.tracer, " width ");
+            EVC_TRACE(&mut bs.tracer, cuw);
+            EVC_TRACE(&mut bs.tracer, " height ");
+            EVC_TRACE(&mut bs.tracer, cuh);
+            EVC_TRACE(&mut bs.tracer, " \n");
 
-        /*core.avail_lr = evc_check_nev_avail(
-            core.x_scu,
-            core.y_scu,
-            cuw,
-            //cuh,
-            self.w_scu,
-            //self.h_scu,
-            &self.map_scu,
-        );*/
+            /* parse CU info */
+            self.evcd_eco_cu()?;
+        }
 
-        /* parse CU info */
-        self.evcd_eco_cu()?;
+        /* inverse transform and dequantization */
+        if self.core.pred_mode != PredMode::MODE_SKIP {
+            self.evcd_itdq();
+        }
 
         Ok(())
     }

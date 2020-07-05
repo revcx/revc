@@ -312,17 +312,10 @@ pub struct Context<T: Pixel> {
 
 impl<T: Pixel> Context<T> {
     pub fn new(cfg: &Config) -> Self {
-        let mut evcd_ctx = EvcdCtx::new();
-        evcd_ctx.magic = EVCD_MAGIC_CODE;
-
-        //TODO:
-        //evc_init_multi_tbl();
-        //evc_init_multi_inv_tbl();
-
         Context {
             frame: None,
             packet: None,
-            evcd_ctx,
+            evcd_ctx: EvcdCtx::new(),
         }
     }
 

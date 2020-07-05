@@ -99,4 +99,6 @@ lazy_static! {
             scan_tbl(64),
         ]
     };
+
+    //pub(crate) static ref evc_tbl_inv_tr: [Box<[i16]>;]
 }
