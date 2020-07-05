@@ -43,11 +43,24 @@ pub(crate) fn EVC_TRACE_INT_HEX(tracer: &mut Option<Tracer>, val: isize) {
     }
 }
 
+#[cfg(feature = "trace_bin")]
+pub(crate) fn TRACE_BIN(tracer: &mut Option<Tracer>, model: u16, range: u32, lps: u32) {
+    EVC_TRACE_COUNTER(tracer);
+    EVC_TRACE(tracer, "model ");
+    EVC_TRACE(tracer, model);
+    EVC_TRACE(tracer, " range ");
+    EVC_TRACE(tracer, range);
+    EVC_TRACE(tracer, " lps ");
+    EVC_TRACE(tracer, lps);
+    EVC_TRACE(tracer, " \n");
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[cfg(not(feature = "trace"))]
 fn OPEN_TRACE() -> Option<Tracer> {
     None
 }
-////////////////////////////////////////////////////////////////////////////////////////////////////
 #[cfg(not(feature = "trace"))]
 pub(crate) fn EVC_TRACE_COUNTER(tracer: &mut Option<Tracer>) {}
 
@@ -56,6 +69,9 @@ pub(crate) fn EVC_TRACE<T: Display>(writer: &mut Option<Tracer>, name: T) {}
 
 #[cfg(not(feature = "trace"))]
 pub(crate) fn EVC_TRACE_INT_HEX(tracer: &mut Option<Tracer>, val: isize) {}
+
+#[cfg(not(feature = "trace_bin"))]
+pub(crate) fn TRACE_BIN(tracer: &mut Option<Tracer>, model: u16, range: u32, lps: u32) {}
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /*

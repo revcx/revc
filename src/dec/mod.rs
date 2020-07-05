@@ -1047,7 +1047,6 @@ impl<T: Pixel> EvcdCtx<T> {
                     }
                 }
             }
-            //eprint!("{} ", self.num_ctb);
 
             self.evcd_eco_tree(
                 self.core.x_pel,
@@ -1075,8 +1074,8 @@ impl<T: Pixel> EvcdCtx<T> {
                     self.core.y_lcu += 1;
                 }
             }
+            //eprint!("{} ", self.num_ctb);
         }
-        //eprint!("{} ", self.num_ctb);
 
         Ok(())
     }
