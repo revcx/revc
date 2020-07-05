@@ -2,6 +2,7 @@ use super::api::frame::*;
 use super::api::util::*;
 use super::api::*;
 use super::com::ipred::*;
+use super::com::itdq::*;
 use super::com::picman::*;
 use super::com::tbl::*;
 use super::com::util::*;
@@ -798,7 +799,19 @@ impl<T: Pixel> EvcdCtx<T> {
         Ok(())
     }
 
-    fn evcd_itdq(&mut self) {}
+    fn evcd_itdq(&mut self) {
+        let mut core = &mut self.core;
+        evc_sub_block_itdq(
+            &mut core.coef.data,
+            core.log2_cuw,
+            core.log2_cuh,
+            core.qp_y,
+            core.qp_u,
+            core.qp_v,
+            &core.is_coef,
+            &core.is_coef_sub,
+        );
+    }
 
     fn evcd_eco_unit(
         &mut self,

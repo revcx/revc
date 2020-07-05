@@ -88,6 +88,8 @@ pub(crate) static evc_tbl_qp_chroma_dynamic_ext: [[i8; MAX_QP_TABLE_SIZE_EXT]; 2
 
 pub(crate) const EVC_TBL_CHROMA_QP_OFFSET: i8 = 6 * (BIT_DEPTH as i8 - 8);
 
+pub(crate) const evc_tbl_dq_scale_b: [i16; 6] = [40, 45, 51, 57, 64, 71];
+
 lazy_static! {
     pub(crate) static ref evc_scan_tbl: [Box<[u16]>; MAX_CU_LOG2 - 1] = {
         [
