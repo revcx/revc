@@ -5,6 +5,7 @@ use crate::dec::LcuSplitMode;
 use std::cmp::*;
 
 /* clipping within min and max */
+#[inline]
 pub(crate) fn EVC_CLIP3<T: Ord>(min_x: T, max_x: T, value: T) -> T {
     max(min_x, min(max_x, value))
 }
