@@ -140,30 +140,6 @@ pub(crate) struct EvcdCore {
     tree_cons: TREE_CONS,
 }
 
-impl EvcdCore {
-    fn set_map_scu(
-        &self,
-        x_scu: u16,
-        y_scu: u16,
-        cuw_scu: u16,
-        cuh_scu: u16,
-        w_scu: u16,
-        map_scu: &mut [MCU],
-        map_ipm: &mut [IntraPredDir],
-    ) {
-        for j in 0..cuh_scu {
-            for i in 0..cuw_scu {
-                let pos = ((y_scu + j) * w_scu + x_scu + i) as usize;
-                map_scu[pos].SET_COD();
-                if self.pred_mode == PredMode::MODE_INTRA {
-                    map_scu[pos].SET_IF();
-                    map_ipm[pos] = self.ipm[0];
-                }
-            }
-        }
-    }
-}
-
 /******************************************************************************
  * CONTEXT used for decoding process.
  *
@@ -224,7 +200,7 @@ pub(crate) struct EvcdCtx<T: Pixel> {
     /* intra prediction modes */
     map_ipm: Vec<IntraPredDir>,
     /* new coding tool flag*/
-    map_cu_mode: Vec<u32>,
+    map_cu_mode: Vec<MCU>,
     /**************************************************************************/
     /* current slice number, which is increased whenever decoding a slice.
     when receiving a slice for new picture, this value is set to zero.
@@ -412,7 +388,7 @@ impl<T: Pixel> EvcdCtx<T> {
         self.map_scu = vec![MCU::default(); self.f_scu as usize];
 
         /* alloc cu mode SCU map */
-        self.map_cu_mode = vec![0; self.f_scu as usize];
+        self.map_cu_mode = vec![MCU::default(); self.f_scu as usize];
 
         /* alloc map for CU split flag */
         self.map_split = vec![
@@ -455,7 +431,7 @@ impl<T: Pixel> EvcdCtx<T> {
         /* clear maps */
         for i in 0..self.f_scu as usize {
             self.map_scu[i] = MCU::default();
-            self.map_cu_mode[i] = 0;
+            self.map_cu_mode[i] = MCU::default();
         }
 
         if self.sh.slice_type == SliceType::EVC_ST_I {
@@ -469,6 +445,53 @@ impl<T: Pixel> EvcdCtx<T> {
         self.core.x_scu = self.core.x_lcu << (MAX_CU_LOG2 - MIN_CU_LOG2) as u16; // set x_scu location
         self.core.y_scu = self.core.y_lcu << (MAX_CU_LOG2 - MIN_CU_LOG2) as u16; // set y_scu location
         self.core.lcu_num = self.core.x_lcu + self.core.y_lcu * self.w_lcu; // Init the first lcu_num in tile
+    }
+
+    fn evcd_set_dec_info(&mut self) {
+        let w_scu = self.w_scu as usize;
+        let scup = self.core.scup as usize;
+        let w_cu = (1 << self.core.log2_cuw as usize) >> MIN_CU_LOG2;
+        let h_cu = (1 << self.core.log2_cuh as usize) >> MIN_CU_LOG2;
+        let flag = if self.core.pred_mode == PredMode::MODE_INTRA {
+            1
+        } else {
+            0
+        };
+        //let mut map_refi = &mut map_refi[scup..];
+        //let mut map_mv = &mut map_mv[scup..];
+
+        if evc_check_luma(&self.core.tree_cons) {
+            for i in 0..h_cu {
+                let mut map_scu = &mut self.map_scu[scup + i * w_scu..];
+                let mut map_ipm = &mut self.map_ipm[scup + i * w_scu..];
+                let mut map_cu_mode = &mut self.map_cu_mode[scup + i * w_scu..];
+                for j in 0..w_cu {
+                    if self.core.pred_mode == PredMode::MODE_SKIP {
+                        map_scu[j].SET_SF();
+                    } else {
+                        map_scu[j].CLR_SF();
+                    }
+
+                    let ii = if i & 32 == 0 { 0 } else { 1 };
+                    let jj = if j & 32 == 0 { 0 } else { 1 };
+                    let sub_idx = (ii << 1) | jj;
+                    if self.core.is_coef_sub[Y_C][sub_idx] {
+                        map_scu[j].SET_CBFL();
+                    } else {
+                        map_scu[j].CLR_CBFL();
+                    }
+                    map_cu_mode[j].SET_LOGW(self.core.log2_cuw as u32);
+                    map_cu_mode[j].SET_LOGH(self.core.log2_cuh as u32);
+
+                    if self.pps.cu_qp_delta_enabled_flag {
+                        map_scu[j].RESET_QP();
+                    }
+                    map_scu[j].SET_IF_COD_SN_QP(flag, self.slice_num as u32, self.core.qp);
+
+                    map_ipm[j] = self.core.ipm[0];
+                }
+            }
+        }
     }
 
     fn evcd_eco_coef(&mut self) -> Result<(), EvcError> {
@@ -632,20 +655,6 @@ impl<T: Pixel> EvcdCtx<T> {
         for c in 0..N_C {
             core.is_coef[c] = if tmp_coef[c] != 0 { true } else { false };
         }
-
-        // set cod for current CU in map_scu
-        let cuw = 1 << core.log2_cuw as u16;
-        let cuh = 1 << core.log2_cuh as u16;
-        core.set_map_scu(
-            core.x_scu,
-            core.y_scu,
-            cuw >> MIN_CU_LOG2 as u16,
-            cuh >> MIN_CU_LOG2 as u16,
-            self.w_scu,
-            //self.h_scu,
-            &mut self.map_scu,
-            &mut self.map_ipm,
-        );
 
         Ok(())
     }
@@ -863,6 +872,8 @@ impl<T: Pixel> EvcdCtx<T> {
         if self.core.pred_mode != PredMode::MODE_SKIP {
             self.evcd_itdq();
         }
+
+        self.evcd_set_dec_info();
 
         Ok(())
     }

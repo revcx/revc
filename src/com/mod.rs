@@ -262,16 +262,21 @@ pub(crate) enum CtxNevIdx {
 pub(crate) struct MCU(u32);
 
 impl MCU {
-    /*
-        /* set slice number to map */
-        # define MCU_SET_SN(m, sn)       (m) = (((m) & 0xFFFFFF80) | ((sn) & 0x7F))
-        /* get slice number from map */
-        # define MCU_GET_SN(m)           (int)((m) & 0x7F)
-    */
+    /* set slice number to map */
+    #[inline]
+    pub(crate) fn SET_SN(&mut self, sn: u32) {
+        self.0 = (self.0 & 0xFFFFFF80) | (sn & 0x7F);
+    }
+    /* get slice number from map */
+    #[inline]
+    pub(crate) fn GET_SN(&self) -> u32 {
+        self.0 & 0x7F
+    }
+
     /* set intra CU flag to map */
     #[inline]
     pub(crate) fn SET_IF(&mut self) {
-        self.0 = self.0 | (1 << 15)
+        self.0 = self.0 | (1 << 15);
     }
     /* get intra CU flag from map */
     #[inline]
@@ -281,46 +286,57 @@ impl MCU {
     /* clear intra CU flag in map */
     #[inline]
     pub(crate) fn CLR_IF(&mut self) {
-        self.0 = self.0 & 0xFFFF7FFF
+        self.0 = self.0 & 0xFFFF7FFF;
     }
-    /*
+
     /* set QP to map */
-    # define MCU_SET_QP(m, qp)       (m) = ((m) | ((qp) & 0x7F) < < 16)
+    #[inline]
+    pub(crate) fn SET_QP(&mut self, qp: u32) {
+        self.0 = self.0 | ((qp & 0x7F) << 16);
+    }
     /* get QP from map */
-    # define MCU_GET_QP(m)           (int)(((m) > > 16) & 0x7F)
-    # if DQP
-    # define MCU_RESET_QP(m)         (m) = ((m) & (~((127) < < 16)))
-    # endif
+    #[inline]
+    pub(crate) fn GET_QP(&self) -> u32 {
+        (self.0 >> 16) & 0x7F
+    }
+
+    #[inline]
+    pub(crate) fn RESET_QP(&mut self) {
+        self.0 = self.0 & (!(127 << 16));
+    }
 
     /* set skip mode flag */
-    # define MCU_SET_SF(m)           (m) = ((m) | (1 < < 23))
+    #[inline]
+    pub(crate) fn SET_SF(&mut self) {
+        self.0 = self.0 | (1 << 23);
+    }
     /* get skip mode flag */
-    # define MCU_GET_SF(m)           (int)(((m) > > 23) & 1)
+    #[inline]
+    pub(crate) fn GET_SF(&self) -> u32 {
+        (self.0 >> 23) & 1
+    }
     /* clear skip mode flag */
-    # define MCU_CLR_SF(m)           (m) = ((m) & (~(1 < < 23)))
+    #[inline]
+    pub(crate) fn CLR_SF(&mut self) {
+        self.0 = self.0 & (!(1 << 23));
+    }
 
     /* set luma cbf flag */
-    # define MCU_SET_CBFL(m)         (m) = ((m) | (1 < < 24))
+    #[inline]
+    pub(crate) fn SET_CBFL(&mut self) {
+        self.0 = self.0 | (1 << 24);
+    }
     /* get luma cbf flag */
-    # define MCU_GET_CBFL(m)         (int)(((m) > > 24) & 1)
+    #[inline]
+    pub(crate) fn GET_CBFL(&self) -> u32 {
+        (self.0 >> 24) & 1
+    }
     /* clear luma cbf flag */
-    # define MCU_CLR_CBFL(m)         (m) = ((m) & (~(1 < < 24)))
+    #[inline]
+    pub(crate) fn CLR_CBFL(&mut self) {
+        self.0 = self.0 & (!(1 << 24))
+    }
 
-    # if DMVR_FLAG
-    /* set dmvr flag */
-    # define MCU_SET_DMVRF(m)         (m) = ((m) | (1 < < 25))
-    /* get dmvr flag */
-    # define MCU_GET_DMVRF(m)         (int)(((m) > > 25) & 1)
-    /* clear dmvr flag */
-    # define MCU_CLR_DMVRF(m)         (m) = ((m) & (~(1 < < 25)))
-    # endif
-    /* set ibc mode flag */
-    # define MCU_SET_IBC(m)          (m) = ((m) | (1 < < 26))
-    /* get ibc mode flag */
-    # define MCU_GET_IBC(m)          (int)(((m) > > 26) & 1)
-    /* clear ibc mode flag */
-    # define MCU_CLR_IBC(m)          (m) = ((m) & (~(1 < < 26)))
-     */
     /* set encoded/decoded CU to map */
     #[inline]
     pub(crate) fn SET_COD(&mut self) {
@@ -337,13 +353,35 @@ impl MCU {
         self.0 = self.0 & 0x7FFFFFFF;
     }
 
-    /*
     /* multi bit setting: intra flag, encoded/decoded flag, slice number */
-    # define MCU_SET_IF_COD_SN_QP(m, i, sn, qp) \
-    (m) = (((m) & 0xFF807F80) | ((sn) & 0x7F) | ((qp) < < 16) | ((i)< < 15) | (1 < < 31))
+    #[inline]
+    pub(crate) fn SET_IF_COD_SN_QP(&mut self, i: u32, sn: u32, qp: u8) {
+        self.0 =
+            (self.0 & 0xFF807F80) | ((sn) & 0x7F) | ((qp as u32) << 16) | ((i) << 15) | (1 << 31);
+    }
+    #[inline]
+    pub(crate) fn IS_COD_NIF(&self) -> bool {
+        ((self.0 >> 15) & 0x10001) == 0x10000
+    }
 
-    # define MCU_IS_COD_NIF(m)      ((((m)> > 15) & 0x10001) == 0x10000)
-     */
+    /* set log2_cuw & log2_cuh to map */
+    #[inline]
+    pub(crate) fn SET_LOGW(&mut self, v: u32) {
+        self.0 = ((self.0 & 0xF0FFFFFF) | ((v) & 0x0F) << 24);
+    }
+    #[inline]
+    pub(crate) fn SET_LOGH(&mut self, v: u32) {
+        self.0 = ((self.0 & 0x0FFFFFFF) | ((v) & 0x0F) << 28);
+    }
+    /* get log2_cuw & log2_cuh to map */
+    #[inline]
+    pub(crate) fn GET_LOGW(&self) -> u32 {
+        (self.0 >> 24) & 0x0F
+    }
+    #[inline]
+    pub(crate) fn GET_LOGH(&self) -> u32 {
+        (self.0 >> 28) & 0x0F
+    }
 }
 /*****************************************************************************
  * NALU header
