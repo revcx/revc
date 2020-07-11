@@ -4,6 +4,7 @@ use super::api::*;
 use super::com::ipred::*;
 use super::com::itdq::*;
 use super::com::picman::*;
+use super::com::recon::*;
 use super::com::tbl::*;
 use super::com::util::*;
 use super::com::*;
@@ -867,41 +868,45 @@ impl EvcdCtx {
                 x >>= 1;
                 y >>= 1;
 
-                /* U */
-                let rec = &mut pic.borrow_mut().frame.planes[U_C];
-                evc_get_nbr_b(
-                    x as usize,
-                    y as usize,
-                    cuw as usize,
-                    cuh as usize,
-                    &rec.as_region(),
-                    self.core.avail_cu,
-                    &mut self.core.nb.data[U_C],
-                    self.core.scup as usize,
-                    &self.map_scu,
-                    self.w_scu as usize,
-                    self.h_scu as usize,
-                    U_C,
-                    constrained_intra_flag,
-                );
+                {
+                    /* U */
+                    let rec = &mut pic.borrow_mut().frame.planes[U_C];
+                    evc_get_nbr_b(
+                        x as usize,
+                        y as usize,
+                        cuw as usize,
+                        cuh as usize,
+                        &rec.as_region(),
+                        self.core.avail_cu,
+                        &mut self.core.nb.data[U_C],
+                        self.core.scup as usize,
+                        &self.map_scu,
+                        self.w_scu as usize,
+                        self.h_scu as usize,
+                        U_C,
+                        constrained_intra_flag,
+                    );
+                }
 
-                /* V */
-                let rec = &mut pic.borrow_mut().frame.planes[V_C];
-                evc_get_nbr_b(
-                    x as usize,
-                    y as usize,
-                    cuw as usize,
-                    cuh as usize,
-                    &rec.as_region(),
-                    self.core.avail_cu,
-                    &mut self.core.nb.data[V_C],
-                    self.core.scup as usize,
-                    &self.map_scu,
-                    self.w_scu as usize,
-                    self.h_scu as usize,
-                    V_C,
-                    constrained_intra_flag,
-                );
+                {
+                    /* V */
+                    let rec = &mut pic.borrow_mut().frame.planes[V_C];
+                    evc_get_nbr_b(
+                        x as usize,
+                        y as usize,
+                        cuw as usize,
+                        cuh as usize,
+                        &rec.as_region(),
+                        self.core.avail_cu,
+                        &mut self.core.nb.data[V_C],
+                        self.core.scup as usize,
+                        &self.map_scu,
+                        self.w_scu as usize,
+                        self.h_scu as usize,
+                        V_C,
+                        constrained_intra_flag,
+                    );
+                }
             }
         }
     }
@@ -1035,7 +1040,19 @@ impl EvcdCtx {
         }
 
         /* reconstruction */
-        //evc_recon_yuv(x, y, cuw, cuh, core->coef, core->pred[0], core->is_coef, ctx->pic, core->pred_mode == MODE_IBC ? 0 : core->ats_inter_info, core->tree_cons);
+        if let Some(pic) = &self.pic {
+            evc_recon_yuv(
+                x as usize,
+                y as usize,
+                cuw as usize,
+                cuh as usize,
+                &self.core.coef.data,
+                &self.core.pred[0].data,
+                &self.core.is_coef,
+                &mut pic.borrow_mut().frame.planes,
+                &self.core.tree_cons,
+            );
+        }
 
         Ok(())
     }

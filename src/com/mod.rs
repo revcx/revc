@@ -4,6 +4,7 @@ pub(crate) mod itdq;
 pub(crate) mod picman;
 pub(crate) mod plane;
 pub(crate) mod plane_region;
+pub(crate) mod recon;
 pub(crate) mod tbl;
 pub(crate) mod util;
 

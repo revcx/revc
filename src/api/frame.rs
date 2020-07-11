@@ -1,6 +1,7 @@
 use crate::com::context::{MAX_SB_SIZE, SUBPEL_FILTER_SIZE};
 use crate::com::plane::*;
 use crate::com::plane_region::*;
+use crate::com::*;
 
 use super::util::*;
 use super::*;
@@ -11,7 +12,7 @@ const FRAME_MARGIN: usize = 16 + SUBPEL_FILTER_SIZE;
 
 #[derive(Debug, Clone, Default)]
 pub struct Frame<T: Pixel> {
-    pub planes: [Plane<T>; 3],
+    pub planes: [Plane<T>; N_C],
     pub chroma_sampling: ChromaSampling,
 }
 
