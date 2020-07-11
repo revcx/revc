@@ -75,7 +75,7 @@ pub(crate) struct EvcdCore {
     coef: CUBuffer<i16>, //[[i16; MAX_CU_DIM]; N_C], //[N_C][MAX_CU_DIM]
     /* pred buffer of current CU */
     /* [1] is used for bi-pred. */
-    pred: CUBuffer<pel>, //[[[pel; MAX_CU_DIM]; N_C]; 2], //[2][N_C][MAX_CU_DIM]
+    pred: [CUBuffer<pel>; 2], //[[[pel; MAX_CU_DIM]; N_C]; 2], //[2][N_C][MAX_CU_DIM]
 
     /* neighbor pixel buffer for intra prediction */
     nb: NBBuffer<pel>, // [N_C][N_REF][MAX_CU_SIZE * 3];
@@ -842,21 +842,19 @@ impl EvcdCtx {
         if evc_check_luma(&self.core.tree_cons) {
             if let Some(pic) = &self.pic {
                 /* Y */
-                let rec = &mut pic.borrow_mut().frame.planes[0];
-                //let s_rec = rec.cfg.stride;
-                //rec = ctx -> pic -> y + (y * s_rec) + x;
+                let rec = &mut pic.borrow_mut().frame.planes[Y_C];
                 evc_get_nbr_b(
-                    x,
-                    y,
-                    cuw,
-                    cuh,
+                    x as usize,
+                    y as usize,
+                    cuw as usize,
+                    cuh as usize,
                     &rec.as_region(),
                     self.core.avail_cu,
                     &mut self.core.nb.data[Y_C],
-                    self.core.scup,
+                    self.core.scup as usize,
                     &self.map_scu,
-                    self.w_scu,
-                    self.h_scu,
+                    self.w_scu as usize,
+                    self.h_scu as usize,
                     Y_C,
                     constrained_intra_flag,
                 );
@@ -864,20 +862,46 @@ impl EvcdCtx {
         }
         if evc_check_chroma(&self.core.tree_cons) {
             if let Some(pic) = &self.pic {
-                let s_rec = pic.borrow().frame.planes[1].cfg.stride;
                 cuw >>= 1;
                 cuh >>= 1;
                 x >>= 1;
                 y >>= 1;
-                /*
+
                 /* U */
-                rec = ctx -> pic -> u + (y * s_rec) + x;
-                evc_get_nbr_b(x, y, cuw, cuh, rec, s_rec, core -> avail_cu, core -> nb, core -> scup, ctx -> map_scu, ctx -> w_scu, ctx -> h_scu, U_C, constrained_intra_flag, ctx -> map_tidx);
+                let rec = &mut pic.borrow_mut().frame.planes[U_C];
+                evc_get_nbr_b(
+                    x as usize,
+                    y as usize,
+                    cuw as usize,
+                    cuh as usize,
+                    &rec.as_region(),
+                    self.core.avail_cu,
+                    &mut self.core.nb.data[U_C],
+                    self.core.scup as usize,
+                    &self.map_scu,
+                    self.w_scu as usize,
+                    self.h_scu as usize,
+                    U_C,
+                    constrained_intra_flag,
+                );
 
                 /* V */
-                rec = ctx -> pic -> v + (y * s_rec) + x;
-                evc_get_nbr_b(x, y, cuw, cuh, rec, s_rec, core -> avail_cu, core -> nb, core -> scup, ctx -> map_scu, ctx -> w_scu, ctx -> h_scu, V_C, constrained_intra_flag, ctx -> map_tidx);
-                */
+                let rec = &mut pic.borrow_mut().frame.planes[V_C];
+                evc_get_nbr_b(
+                    x as usize,
+                    y as usize,
+                    cuw as usize,
+                    cuh as usize,
+                    &rec.as_region(),
+                    self.core.avail_cu,
+                    &mut self.core.nb.data[V_C],
+                    self.core.scup as usize,
+                    &self.map_scu,
+                    self.w_scu as usize,
+                    self.h_scu as usize,
+                    V_C,
+                    constrained_intra_flag,
+                );
             }
         }
     }
@@ -977,15 +1001,37 @@ impl EvcdCtx {
                 &self.map_scu,
             );
             self.get_nbr_yuv(x, y, cuw, cuh);
-            /*if (evcd_check_luma(ctx, core))
-            {
-                evc_ipred_b(core->nb[0][0] + 2, core->nb[0][1] + cuh, core->nb[0][2] + 2, core->avail_lr, core->pred[0][Y_C], core->ipm[0], cuw, cuh);
+            if evc_check_luma(&self.core.tree_cons) {
+                evc_ipred_b(
+                    &self.core.nb.data[Y_C][0][2..],
+                    &self.core.nb.data[Y_C][1][cuh as usize..],
+                    self.core.nb.data[Y_C][1][cuh as usize - 1],
+                    &mut self.core.pred[0].data[Y_C],
+                    self.core.ipm[0],
+                    cuw as usize,
+                    cuh as usize,
+                );
             }
-            if (evcd_check_chroma(ctx, core))
-            {
-                evc_ipred_uv_b(core->nb[1][0] + 2, core->nb[1][1] + (cuh >> 1), core->nb[1][2] + 2, core->avail_lr, core->pred[0][U_C], core->ipm[1], core->ipm[0], cuw >> 1, cuh >> 1);
-                evc_ipred_uv_b(core->nb[2][0] + 2, core->nb[2][1] + (cuh >> 1), core->nb[2][2] + 2, core->avail_lr, core->pred[0][V_C], core->ipm[1], core->ipm[0], cuw >> 1, cuh >> 1);
-            }*/
+            if evc_check_chroma(&self.core.tree_cons) {
+                evc_ipred_b(
+                    &self.core.nb.data[U_C][0][2..],
+                    &self.core.nb.data[U_C][1][(cuh >> 1) as usize..],
+                    self.core.nb.data[U_C][1][(cuh >> 1) as usize - 1],
+                    &mut self.core.pred[0].data[U_C],
+                    self.core.ipm[1],
+                    cuw as usize >> 1,
+                    cuh as usize >> 1,
+                );
+                evc_ipred_b(
+                    &self.core.nb.data[V_C][0][2..],
+                    &self.core.nb.data[V_C][1][(cuh >> 1) as usize..],
+                    self.core.nb.data[V_C][1][(cuh >> 1) as usize - 1],
+                    &mut self.core.pred[0].data[V_C],
+                    self.core.ipm[1],
+                    cuw as usize >> 1,
+                    cuh as usize >> 1,
+                );
+            }
         }
 
         /* reconstruction */

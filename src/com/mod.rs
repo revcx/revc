@@ -60,7 +60,7 @@ pub(crate) const MV_D: usize = 2;
 /* Reference index indicator */
 pub(crate) const REFI: usize = 2;
 
-pub(crate) const N_REF: usize = 3; /* left, up, right */
+pub(crate) const N_REF: usize = 2; /* left, up */
 pub(crate) const NUM_NEIB: usize = 4; /* LR: 00, 10, 01, 11*/
 
 pub(crate) const MAX_CU_LOG2: usize = 6; // baseline: 64x64
