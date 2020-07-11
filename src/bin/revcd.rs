@@ -160,7 +160,7 @@ fn main() -> io::Result<()> {
         ..Default::default()
     };
 
-    let mut ctx: Context<u8> = Context::new(&cfg);
+    let mut ctx: Context = Context::new(&cfg);
 
     let mut pic_cnt: usize = 0;
     let mut clk_tot = 1;

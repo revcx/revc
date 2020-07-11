@@ -252,7 +252,7 @@ pub(crate) static evc_tbl_tm[i8;MAX_CU_DEPTH] =
 };*/
 
 lazy_static! {
-    pub(crate) static ref evc_scan_tbl: [Box<[u16]>; MAX_CU_LOG2 - 1] = {
+    pub(crate) static ref evc_scan_tbl: [Box<[u16]>; MAX_CU_LOG2] = {
         [
             scan_tbl(2),
             scan_tbl(4),
@@ -262,7 +262,7 @@ lazy_static! {
             scan_tbl(64),
         ]
     };
-    pub(crate) static ref evc_tbl_tr: [Box<[i16]>; MAX_CU_LOG2 - 1] = {
+    pub(crate) static ref evc_tbl_tr: [Box<[i16]>; MAX_CU_LOG2] = {
         [
             evc_init_multi_tbl(2),
             evc_init_multi_tbl(4),
@@ -272,7 +272,7 @@ lazy_static! {
             evc_init_multi_tbl(64),
         ]
     };
-    pub(crate) static ref evc_tbl_inv_tr: [Box<[i16]>; MAX_CU_LOG2 - 1] = {
+    pub(crate) static ref evc_tbl_inv_tr: [Box<[i16]>; MAX_CU_LOG2] = {
         [
             evc_init_multi_inv_tbl(2),
             evc_init_multi_inv_tbl(4),

@@ -50,6 +50,19 @@ impl<T: Default + Copy> Default for CUBuffer<T> {
     }
 }
 
+#[derive(Clone)]
+pub(crate) struct NBBuffer<T: Default + Copy> {
+    pub(crate) data: [[[T; MAX_CU_SIZE * 3]; N_REF]; N_C],
+}
+
+impl<T: Default + Copy> Default for NBBuffer<T> {
+    fn default() -> Self {
+        NBBuffer {
+            data: [[[T::default(); MAX_CU_SIZE * 3]; N_REF]; N_C],
+        }
+    }
+}
+
 /*****************************************************************************
  * CORE information used for decoding process.
  *
@@ -65,7 +78,7 @@ pub(crate) struct EvcdCore {
     pred: CUBuffer<pel>, //[[[pel; MAX_CU_DIM]; N_C]; 2], //[2][N_C][MAX_CU_DIM]
 
     /* neighbor pixel buffer for intra prediction */
-    //nb: [[[pel; MAX_CU_SIZE * 3]; N_REF]; N_C],
+    nb: NBBuffer<pel>, // [N_C][N_REF][MAX_CU_SIZE * 3];
     /* reference index for current CU */
     refi: [i8; REFP_NUM],
     /* motion vector for current CU */
@@ -136,7 +149,7 @@ pub(crate) struct EvcdCore {
     mvd: [[i16; MV_D]; REFP_NUM],
     inter_dir: InterPredDir,
     bi_idx: i16,
-    ctx_flags: [u8; CtxNevIdx::NUM_CNID as usize],
+    ctx_flags: [u8; NUM_CNID],
     tree_cons: TREE_CONS,
 }
 
@@ -146,7 +159,7 @@ pub(crate) struct EvcdCore {
  * All have to be stored are in this structure.
  *****************************************************************************/
 //#[derive(Default)]
-pub(crate) struct EvcdCtx<T: Pixel> {
+pub(crate) struct EvcdCtx {
     /* magic code */
     magic: u32,
 
@@ -161,7 +174,7 @@ pub(crate) struct EvcdCtx<T: Pixel> {
     /* current slice header */
     sh: EvcSh,
     /* decoded picture buffer management */
-    dpm: EvcPm<T>,
+    dpm: EvcPm,
     /* create descriptor */
     //EVCD_CDSC               cdsc;
     /* sequence parameter set */
@@ -169,7 +182,7 @@ pub(crate) struct EvcdCtx<T: Pixel> {
     /* picture parameter set */
     pps: EvcPps,
     /* current decoded (decoding) picture buffer */
-    pic: Option<Rc<RefCell<EvcPic<T>>>>,
+    pic: Option<Rc<RefCell<EvcPic>>>,
     /* SBAC */
     sbac_dec: EvcdSbac,
     sbac_ctx: EvcSbacCtx,
@@ -235,7 +248,7 @@ pub(crate) struct EvcdCtx<T: Pixel> {
     /* bitstream has an error? */
     bs_err: u8,
     /* reference picture (0: foward, 1: backward) */
-    refp: Vec<Vec<EvcRefP<T>>>, //[[EvcRefP<T>; REFP_NUM]; MAX_NUM_REF_PICS],
+    refp: Vec<Vec<EvcRefP>>, //[[EvcRefP; REFP_NUM]; MAX_NUM_REF_PICS],
     /* flag for picture signature enabling */
     use_pic_sign: u8,
     /* picture signature (MD5 digest 128bits) for each component */
@@ -247,7 +260,7 @@ pub(crate) struct EvcdCtx<T: Pixel> {
     num_ctb: u32,
 }
 
-impl<T: Pixel> EvcdCtx<T> {
+impl EvcdCtx {
     pub(crate) fn new() -> Self {
         let mut refp = vec![];
         for j in 0..MAX_NUM_REF_PICS {
@@ -822,6 +835,53 @@ impl<T: Pixel> EvcdCtx<T> {
         );
     }
 
+    fn get_nbr_yuv(&mut self, mut x: u16, mut y: u16, mut cuw: u8, mut cuh: u8) {
+        let constrained_intra_flag =
+            self.core.pred_mode == PredMode::MODE_INTRA && self.pps.constrained_intra_pred_flag;
+
+        if evc_check_luma(&self.core.tree_cons) {
+            if let Some(pic) = &self.pic {
+                /* Y */
+                let rec = &mut pic.borrow_mut().frame.planes[0];
+                //let s_rec = rec.cfg.stride;
+                //rec = ctx -> pic -> y + (y * s_rec) + x;
+                evc_get_nbr_b(
+                    x,
+                    y,
+                    cuw,
+                    cuh,
+                    &rec.as_region(),
+                    self.core.avail_cu,
+                    &mut self.core.nb.data[Y_C],
+                    self.core.scup,
+                    &self.map_scu,
+                    self.w_scu,
+                    self.h_scu,
+                    Y_C,
+                    constrained_intra_flag,
+                );
+            }
+        }
+        if evc_check_chroma(&self.core.tree_cons) {
+            if let Some(pic) = &self.pic {
+                let s_rec = pic.borrow().frame.planes[1].cfg.stride;
+                cuw >>= 1;
+                cuh >>= 1;
+                x >>= 1;
+                y >>= 1;
+                /*
+                /* U */
+                rec = ctx -> pic -> u + (y * s_rec) + x;
+                evc_get_nbr_b(x, y, cuw, cuh, rec, s_rec, core -> avail_cu, core -> nb, core -> scup, ctx -> map_scu, ctx -> w_scu, ctx -> h_scu, U_C, constrained_intra_flag, ctx -> map_tidx);
+
+                /* V */
+                rec = ctx -> pic -> v + (y * s_rec) + x;
+                evc_get_nbr_b(x, y, cuw, cuh, rec, s_rec, core -> avail_cu, core -> nb, core -> scup, ctx -> map_scu, ctx -> w_scu, ctx -> h_scu, V_C, constrained_intra_flag, ctx -> map_tidx);
+                */
+            }
+        }
+    }
+
     fn evcd_eco_unit(
         &mut self,
         x: u16,
@@ -830,6 +890,9 @@ impl<T: Pixel> EvcdCtx<T> {
         log2_cuh: u8,
         tree_cons: TREE_CONS_NEW,
     ) -> Result<(), EvcError> {
+        let cuw = 1 << log2_cuw;
+        let cuh = 1 << log2_cuh;
+
         //entropy decoding
         {
             let core = &mut self.core;
@@ -847,9 +910,6 @@ impl<T: Pixel> EvcdCtx<T> {
             core.x_scu = PEL2SCU(x as usize) as u16;
             core.y_scu = PEL2SCU(y as usize) as u16;
             core.scup = core.x_scu as u32 + core.y_scu as u32 * self.w_scu as u32;
-
-            let cuw = 1 << log2_cuw as u16;
-            let cuh = 1 << log2_cuh as u16;
 
             EVC_TRACE_COUNTER(&mut bs.tracer);
             EVC_TRACE(&mut bs.tracer, "poc: ");
@@ -874,6 +934,62 @@ impl<T: Pixel> EvcdCtx<T> {
         }
 
         self.evcd_set_dec_info();
+
+        /* prediction */
+        if self.core.pred_mode != PredMode::MODE_INTRA {
+            //TODO
+            /*core->avail_cu = evc_get_avail_inter(core->x_scu, core->y_scu, ctx->w_scu, ctx->h_scu, core->scup, cuw, cuh, ctx->map_scu, ctx->map_tidx);
+            if (core->pred_mode == MODE_SKIP)
+            {
+                evcd_get_skip_motion(ctx, core);
+            }else
+            {
+                if (core->inter_dir == PRED_DIR)
+                {
+                    if(ctx->sps.tool_admvp == 0)
+                    {
+                        evc_get_mv_dir(ctx->refp[0], ctx->poc.poc_val, core->scup + ((1 << (core->log2_cuw - MIN_CU_LOG2)) - 1) + ((1 << (core->log2_cuh - MIN_CU_LOG2)) - 1) * ctx->w_scu, core->scup, ctx->w_scu, ctx->h_scu, core->mv
+                        , ctx->sps.tool_admvp
+                        );
+                        core->refi[REFP_0] = 0;
+                        core->refi[REFP_1] = 0;
+                    }
+                    else if (core->mvr_idx == 0)
+                    {
+                        evcd_get_direct_motion(ctx, core);
+                    }
+                } else
+                {
+                    evcd_get_inter_motion(ctx, core);
+                }
+            }
+            evc_mc(x, y, ctx->w, ctx->h, cuw, cuh, core->refi, core->mv, ctx->refp, core->pred, ctx->poc.poc_val);
+             */
+        } else {
+            self.core.avail_cu = evc_get_avail_intra(
+                self.core.x_scu as usize,
+                self.core.y_scu as usize,
+                self.w_scu as usize,
+                self.h_scu as usize,
+                self.core.scup as usize,
+                self.core.log2_cuw,
+                self.core.log2_cuh,
+                &self.map_scu,
+            );
+            self.get_nbr_yuv(x, y, cuw, cuh);
+            /*if (evcd_check_luma(ctx, core))
+            {
+                evc_ipred_b(core->nb[0][0] + 2, core->nb[0][1] + cuh, core->nb[0][2] + 2, core->avail_lr, core->pred[0][Y_C], core->ipm[0], cuw, cuh);
+            }
+            if (evcd_check_chroma(ctx, core))
+            {
+                evc_ipred_uv_b(core->nb[1][0] + 2, core->nb[1][1] + (cuh >> 1), core->nb[1][2] + 2, core->avail_lr, core->pred[0][U_C], core->ipm[1], core->ipm[0], cuw >> 1, cuh >> 1);
+                evc_ipred_uv_b(core->nb[2][0] + 2, core->nb[2][1] + (cuh >> 1), core->nb[2][2] + 2, core->avail_lr, core->pred[0][V_C], core->ipm[1], core->ipm[0], cuw >> 1, cuh >> 1);
+            }*/
+        }
+
+        /* reconstruction */
+        //evc_recon_yuv(x, y, cuw, cuh, core->coef, core->pred[0], core->is_coef, ctx->pic, core->pred_mode == MODE_IBC ? 0 : core->ats_inter_info, core->tree_cons);
 
         Ok(())
     }
@@ -1249,7 +1365,7 @@ impl<T: Pixel> EvcdCtx<T> {
         Ok(stat)
     }
 
-    pub(crate) fn pull_frm(&mut self) -> Result<Frame<T>, EvcError> {
+    pub(crate) fn pull_frm(&mut self) -> Result<Frame<pel>, EvcError> {
         let pic = self.dpm.evc_picman_out_pic()?;
         //if let Some(p) = &pic {}
         Err(EvcError::EVC_ERR_UNEXPECTED)

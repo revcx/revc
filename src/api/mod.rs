@@ -10,7 +10,7 @@ pub mod frame;
 pub mod util;
 
 use frame::Frame;
-use util::Pixel;
+use util::*;
 
 use crate::dec::*;
 
@@ -303,14 +303,14 @@ impl Default for Config {
     }
 }
 
-pub struct Context<T: Pixel> {
-    pub(crate) frame: Option<Frame<T>>,
+pub struct Context {
+    pub(crate) frame: Option<Frame<pel>>,
     pub(crate) packet: Option<Packet>,
 
-    evcd_ctx: EvcdCtx<T>,
+    evcd_ctx: EvcdCtx,
 }
 
-impl<T: Pixel> Context<T> {
+impl Context {
     pub fn new(cfg: &Config) -> Self {
         Context {
             frame: None,
@@ -323,7 +323,7 @@ impl<T: Pixel> Context<T> {
         self.evcd_ctx.decode_nalu(pkt)
     }
 
-    pub fn pull(&mut self) -> Result<Frame<T>, EvcError> {
+    pub fn pull(&mut self) -> Result<Frame<pel>, EvcError> {
         self.evcd_ctx.pull_frm()
     }
 }

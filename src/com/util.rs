@@ -160,6 +160,60 @@ pub(crate) fn evc_check_nev_avail(
     return avail_lr;
 }
 
+pub(crate) fn evc_get_avail_intra(
+    x_scu: usize,
+    y_scu: usize,
+    w_scu: usize,
+    h_scu: usize,
+    scup: usize,
+    log2_cuw: u8,
+    log2_cuh: u8,
+    map_scu: &[MCU],
+) -> u16 {
+    let mut avail = 0;
+
+    let log2_scuw = log2_cuw as usize - MIN_CU_LOG2;
+    let log2_scuh = log2_cuh as usize - MIN_CU_LOG2;
+    let scuw = 1 << log2_scuw;
+    let scuh = 1 << log2_scuh;
+    let curr_scup = x_scu + y_scu * w_scu;
+
+    if x_scu > 0 && map_scu[(scup - 1) as usize].GET_COD() != 0 {
+        SET_AVAIL(&mut avail, AVAIL_LE);
+
+        if y_scu + scuh + scuw - 1 < h_scu
+            && map_scu[(scup + (w_scu * (scuw + scuh)) - w_scu - 1) as usize].GET_COD() != 0
+        {
+            SET_AVAIL(&mut avail, AVAIL_LO_LE);
+        }
+    }
+
+    if y_scu > 0 {
+        SET_AVAIL(&mut avail, AVAIL_UP);
+        SET_AVAIL(&mut avail, AVAIL_RI_UP);
+
+        if x_scu > 0 && map_scu[(scup - w_scu - 1) as usize].GET_COD() != 0 {
+            SET_AVAIL(&mut avail, AVAIL_UP_LE);
+        }
+
+        if x_scu + scuw < w_scu && map_scu[(scup - w_scu + scuw) as usize].GET_COD() != 0 {
+            SET_AVAIL(&mut avail, AVAIL_UP_RI);
+        }
+    }
+
+    if x_scu + scuw < w_scu && map_scu[(scup + scuw) as usize].GET_COD() != 0 {
+        SET_AVAIL(&mut avail, AVAIL_RI);
+
+        if y_scu + scuh + scuw - 1 < h_scu
+            && map_scu[(scup + (w_scu * (scuw + scuh - 1)) + scuw) as usize].GET_COD() != 0
+        {
+            SET_AVAIL(&mut avail, AVAIL_LO_RI);
+        }
+    }
+
+    return avail;
+}
+
 #[inline]
 pub(crate) fn evc_check_only_intra(tree_cons: &TREE_CONS) -> bool {
     tree_cons.mode_cons == MODE_CONS::eOnlyIntra

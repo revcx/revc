@@ -63,7 +63,7 @@ pub(crate) const REFI: usize = 2;
 pub(crate) const N_REF: usize = 3; /* left, up, right */
 pub(crate) const NUM_NEIB: usize = 4; /* LR: 00, 10, 01, 11*/
 
-pub(crate) const MAX_CU_LOG2: usize = 7;
+pub(crate) const MAX_CU_LOG2: usize = 6; // baseline: 64x64
 pub(crate) const MIN_CU_LOG2: usize = 2;
 pub(crate) const MAX_CU_SIZE: usize = (1 << MAX_CU_LOG2);
 pub(crate) const MIN_CU_SIZE: usize = (1 << MIN_CU_LOG2);
@@ -112,39 +112,51 @@ pub(crate) const MAX_NUM_TILES_ROW: usize = 22;
 pub(crate) const MAX_NUM_TILES_COL: usize = 20;
 
 /* Neighboring block availability flag bits */
-pub(crate) const AVAIL_BIT_UP: usize = 0;
-pub(crate) const AVAIL_BIT_LE: usize = 1;
-pub(crate) const AVAIL_BIT_RI: usize = 3;
-pub(crate) const AVAIL_BIT_LO: usize = 4;
-pub(crate) const AVAIL_BIT_UP_LE: usize = 5;
-pub(crate) const AVAIL_BIT_UP_RI: usize = 6;
-pub(crate) const AVAIL_BIT_LO_LE: usize = 7;
-pub(crate) const AVAIL_BIT_LO_RI: usize = 8;
-pub(crate) const AVAIL_BIT_RI_UP: usize = 9;
-pub(crate) const AVAIL_BIT_UP_LE_LE: usize = 10;
-pub(crate) const AVAIL_BIT_UP_RI_RI: usize = 11;
+pub(crate) const AVAIL_BIT_UP: u16 = 0;
+pub(crate) const AVAIL_BIT_LE: u16 = 1;
+pub(crate) const AVAIL_BIT_RI: u16 = 3;
+pub(crate) const AVAIL_BIT_LO: u16 = 4;
+pub(crate) const AVAIL_BIT_UP_LE: u16 = 5;
+pub(crate) const AVAIL_BIT_UP_RI: u16 = 6;
+pub(crate) const AVAIL_BIT_LO_LE: u16 = 7;
+pub(crate) const AVAIL_BIT_LO_RI: u16 = 8;
+pub(crate) const AVAIL_BIT_RI_UP: u16 = 9;
+pub(crate) const AVAIL_BIT_UP_LE_LE: u16 = 10;
+pub(crate) const AVAIL_BIT_UP_RI_RI: u16 = 11;
 
 /* Neighboring block availability flags */
-pub(crate) const AVAIL_UP: usize = (1 << AVAIL_BIT_UP);
-pub(crate) const AVAIL_LE: usize = (1 << AVAIL_BIT_LE);
-pub(crate) const AVAIL_RI: usize = (1 << AVAIL_BIT_RI);
-pub(crate) const AVAIL_LO: usize = (1 << AVAIL_BIT_LO);
-pub(crate) const AVAIL_UP_LE: usize = (1 << AVAIL_BIT_UP_LE);
-pub(crate) const AVAIL_UP_RI: usize = (1 << AVAIL_BIT_UP_RI);
-pub(crate) const AVAIL_LO_LE: usize = (1 << AVAIL_BIT_LO_LE);
-pub(crate) const AVAIL_LO_RI: usize = (1 << AVAIL_BIT_LO_RI);
-pub(crate) const AVAIL_RI_UP: usize = (1 << AVAIL_BIT_RI_UP);
-pub(crate) const AVAIL_UP_LE_LE: usize = (1 << AVAIL_BIT_UP_LE_LE);
-pub(crate) const AVAIL_UP_RI_RI: usize = (1 << AVAIL_BIT_UP_RI_RI);
+pub(crate) const AVAIL_UP: u16 = (1 << AVAIL_BIT_UP);
+pub(crate) const AVAIL_LE: u16 = (1 << AVAIL_BIT_LE);
+pub(crate) const AVAIL_RI: u16 = (1 << AVAIL_BIT_RI);
+pub(crate) const AVAIL_LO: u16 = (1 << AVAIL_BIT_LO);
+pub(crate) const AVAIL_UP_LE: u16 = (1 << AVAIL_BIT_UP_LE);
+pub(crate) const AVAIL_UP_RI: u16 = (1 << AVAIL_BIT_UP_RI);
+pub(crate) const AVAIL_LO_LE: u16 = (1 << AVAIL_BIT_LO_LE);
+pub(crate) const AVAIL_LO_RI: u16 = (1 << AVAIL_BIT_LO_RI);
+pub(crate) const AVAIL_RI_UP: u16 = (1 << AVAIL_BIT_RI_UP);
+pub(crate) const AVAIL_UP_LE_LE: u16 = (1 << AVAIL_BIT_UP_LE_LE);
+pub(crate) const AVAIL_UP_RI_RI: u16 = (1 << AVAIL_BIT_UP_RI_RI);
 
 /* MB availability check macro */
-//pub(crate) const IS_AVAIL(avail, pos)  : usize =        (((avail)&(pos)) == (pos))
+#[inline]
+pub(crate) fn IS_AVAIL(avail: u16, pos: u16) -> bool {
+    (avail & pos) == pos
+}
 /* MB availability set macro */
-//pub(crate) const SET_AVAIL(avail, pos) : usize =          (avail) |= (pos)
+#[inline]
+pub(crate) fn SET_AVAIL(avail: &mut u16, pos: u16) {
+    *avail |= pos;
+}
 /* MB availability remove macro */
-//pub(crate) const REM_AVAIL(avail, pos)    : usize =         (avail) &= (~(pos))
+#[inline]
+pub(crate) fn REM_AVAIL(avail: &mut u16, pos: u16) {
+    *avail &= !pos
+}
 /* MB availability into bit flag */
-//pub(crate) const GET_AVAIL_FLAG(avail, bit)      (((avail)>>(bit)) & 0x1)
+#[inline]
+pub(crate) fn GET_AVAIL_FLAG(avail: u16, bit: u16) -> bool {
+    (avail >> bit) & 0x1 != 0
+}
 
 #[inline]
 pub(crate) fn GET_QP(qp: i8, dqp: i8) -> i8 {
@@ -238,8 +250,8 @@ pub(crate) enum CtxNevIdx {
     CNID_MODE_CONS = 2,
     CNID_AFFN_FLAG = 3,
     CNID_IBC_FLAG = 4,
-    NUM_CNID = 5,
 }
+pub(crate) const NUM_CNID: usize = 5;
 
 /*************************************************
 
