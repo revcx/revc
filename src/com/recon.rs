@@ -29,8 +29,8 @@ fn evc_recon(
     {
         for i in 0..cuh {
             for j in 0..cuw {
-                let t0 = coef[i * cuw + j] + pred[i * cuw + j] as i16;
-                rec[y + i][x + j] = EVC_CLIP3(0i16, ((1 << BIT_DEPTH) - 1) as i16, t0) as u16;
+                let t0 = coef[i * cuw + j] as i32 + pred[i * cuw + j] as i32;
+                rec[y + i][x + j] = EVC_CLIP3(0i32, ((1 << BIT_DEPTH) - 1) as i32, t0) as u16;
             }
         }
         //#if SIMD_CLIP

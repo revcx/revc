@@ -103,6 +103,10 @@ impl EvcRefP {
  *****************************************************************************/
 //#[derive(Default)]
 pub(crate) struct EvcPm {
+    pub(crate) width: usize,
+    pub(crate) height: usize,
+    pub(crate) chroma_sampling: ChromaSampling,
+
     /* picture store (including reference and non-reference) */
     pub(crate) pic: Vec<Option<Rc<RefCell<EvcPic>>>>, //[Option<Rc<RefCell<EvcPic<T>>>>; MAX_PB_SIZE],
     /* address of reference pictures */
@@ -128,7 +132,7 @@ pub(crate) struct EvcPm {
 }
 
 impl EvcPm {
-    pub(crate) fn new() -> Self {
+    pub(crate) fn new(width: usize, height: usize, chroma_sampling: ChromaSampling) -> Self {
         let mut pic = vec![];
         for i in 0..MAX_PB_SIZE {
             pic.push(None);
@@ -139,6 +143,9 @@ impl EvcPm {
         }
 
         EvcPm {
+            width,
+            height,
+            chroma_sampling,
             pic,     //[None; MAX_PB_SIZE],
             pic_ref, //[None; MAX_NUM_REF_PICS],
             max_num_ref_pics: 0,
@@ -364,9 +371,9 @@ impl EvcPm {
             //evc_assert_gv(pic != NULL, ret, EVC_ERR_OUT_OF_MEMORY, ERR);
             //TODO: add width, height, CS
             self.pic_lease = Some(Rc::new(RefCell::new(EvcPic::new(
-                0,
-                0,
-                ChromaSampling::Cs400,
+                self.width,
+                self.width,
+                self.chroma_sampling,
             ))));
             if let Some(pic) = &self.pic_lease {
                 return Ok(Some(Rc::clone(pic)));

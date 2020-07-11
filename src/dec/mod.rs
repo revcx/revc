@@ -175,7 +175,7 @@ pub(crate) struct EvcdCtx {
     /* current slice header */
     sh: EvcSh,
     /* decoded picture buffer management */
-    dpm: EvcPm,
+    dpm: Option<EvcPm>,
     /* create descriptor */
     //EVCD_CDSC               cdsc;
     /* sequence parameter set */
@@ -191,6 +191,8 @@ pub(crate) struct EvcdCtx {
     w: u16,
     /* decoding picture height */
     h: u16,
+    /* decoding chroma sampling */
+    cs: ChromaSampling,
     /* maximum CU width and height */
     max_cuwh: u16,
     /* log2 of maximum CU width and height */
@@ -286,7 +288,7 @@ impl EvcdCtx {
             /* current slice header */
             sh: EvcSh::default(),
             /* decoded picture buffer management */
-            dpm: EvcPm::new(),
+            dpm: None,
             /* create descriptor */
             //EVCD_CDSC               cdsc;
             /* sequence parameter set */
@@ -302,6 +304,7 @@ impl EvcdCtx {
             w: 0,
             /* decoding picture height */
             h: 0,
+            cs: ChromaSampling::Cs400,
             /* maximum CU width and height */
             max_cuwh: 0,
             /* log2 of maximum CU width and height */
@@ -380,7 +383,7 @@ impl EvcdCtx {
             /* resolution was changed */
             self.w = self.sps.pic_width_in_luma_samples;
             self.h = self.sps.pic_height_in_luma_samples;
-
+            self.cs = self.sps.chroma_format_idc.into();
             assert_eq!(self.sps.sps_btt_flag, false);
 
             self.max_cuwh = 1 << 6;
@@ -419,11 +422,14 @@ impl EvcdCtx {
         /* initialize reference picture manager */
         self.ref_pic_gap_length = (1 << self.sps.log2_ref_pic_gap_length) as u32;
 
-        self.dpm.evc_picman_init(
+        /* initialize decode picture manager */
+        let mut dpm = EvcPm::new(self.w as usize, self.h as usize, self.cs);
+        dpm.evc_picman_init(
             MAX_PB_SIZE as u8,
             MAX_NUM_REF_PICS as u8,
             //PICBUF_ALLOCATOR * pa
         )?;
+        self.dpm = Some(dpm);
 
         Ok(())
     }
@@ -768,7 +774,7 @@ impl EvcdCtx {
                                 bs,
                                 sbac,
                                 sbac_ctx,
-                                self.dpm.num_refp[inter_dir_idx],
+                                self.dpm.as_ref().unwrap().num_refp[inter_dir_idx],
                             )? as i8;
                             core.mvp_idx[inter_dir_idx] = evcd_eco_mvp_idx(bs, sbac, sbac_ctx)?;
                             evcd_eco_get_mvd(bs, sbac, sbac_ctx, &mut core.mvd[inter_dir_idx])?;
@@ -1277,7 +1283,7 @@ impl EvcdCtx {
                     self.core.y_lcu += 1;
                 }
             }
-            //eprint!("{} ", self.num_ctb);
+            eprint!("{} ", self.num_ctb);
         }
 
         Ok(())
@@ -1302,7 +1308,7 @@ impl EvcdCtx {
             stat.tid = self.nalu.nuh_temporal_id as isize;
 
             for i in 0..2 {
-                stat.refpic_num[i] = self.dpm.num_refp[i];
+                stat.refpic_num[i] = self.dpm.as_ref().unwrap().num_refp[i];
                 for j in 0..stat.refpic_num[i] as usize {
                     stat.refpic[i][j] = self.refp[j][i].poc as isize;
                 }
@@ -1372,7 +1378,7 @@ impl EvcdCtx {
             }
 
             /* initialize reference pictures */
-            self.dpm.evc_picman_refp_init(
+            self.dpm.as_mut().unwrap().evc_picman_refp_init(
                 self.sps.max_num_ref_pics,
                 self.sh.slice_type,
                 self.poc.poc_val as u32,
@@ -1383,7 +1389,7 @@ impl EvcdCtx {
 
             if self.num_ctb == self.f_lcu {
                 /* get available frame buffer for decoded image */
-                self.pic = self.dpm.evc_picman_get_empty_pic()?;
+                self.pic = self.dpm.as_mut().unwrap().evc_picman_get_empty_pic()?;
 
                 /* get available frame buffer for decoded image */
                 //self.map_refi = self.pic->map_refi;
@@ -1403,7 +1409,7 @@ impl EvcdCtx {
                 //TODO
 
                 /* put decoded picture to DPB */
-                self.dpm.evc_picman_put_pic(
+                self.dpm.as_mut().unwrap().evc_picman_put_pic(
                     &self.pic,
                     self.nalu.nal_unit_type == NaluType::EVC_IDR_NUT,
                     self.poc.poc_val as u32,
@@ -1421,16 +1427,21 @@ impl EvcdCtx {
         }
 
         let mut stat = self.make_stat(nalu_type);
-        //if self.num_ctb > 0 {
-        stat.fnum = -1;
-        //}
+        if self.num_ctb > 0 {
+            stat.fnum = -1;
+        }
 
         Ok(stat)
     }
 
     pub(crate) fn pull_frm(&mut self) -> Result<Frame<pel>, EvcError> {
-        let pic = self.dpm.evc_picman_out_pic()?;
-        //if let Some(p) = &pic {}
-        Err(EvcError::EVC_ERR_UNEXPECTED)
+        let pic = self.dpm.as_mut().unwrap().evc_picman_out_pic()?;
+        if let Some(p) = &pic {
+            //TODO: optimize it without clone
+            let frame = p.borrow().frame.clone();
+            Ok(frame)
+        } else {
+            Err(EvcError::EVC_OK_FRM_DELAYED)
+        }
     }
 }

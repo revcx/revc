@@ -17,14 +17,6 @@ use crate::dec::*;
 /*****************************************************************************
  * return values and error code
  *****************************************************************************/
-/* no more frames, but it is OK */
-pub const EVC_OK_NO_MORE_FRM: usize = 205;
-/* progress success, but output is not available temporarily */
-pub const EVC_OK_OUT_NOT_AVAILABLE: usize = 204;
-/* frame dimension (width or height) has been changed */
-pub const EVC_OK_DIM_CHANGED: usize = (203);
-/* decoding success, but output frame has been delayed */
-pub const EVC_OK_FRM_DELAYED: usize = (202);
 /* not matched CRC value */
 pub const EVC_ERR_BAD_CRC: usize = (201);
 /* CRC value presented but ignored at decoder*/
@@ -33,6 +25,15 @@ pub const EVC_OK: usize = 0;
 
 #[derive(Debug, FromPrimitive, ToPrimitive, PartialOrd, Ord, PartialEq, Eq)]
 pub enum EvcError {
+    /* no more frames, but it is OK */
+    EVC_OK_NO_MORE_FRM = 205,
+    /* progress success, but output is not available temporarily */
+    EVC_OK_OUT_NOT_AVAILABLE = 204,
+    /* frame dimension (width or height) has been changed */
+    EVC_OK_DIM_CHANGED = 203,
+    /* decoding success, but output frame has been delayed */
+    EVC_OK_FRM_DELAYED = 202,
+
     EVC_ERR = (-1), /* generic error */
     EVC_ERR_INVALID_ARGUMENT = (-101),
     EVC_ERR_OUT_OF_MEMORY = (-102),
@@ -233,15 +234,27 @@ impl fmt::Display for Packet {
 #[derive(Copy, Clone, Debug, PartialEq, FromPrimitive)]
 #[repr(C)]
 pub enum ChromaSampling {
+    Cs400,
     Cs420,
     Cs422,
     Cs444,
-    Cs400,
 }
 
 impl Default for ChromaSampling {
     fn default() -> Self {
         ChromaSampling::Cs420
+    }
+}
+
+impl From<u8> for ChromaSampling {
+    fn from(val: u8) -> Self {
+        use self::ChromaSampling::*;
+        match val {
+            0 => Cs400,
+            1 => Cs420,
+            2 => Cs422,
+            _ => Cs444,
+        }
     }
 }
 

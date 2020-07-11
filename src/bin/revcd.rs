@@ -160,7 +160,7 @@ fn main() -> io::Result<()> {
         ..Default::default()
     };
 
-    let mut ctx: Context = Context::new(&cfg);
+    let mut ctx = Context::new(&cfg);
 
     let mut pic_cnt: usize = 0;
     let mut clk_tot = 1;
@@ -222,19 +222,23 @@ fn main() -> io::Result<()> {
             }
         }
 
-        if (state != EvcdState::STATE_DECODING) {
+        if state != EvcdState::STATE_DECODING {
             let ret = ctx.pull();
             match ret {
-                Ok(_) => {}
+                Ok(frame) => cli.muxer.write(&frame)?,
                 Err(err) => {
-                    if (err == EvcError::EVC_ERR_UNEXPECTED) {
-                        if cli.verbose {
-                            eprint!("bumping process completed\n");
-                        }
+                    if err == EvcError::EVC_OK_FRM_DELAYED {
+                        //do nothing, expected
                     } else {
-                        eprint!("failed to pull the decoded image\n");
+                        if err == EvcError::EVC_ERR_UNEXPECTED {
+                            if cli.verbose {
+                                eprint!("bumping process completed\n");
+                            }
+                        } else {
+                            eprint!("failed to pull the decoded image\n");
+                        }
+                        break;
                     }
-                    break;
                 }
             }
 

@@ -1,5 +1,6 @@
 use super::Muxer;
 
+use std::cmp::*;
 use std::fs::File;
 use std::io;
 use std::io::Write;
@@ -7,6 +8,12 @@ use std::slice;
 
 use revc::api::frame::*;
 use revc::api::util::*;
+
+/* clipping within min and max */
+#[inline]
+pub(crate) fn IFVCA_CLIP<T: Ord>(min_x: T, max_x: T, value: T) -> T {
+    max(min_x, min(max_x, value))
+}
 
 pub struct YuvMuxer {
     writer: Box<dyn Write>,
@@ -24,7 +31,7 @@ impl YuvMuxer {
 }
 
 impl Muxer for YuvMuxer {
-    fn write(&mut self, f: &Frame<u8>) -> io::Result<()> {
+    fn write(&mut self, f: &Frame<u16>) -> io::Result<()> {
         let pitch_y = f.planes[0].cfg.width;
         let height = f.planes[0].cfg.height;
         let chroma_sampling_period = f.chroma_sampling.sampling_period();
@@ -51,7 +58,10 @@ impl Muxer for YuvMuxer {
             .zip(rec_y.chunks_mut(pitch_y))
         {
             line_out.copy_from_slice(
-                &line.iter().map(|&v| u8::cast_from(v)).collect::<Vec<u8>>()[..pitch_y],
+                &line
+                    .iter()
+                    .map(|&v| u8::cast_from(IFVCA_CLIP(0, 255, (v + 2) >> 2)))
+                    .collect::<Vec<u8>>()[..pitch_y],
             );
         }
         for (line, line_out) in f.planes[1]
@@ -60,7 +70,10 @@ impl Muxer for YuvMuxer {
             .zip(rec_u.chunks_mut(pitch_uv))
         {
             line_out.copy_from_slice(
-                &line.iter().map(|&v| u8::cast_from(v)).collect::<Vec<u8>>()[..pitch_uv],
+                &line
+                    .iter()
+                    .map(|&v| u8::cast_from(IFVCA_CLIP(0, 255, (v + 2) >> 2)))
+                    .collect::<Vec<u8>>()[..pitch_uv],
             );
         }
         for (line, line_out) in f.planes[2]
@@ -69,7 +82,10 @@ impl Muxer for YuvMuxer {
             .zip(rec_v.chunks_mut(pitch_uv))
         {
             line_out.copy_from_slice(
-                &line.iter().map(|&v| u8::cast_from(v)).collect::<Vec<u8>>()[..pitch_uv],
+                &line
+                    .iter()
+                    .map(|&v| u8::cast_from(IFVCA_CLIP(0, 255, (v + 2) >> 2)))
+                    .collect::<Vec<u8>>()[..pitch_uv],
             );
         }
 
