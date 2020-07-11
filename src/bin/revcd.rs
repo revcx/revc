@@ -15,6 +15,7 @@ struct CLISettings {
     pub frames: usize,
     pub verbose: bool,
     pub threads: usize,
+    pub bitdepth: u8,
 }
 
 fn parse_cli() -> CLISettings {
@@ -32,6 +33,7 @@ fn parse_cli() -> CLISettings {
         .arg(
             Arg::with_name("THREADS")
                 .help("Set the threadpool size")
+                .short("t")
                 .long("threads")
                 .takes_value(true)
                 .default_value("1"),
@@ -51,6 +53,14 @@ fn parse_cli() -> CLISettings {
                 .long("output")
                 .required_unless("FULLHELP")
                 .takes_value(true),
+        )
+        .arg(
+            Arg::with_name("BITDEPTH")
+                .help("output bitdepth (8(default), 10)")
+                .short("b")
+                .long("bitdepth")
+                .takes_value(true)
+                .default_value("8"),
         )
         .arg(
             Arg::with_name("FRAMES")
@@ -83,6 +93,10 @@ fn parse_cli() -> CLISettings {
         threads: matches
             .value_of("THREADS")
             .map(|v| v.parse().expect("Threads must be an integer"))
+            .unwrap(),
+        bitdepth: matches
+            .value_of("BITDEPTH")
+            .map(|v| v.parse().expect("Bitdepth must be an integer"))
             .unwrap(),
     }
 }
@@ -225,7 +239,7 @@ fn main() -> io::Result<()> {
         if state != EvcdState::STATE_DECODING {
             let ret = ctx.pull();
             match ret {
-                Ok(frame) => cli.muxer.write(&frame)?,
+                Ok(frame) => cli.muxer.write(&frame, cli.bitdepth)?,
                 Err(err) => {
                     if err == EvcError::EVC_OK_FRM_DELAYED {
                         //do nothing, expected
