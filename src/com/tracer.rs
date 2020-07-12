@@ -40,6 +40,18 @@ pub(crate) fn EVC_TRACE_INT_HEX(tracer: &mut Option<Tracer>, val: isize) {
     }
 }
 
+#[cfg(feature = "trace_bin")]
+pub(crate) fn TRACE_BIN(tracer: &mut Option<Tracer>, model: u16, range: u32, lps: u32) {
+    EVC_TRACE_COUNTER(tracer);
+    EVC_TRACE(tracer, "model ");
+    EVC_TRACE(tracer, model);
+    EVC_TRACE(tracer, " range ");
+    EVC_TRACE(tracer, range);
+    EVC_TRACE(tracer, " lps ");
+    EVC_TRACE(tracer, lps);
+    EVC_TRACE(tracer, " \n");
+}
+
 #[cfg(feature = "trace_coef")]
 pub(crate) fn TRACE_COEF(
     tracer: &mut Option<Tracer>,
@@ -82,15 +94,24 @@ pub(crate) fn TRACE_RESI(
     EVC_TRACE(tracer, " \n");
 }
 
-#[cfg(feature = "trace_bin")]
-pub(crate) fn TRACE_BIN(tracer: &mut Option<Tracer>, model: u16, range: u32, lps: u32) {
+#[cfg(feature = "trace_pred")]
+pub(crate) fn TRACE_PRED(
+    tracer: &mut Option<Tracer>,
+    ch_type: usize,
+    cuw: usize,
+    cuh: usize,
+    pred: &[u16],
+) {
     EVC_TRACE_COUNTER(tracer);
-    EVC_TRACE(tracer, "model ");
-    EVC_TRACE(tracer, model);
-    EVC_TRACE(tracer, " range ");
-    EVC_TRACE(tracer, range);
-    EVC_TRACE(tracer, " lps ");
-    EVC_TRACE(tracer, lps);
+    EVC_TRACE(tracer, "Predictor for ");
+    EVC_TRACE(tracer, ch_type);
+    EVC_TRACE(tracer, " : ");
+    for i in 0..cuw * cuh {
+        if i != 0 {
+            EVC_TRACE(tracer, " , ");
+        }
+        EVC_TRACE(tracer, pred[i]);
+    }
     EVC_TRACE(tracer, " \n");
 }
 
@@ -108,6 +129,9 @@ pub(crate) fn EVC_TRACE<T: Display>(writer: &mut Option<Tracer>, name: T) {}
 
 #[cfg(not(feature = "trace"))]
 pub(crate) fn EVC_TRACE_INT_HEX(tracer: &mut Option<Tracer>, val: isize) {}
+
+#[cfg(not(feature = "trace_bin"))]
+pub(crate) fn TRACE_BIN(tracer: &mut Option<Tracer>, model: u16, range: u32, lps: u32) {}
 
 #[cfg(not(feature = "trace_coef"))]
 pub(crate) fn TRACE_COEF(
@@ -129,6 +153,12 @@ pub(crate) fn TRACE_RESI(
 ) {
 }
 
-#[cfg(not(feature = "trace_bin"))]
-pub(crate) fn TRACE_BIN(tracer: &mut Option<Tracer>, model: u16, range: u32, lps: u32) {}
-////////////////////////////////////////////////////////////////////////////////////////////////////
+#[cfg(not(feature = "trace_pred"))]
+pub(crate) fn TRACE_PRED(
+    tracer: &mut Option<Tracer>,
+    ch_type: usize,
+    cuw: usize,
+    cuh: usize,
+    pred: &[u16],
+) {
+}

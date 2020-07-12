@@ -1024,6 +1024,13 @@ impl EvcdCtx {
                     cuw as usize,
                     cuh as usize,
                 );
+                TRACE_PRED(
+                    &mut self.bs.tracer,
+                    Y_C,
+                    cuw as usize,
+                    cuh as usize,
+                    &self.core.pred[0].data[Y_C],
+                );
             }
             if evc_check_chroma(&self.core.tree_cons) {
                 evc_ipred_b(
@@ -1035,6 +1042,14 @@ impl EvcdCtx {
                     cuw as usize >> 1,
                     cuh as usize >> 1,
                 );
+                TRACE_PRED(
+                    &mut self.bs.tracer,
+                    U_C,
+                    cuw as usize >> 1,
+                    cuh as usize >> 1,
+                    &self.core.pred[0].data[U_C],
+                );
+
                 evc_ipred_b(
                     &self.core.nb.data[V_C][0][2..],
                     &self.core.nb.data[V_C][1][(cuh >> 1) as usize..],
@@ -1043,6 +1058,13 @@ impl EvcdCtx {
                     self.core.ipm[1],
                     cuw as usize >> 1,
                     cuh as usize >> 1,
+                );
+                TRACE_PRED(
+                    &mut self.bs.tracer,
+                    V_C,
+                    cuw as usize >> 1,
+                    cuh as usize >> 1,
+                    &self.core.pred[0].data[V_C],
                 );
             }
         }
