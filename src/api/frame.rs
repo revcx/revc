@@ -1,4 +1,3 @@
-use crate::com::context::{MAX_SB_SIZE, SUBPEL_FILTER_SIZE};
 use crate::com::plane::*;
 use crate::com::region::*;
 use crate::com::*;
@@ -7,8 +6,6 @@ use super::util::*;
 use super::*;
 
 use std::fmt;
-
-const FRAME_MARGIN: usize = 16 + SUBPEL_FILTER_SIZE;
 
 #[derive(Debug, Clone, Default)]
 pub struct Frame<T: Pixel> {
@@ -20,7 +17,7 @@ impl<T: Pixel> Frame<T> {
     pub fn new(width: usize, height: usize, chroma_sampling: ChromaSampling) -> Self {
         let luma_width = width.align_power_of_two(3);
         let luma_height = height.align_power_of_two(3);
-        let luma_padding = MAX_SB_SIZE + FRAME_MARGIN;
+        let luma_padding = PIC_PAD_SIZE_L;
 
         let (chroma_sampling_period_x, chroma_sampling_period_y) =
             chroma_sampling.sampling_period();

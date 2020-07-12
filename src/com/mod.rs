@@ -1,4 +1,3 @@
-pub(crate) mod context;
 pub(crate) mod ipred;
 pub(crate) mod itdq;
 pub(crate) mod picman;

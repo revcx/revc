@@ -1,11 +1,88 @@
-use super::context::*;
 use super::plane::*;
-
+use super::*;
 use crate::api::util::*;
 
 use std::marker::PhantomData;
 use std::ops::{Index, IndexMut};
 use std::slice;
+
+const SUPERBLOCK_TO_PLANE_SHIFT: usize = MAX_CU_LOG2;
+const SUPERBLOCK_TO_BLOCK_SHIFT: usize = (MAX_CU_LOG2 - MIN_CU_LOG2);
+pub const BLOCK_TO_PLANE_SHIFT: usize = MIN_CU_LOG2;
+pub const LOCAL_BLOCK_MASK: usize = (1 << SUPERBLOCK_TO_BLOCK_SHIFT) - 1;
+
+/// Absolute offset in superblocks inside a plane, where a superblock is defined
+/// to be an N*N square where N = (1 << SUPERBLOCK_TO_PLANE_SHIFT).
+#[derive(Clone, Copy, Debug)]
+pub struct SuperBlockOffset {
+    pub x: usize,
+    pub y: usize,
+}
+
+impl SuperBlockOffset {
+    /// Offset of a block inside the current superblock.
+    pub fn block_offset(self, block_x: usize, block_y: usize) -> BlockOffset {
+        BlockOffset {
+            x: (self.x << SUPERBLOCK_TO_BLOCK_SHIFT) + block_x,
+            y: (self.y << SUPERBLOCK_TO_BLOCK_SHIFT) + block_y,
+        }
+    }
+
+    /// Offset of the top-left pixel of this block.
+    pub fn plane_offset(self, plane: &PlaneConfig) -> PlaneOffset {
+        PlaneOffset {
+            x: (self.x as isize) << (SUPERBLOCK_TO_PLANE_SHIFT - plane.xdec) as isize,
+            y: (self.y as isize) << (SUPERBLOCK_TO_PLANE_SHIFT - plane.ydec) as isize,
+        }
+    }
+}
+
+/// Absolute offset in blocks inside a plane, where a block is defined
+/// to be an N*N square where N = (1 << BLOCK_TO_PLANE_SHIFT).
+#[derive(Clone, Copy, Debug)]
+pub struct BlockOffset {
+    pub x: usize,
+    pub y: usize,
+}
+
+impl BlockOffset {
+    /// Offset of the superblock in which this block is located.
+    pub fn sb_offset(self) -> SuperBlockOffset {
+        SuperBlockOffset {
+            x: self.x >> SUPERBLOCK_TO_BLOCK_SHIFT,
+            y: self.y >> SUPERBLOCK_TO_BLOCK_SHIFT,
+        }
+    }
+
+    /// Offset of the top-left pixel of this block.
+    pub fn plane_offset(self, plane: &PlaneConfig) -> PlaneOffset {
+        PlaneOffset {
+            x: (self.x >> plane.xdec << BLOCK_TO_PLANE_SHIFT) as isize,
+            y: (self.y >> plane.ydec << BLOCK_TO_PLANE_SHIFT) as isize,
+        }
+    }
+
+    /// Convert to plane offset without decimation
+    #[inline]
+    pub fn to_luma_plane_offset(self) -> PlaneOffset {
+        PlaneOffset {
+            x: (self.x as isize) << BLOCK_TO_PLANE_SHIFT as isize,
+            y: (self.y as isize) << BLOCK_TO_PLANE_SHIFT as isize,
+        }
+    }
+
+    pub fn with_offset(self, col_offset: isize, row_offset: isize) -> BlockOffset {
+        let x = self.x as isize + col_offset;
+        let y = self.y as isize + row_offset;
+        debug_assert!(x >= 0);
+        debug_assert!(y >= 0);
+
+        BlockOffset {
+            x: x as usize,
+            y: y as usize,
+        }
+    }
+}
 
 /// Rectangle of a plane region, in pixels
 #[derive(Debug, Clone, Copy)]
@@ -247,10 +324,10 @@ macro_rules! plane_region_common {
         debug_assert!(self.rect.x >= 0);
         debug_assert!(self.rect.y >= 0);
         let PlaneConfig { xdec, ydec, .. } = self.plane_cfg;
-        debug_assert!(self.rect.x as usize % (MI_SIZE >> xdec) == 0);
-        debug_assert!(self.rect.y as usize % (MI_SIZE >> ydec) == 0);
-        let bx = self.rect.x as usize >> MI_SIZE_LOG2 - xdec;
-        let by = self.rect.y as usize >> MI_SIZE_LOG2 - ydec;
+        debug_assert!(self.rect.x as usize % (MIN_CU_SIZE >> xdec) == 0);
+        debug_assert!(self.rect.y as usize % (MIN_CU_SIZE >> ydec) == 0);
+        let bx = self.rect.x as usize >> MIN_CU_LOG2 - xdec;
+        let by = self.rect.y as usize >> MIN_CU_LOG2 - ydec;
         BlockOffset {
           x: bx + tile_bo.x,
           y: by + tile_bo.y,
