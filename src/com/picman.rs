@@ -22,7 +22,6 @@ pub(crate) struct EvcPic {
 
     pub(crate) map_mv: Rc<RefCell<Vec<[[i16; MV_D]; REFP_NUM]>>>,
     pub(crate) map_refi: Rc<RefCell<Vec<[i8; REFP_NUM]>>>,
-
     pub(crate) list_poc: [u32; MAX_NUM_REF_PICS],
 
     pub(crate) pic_deblock_alpha_offset: i8,
@@ -64,35 +63,46 @@ pub(crate) struct EvcRefP {
     pub(crate) pic: Option<Rc<RefCell<EvcPic>>>,
     /* POC of reference picture */
     pub(crate) poc: u32,
-    /*s16            (*map_mv)[REFP_NUM][MV_D];
-    s16            (*map_unrefined_mv)[REFP_NUM][MV_D];
-    s8             (*map_refi)[REFP_NUM];
-    u32             *list_poc;*/
+    pub(crate) map_mv: Option<Rc<RefCell<Vec<[[i16; MV_D]; REFP_NUM]>>>>,
+    pub(crate) map_refi: Option<Rc<RefCell<Vec<[i8; REFP_NUM]>>>>,
+    pub(crate) list_poc: [u32; MAX_NUM_REF_PICS],
 }
 
 impl EvcRefP {
     pub(crate) fn new() -> Self {
-        EvcRefP { pic: None, poc: 0 }
+        EvcRefP {
+            pic: None,
+            poc: 0,
+            map_mv: None,
+            map_refi: None,
+            list_poc: [0; MAX_NUM_REF_PICS],
+        }
     }
 
     fn set_refp(&mut self, pic_ref: Rc<RefCell<EvcPic>>) {
-        /*refp->map_mv   = pic_ref->map_mv;
-        refp->map_unrefined_mv = pic_ref->map_mv;
-        refp->map_refi = pic_ref->map_refi;
-        refp->list_poc = pic_ref->list_poc;*/
-        self.poc = pic_ref.borrow().poc;
+        {
+            let pic = pic_ref.borrow();
+            self.map_mv = Some(Rc::clone(&pic.map_mv));
+            self.map_refi = Some(Rc::clone(&pic.map_refi));
+            self.list_poc.copy_from_slice(&pic.list_poc);
+            self.poc = pic.poc;
+        }
+
         self.pic = Some(pic_ref);
     }
 
     fn copy_refp(&mut self, refp_src: &EvcRefP) {
-        /*
-            refp_dst->map_mv   = refp_src->map_mv;
-        #if DMVR_LAG
-            refp_dst->map_unrefined_mv = refp_src->map_mv;
-        #endif
-            refp_dst->map_refi = refp_src->map_refi;
-            refp_dst->list_poc = refp_src->list_poc;*/
-
+        if let Some(map_mv) = &refp_src.map_mv {
+            self.map_mv = Some(Rc::clone(map_mv));
+        } else {
+            self.map_mv = None;
+        }
+        if let Some(map_refi) = &refp_src.map_refi {
+            self.map_refi = Some(Rc::clone(map_refi));
+        } else {
+            self.map_refi = None;
+        }
+        self.list_poc.copy_from_slice(&refp_src.list_poc);
         self.poc = refp_src.poc;
         self.pic = if let Some(pic) = &refp_src.pic {
             Some(Rc::clone(pic))

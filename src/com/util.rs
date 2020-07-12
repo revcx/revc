@@ -406,8 +406,7 @@ pub(crate) fn evc_init_multi_inv_tbl(c: usize) -> Box<[i16]> {
 pub(crate) fn evc_get_motion(
     scup: usize,
     lidx: usize,
-    map_refi: &[i8; REFP_NUM],
-    map_mv: &[[i16; MV_D]; REFP_NUM],
+    map_mv: &Vec<[[i16; MV_D]; REFP_NUM]>,
     refp: &Vec<Vec<EvcRefP>>,
     cuw: usize,
     cuh: usize,
@@ -416,7 +415,6 @@ pub(crate) fn evc_get_motion(
     refi: &mut [i8; MAX_NUM_MVP],
     mvp: &mut [[i16; MV_D]; MAX_NUM_MVP],
 ) {
-    /*
     if IS_AVAIL(avail, AVAIL_LE) {
         refi[0] = 0;
         mvp[0][MV_X] = map_mv[scup - 1][lidx][MV_X];
@@ -447,8 +445,44 @@ pub(crate) fn evc_get_motion(
         mvp[2][MV_Y] = 1;
     }
     refi[3] = 0;
-    mvp[3][MV_X] = refp[0][lidx].map_mv[scup][0][MV_X];
-    mvp[3][MV_Y] = refp[0][lidx].map_mv[scup][0][MV_Y];
 
-     */
+    if let Some(map_mv) = &refp[0][lidx].map_mv {
+        let mv = map_mv.borrow();
+        mvp[3][MV_X] = mv[scup][0][MV_X];
+        mvp[3][MV_Y] = mv[scup][0][MV_Y];
+    }
+}
+
+pub(crate) fn evc_get_mv_dir(
+    refp: &[EvcRefP],
+    poc: i32,
+    scup: usize,
+    c_scu: usize,
+    w_scu: u16,
+    h_scu: u16,
+    mvp: &mut [[i16; MV_D]; REFP_NUM],
+) {
+    let mut mvc = [0i16; MV_D];
+
+    if let Some(map_mv) = &refp[REFP_1].map_mv {
+        let mv = map_mv.borrow();
+        mvc[MV_X] = mv[scup][0][MV_X];
+        mvc[MV_Y] = mv[scup][0][MV_Y];
+    }
+
+    let dpoc_co = refp[REFP_1].poc as i32 - refp[REFP_1].list_poc[0] as i32;
+    let dpoc_L0 = poc - refp[REFP_0].poc as i32;
+    let dpoc_L1 = refp[REFP_1].poc as i32 - poc;
+
+    if dpoc_co == 0 {
+        mvp[REFP_0][MV_X] = 0;
+        mvp[REFP_0][MV_Y] = 0;
+        mvp[REFP_1][MV_X] = 0;
+        mvp[REFP_1][MV_Y] = 0;
+    } else {
+        mvp[REFP_0][MV_X] = (dpoc_L0 * mvc[MV_X] as i32 / dpoc_co) as i16;
+        mvp[REFP_0][MV_Y] = (dpoc_L0 * mvc[MV_Y] as i32 / dpoc_co) as i16;
+        mvp[REFP_1][MV_X] = (-dpoc_L1 * mvc[MV_X] as i32 / dpoc_co) as i16;
+        mvp[REFP_1][MV_Y] = (-dpoc_L1 * mvc[MV_Y] as i32 / dpoc_co) as i16;
+    }
 }

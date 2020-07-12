@@ -3,6 +3,7 @@ use super::api::util::*;
 use super::api::*;
 use super::com::ipred::*;
 use super::com::itdq::*;
+use super::com::mc::*;
 use super::com::picman::*;
 use super::com::recon::*;
 use super::com::tbl::*;
@@ -209,11 +210,9 @@ pub(crate) struct EvcdCtx {
     /* LCU split information */
     map_split: Vec<LcuSplitMode>,
     /* decoded motion vector for every blocks */
-    /*s16                  (* map_mv)[REFP_NUM][MV_D];
-    /* decoded motion vector for every blocks */
-    s16                  (* map_unrefined_mv)[REFP_NUM][MV_D];
+    map_mv: Option<Rc<RefCell<Vec<[[i16; MV_D]; REFP_NUM]>>>>,
     /* reference frame indices */
-    s8                   (* map_refi)[REFP_NUM];*/
+    map_refi: Option<Rc<RefCell<Vec<[i8; REFP_NUM]>>>>,
     /* intra prediction modes */
     map_ipm: Vec<IntraPredDir>,
     /* new coding tool flag*/
@@ -321,11 +320,9 @@ impl EvcdCtx {
             /* LCU split information */
             map_split: vec![],
             /* decoded motion vector for every blocks */
-            /*s16                  (* map_mv)[REFP_NUM][MV_D];
-            /* decoded motion vector for every blocks */
-            s16                  (* map_unrefined_mv)[REFP_NUM][MV_D];
+            map_mv: None,
             /* reference frame indices */
-            s8                   (* map_refi)[REFP_NUM];*/
+            map_refi: None,
             /* intra prediction modes */
             map_ipm: vec![],
             /* new coding tool flag*/
@@ -923,55 +920,86 @@ impl EvcdCtx {
     }
 
     fn evcd_get_skip_motion(&mut self, cuw: u8, cuh: u8) {
-        let mut srefi: [[i8; MAX_NUM_MVP]; REFP_NUM];
-        let mut smvp: [[[i16; MV_D]; MAX_NUM_MVP]; REFP_NUM];
+        let mut srefi = [[0i8; MAX_NUM_MVP]; REFP_NUM];
+        let mut smvp = [[[0i16; MV_D]; MAX_NUM_MVP]; REFP_NUM];
 
         let core = &mut self.core;
-        /*
-               evc_get_motion(
-                   core.scup as usize,
-                   REFP_0,
-                   &self.map_refi,
-                   &self.map_mv,
-                   &self.refp,
-                   cuw as usize,
-                   cuh as usize,
-                   self.w_scu as usize,
-                   core.avail_cu,
-                   &mut srefi[REFP_0],
-                   &mut smvp[REFP_0],
-               );
+        let map_mv = self.map_mv.as_ref().unwrap().borrow();
 
-               core.refi[REFP_0] = srefi[REFP_0][core.mvp_idx[REFP_0]];
+        evc_get_motion(
+            core.scup as usize,
+            REFP_0,
+            &*map_mv,
+            &self.refp,
+            cuw as usize,
+            cuh as usize,
+            self.w_scu as usize,
+            core.avail_cu,
+            &mut srefi[REFP_0],
+            &mut smvp[REFP_0],
+        );
 
-               core.mv[REFP_0][MV_X] = smvp[REFP_0][core.mvp_idx[REFP_0]][MV_X];
-               core.mv[REFP_0][MV_Y] = smvp[REFP_0][core.mvp_idx[REFP_0]][MV_Y];
+        core.refi[REFP_0] = srefi[REFP_0][core.mvp_idx[REFP_0] as usize];
 
-               if self.sh.slice_type == SliceType::EVC_ST_P {
-                   core.refi[REFP_1] = REFI_INVALID;
-                   core.mv[REFP_1][MV_X] = 0;
-                   core.mv[REFP_1][MV_Y] = 0;
-               } else {
-                   evc_get_motion(
-                       core.scup as usize,
-                       REFP_1,
-                       &self.map_refi,
-                       &self.map_mv,
-                       &self.refp,
-                       cuw as usize,
-                       cuh as usize,
-                       self.w_scu as usize,
-                       core.avail_cu,
-                       &mut srefi[REFP_1],
-                       &mut smvp[REFP_1],
-                   );
+        core.mv[REFP_0][MV_X] = smvp[REFP_0][core.mvp_idx[REFP_0] as usize][MV_X];
+        core.mv[REFP_0][MV_Y] = smvp[REFP_0][core.mvp_idx[REFP_0] as usize][MV_Y];
 
-                   core.refi[REFP_1] = srefi[REFP_1][core.mvp_idx[REFP_1]];
-                   core.mv[REFP_1][MV_X] = smvp[REFP_1][core.mvp_idx[REFP_1]][MV_X];
-                   core.mv[REFP_1][MV_Y] = smvp[REFP_1][core.mvp_idx[REFP_1]][MV_Y];
-               }
+        if self.sh.slice_type == SliceType::EVC_ST_P {
+            core.refi[REFP_1] = REFI_INVALID;
+            core.mv[REFP_1][MV_X] = 0;
+            core.mv[REFP_1][MV_Y] = 0;
+        } else {
+            evc_get_motion(
+                core.scup as usize,
+                REFP_1,
+                &*map_mv,
+                &self.refp,
+                cuw as usize,
+                cuh as usize,
+                self.w_scu as usize,
+                core.avail_cu,
+                &mut srefi[REFP_1],
+                &mut smvp[REFP_1],
+            );
 
-        */
+            core.refi[REFP_1] = srefi[REFP_1][core.mvp_idx[REFP_1] as usize];
+            core.mv[REFP_1][MV_X] = smvp[REFP_1][core.mvp_idx[REFP_1] as usize][MV_X];
+            core.mv[REFP_1][MV_Y] = smvp[REFP_1][core.mvp_idx[REFP_1] as usize][MV_Y];
+        }
+    }
+
+    fn evcd_get_inter_motion(&mut self, cuw: u8, cuh: u8) {
+        let mut mvp = [[0i16; MV_D]; MAX_NUM_MVP];
+        let mut refi = [0i8; MAX_NUM_MVP];
+
+        let core = &mut self.core;
+        let map_mv = self.map_mv.as_ref().unwrap().borrow();
+
+        for inter_dir_idx in 0..2 {
+            /* 0: forward, 1: backward */
+            if (((core.inter_dir as usize + 1) >> inter_dir_idx) & 1) != 0 {
+                evc_get_motion(
+                    core.scup as usize,
+                    inter_dir_idx,
+                    &*map_mv,
+                    &self.refp,
+                    cuw as usize,
+                    cuh as usize,
+                    self.w_scu as usize,
+                    core.avail_cu,
+                    &mut refi,
+                    &mut mvp,
+                );
+                core.mv[inter_dir_idx][MV_X] =
+                    mvp[core.mvp_idx[inter_dir_idx] as usize][MV_X] + core.mvd[inter_dir_idx][MV_X];
+                core.mv[inter_dir_idx][MV_Y] =
+                    mvp[core.mvp_idx[inter_dir_idx] as usize][MV_Y] + core.mvd[inter_dir_idx][MV_Y];
+            } else {
+                core.refi[inter_dir_idx] = REFI_INVALID;
+                core.mv[inter_dir_idx][MV_X] = 0;
+                core.mv[inter_dir_idx][MV_Y] = 0;
+            }
+        }
     }
 
     fn evcd_eco_unit(
@@ -1041,29 +1069,39 @@ impl EvcdCtx {
             );
             if self.core.pred_mode == PredMode::MODE_SKIP {
                 self.evcd_get_skip_motion(cuw, cuh);
-            } /*else
-              {
-                  if (core->inter_dir == PRED_DIR)
-                  {
-                      if(ctx->sps.tool_admvp == 0)
-                      {
-                          evc_get_mv_dir(ctx->refp[0], ctx->poc.poc_val, core->scup + ((1 << (core->log2_cuw - MIN_CU_LOG2)) - 1) + ((1 << (core->log2_cuh - MIN_CU_LOG2)) - 1) * ctx->w_scu, core->scup, ctx->w_scu, ctx->h_scu, core->mv
-                          , ctx->sps.tool_admvp
-                          );
-                          core->refi[REFP_0] = 0;
-                          core->refi[REFP_1] = 0;
-                      }
-                      else if (core->mvr_idx == 0)
-                      {
-                          evcd_get_direct_motion(ctx, core);
-                      }
-                  } else
-                  {
-                      evcd_get_inter_motion(ctx, core);
-                  }
-              }
-              evc_mc(x, y, ctx->w, ctx->h, cuw, cuh, core->refi, core->mv, ctx->refp, core->pred, ctx->poc.poc_val);
-               */
+            } else {
+                if self.core.inter_dir == InterPredDir::PRED_DIR {
+                    evc_get_mv_dir(
+                        &self.refp[0],
+                        self.poc.poc_val,
+                        self.core.scup as usize
+                            + ((1 << (self.core.log2_cuw as usize - MIN_CU_LOG2)) - 1)
+                            + ((1 << (self.core.log2_cuh as usize - MIN_CU_LOG2)) - 1)
+                                * self.w_scu as usize,
+                        self.core.scup as usize,
+                        self.w_scu,
+                        self.h_scu,
+                        &mut self.core.mv,
+                    );
+                    self.core.refi[REFP_0] = 0;
+                    self.core.refi[REFP_1] = 0;
+                } else {
+                    self.evcd_get_inter_motion(cuw, cuh);
+                }
+            }
+            evc_mc(
+                x,
+                y,
+                self.w,
+                self.h,
+                cuw,
+                cuh,
+                &self.core.refi,
+                &self.core.mv,
+                &self.refp,
+                &self.core.pred,
+                self.poc.poc_val,
+            );
         } else {
             self.core.avail_cu = evc_get_avail_intra(
                 self.core.x_scu as usize,
@@ -1479,8 +1517,11 @@ impl EvcdCtx {
                 self.pic = self.dpm.as_mut().unwrap().evc_picman_get_empty_pic()?;
 
                 /* get available frame buffer for decoded image */
-                //self.map_refi = self.pic->map_refi;
-                //self.map_mv = self.pic->map_mv;
+                if let Some(pic) = &self.pic {
+                    let p = pic.borrow();
+                    self.map_refi = Some(Rc::clone(&p.map_refi));
+                    self.map_mv = Some(Rc::clone(&p.map_mv));
+                }
             }
 
             /* decode slice layer */
