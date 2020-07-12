@@ -102,7 +102,7 @@ pub(crate) fn evc_get_nbr_b(
                 && (!constrained_intra_pred || map_scu[scup - 1 + i * w_scu].GET_IF() != 0)
             {
                 for j in 0..unit_size {
-                    left[i * unit_size + j] = src[y + j][x - 1];
+                    left[i * unit_size + j] = src[y + i * unit_size + j][x - 1];
                 }
             } else {
                 for v in left[i * unit_size..(i + 1) * unit_size].iter_mut() {
