@@ -372,7 +372,7 @@ impl EvcPm {
             //TODO: add width, height, CS
             self.pic_lease = Some(Rc::new(RefCell::new(EvcPic::new(
                 self.width,
-                self.width,
+                self.height,
                 self.chroma_sampling,
             ))));
             if let Some(pic) = &self.pic_lease {
