@@ -5,7 +5,7 @@ use std::marker::PhantomData;
 use std::mem;
 use std::ops::{Index, IndexMut, Range};
 
-use super::plane_region::*;
+use super::region::*;
 
 use crate::api::util::*;
 

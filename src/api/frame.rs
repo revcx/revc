@@ -1,6 +1,6 @@
 use crate::com::context::{MAX_SB_SIZE, SUBPEL_FILTER_SIZE};
 use crate::com::plane::*;
-use crate::com::plane_region::*;
+use crate::com::region::*;
 use crate::com::*;
 
 use super::util::*;
