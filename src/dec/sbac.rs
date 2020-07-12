@@ -1,6 +1,7 @@
 use super::bsr::*;
 
 use crate::api::*;
+use crate::com::tracer::*;
 use crate::com::*;
 use crate::dec::EvcdCtx;
 

@@ -6,6 +6,7 @@ use super::com::itdq::*;
 use super::com::picman::*;
 use super::com::recon::*;
 use super::com::tbl::*;
+use super::com::tracer::*;
 use super::com::util::*;
 use super::com::*;
 
@@ -831,6 +832,7 @@ impl EvcdCtx {
     fn evcd_itdq(&mut self) {
         let mut core = &mut self.core;
         evc_sub_block_itdq(
+            &mut self.bs.tracer,
             &mut core.coef.data,
             core.log2_cuw,
             core.log2_cuh,

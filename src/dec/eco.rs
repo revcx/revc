@@ -4,6 +4,7 @@ use super::{EvcdCore, EvcdCtx};
 
 use crate::api::{EvcError, NaluType, SliceType};
 use crate::com::tbl::*;
+use crate::com::tracer::*;
 use crate::com::util::*;
 use crate::com::*;
 
@@ -652,7 +653,7 @@ pub(crate) fn evcd_eco_xcoef(
 ) -> Result<(), EvcError> {
     evcd_eco_run_length_cc(bs, sbac, sbac_ctx, coef, log2_w, log2_h, ch_type)?;
 
-    TRACE_COEFFS(
+    TRACE_COEF(
         &mut bs.tracer,
         ch_type,
         1 << log2_w as usize,

@@ -1,4 +1,5 @@
 use super::tbl::*;
+use super::tracer::*;
 use super::util::*;
 use super::*;
 
@@ -37,6 +38,7 @@ fn ITX_CLIP_32(x: i64) -> i32 {
 }
 
 pub(crate) fn evc_sub_block_itdq(
+    tracer: &mut Option<Tracer>,
     coef: &mut [[i16; MAX_CU_DIM]],
     log2_cuw: u8,
     log2_cuh: u8,
@@ -75,7 +77,7 @@ pub(crate) fn evc_sub_block_itdq(
     for j in 0..loop_h {
         for i in 0..loop_w {
             for c in 0..N_C {
-                let chroma = if c > 1 { 1 } else { 0 };
+                let chroma = if c > 0 { 1 } else { 0 };
                 if nnz_sub[c][(j << 1) | i] {
                     let pos_sub_x = i * (1 << (log2_w_sub - chroma));
                     let pos_sub_y = j * (1 << (log2_h_sub - chroma)) * (stride >> chroma);
@@ -108,6 +110,14 @@ pub(crate) fn evc_sub_block_itdq(
                             (log2_h_sub - chroma) as u8,
                         );
                     }
+
+                    TRACE_RESI(
+                        tracer,
+                        c,
+                        1 << (log2_w_sub - chroma) as usize,
+                        1 << (log2_h_sub - chroma) as usize,
+                        &coef[c],
+                    );
                 }
             }
         }

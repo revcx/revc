@@ -15,10 +15,12 @@ binaries = [
 ]
 default = ["binaries"]
 trace = []
-trace_coeffs = ["trace"]
 trace_bin = ["trace"]
-trace_hls = ["trace"]
-
+trace_coef = ["trace"]
+trace_resi = ["trace"]
+trace_pred = ["trace"]
+trace_reco = ["trace"]
+trace_dbf = ["trace"]
 
 [dependencies]
 arg_enum_proc_macro = "0.1.1"
