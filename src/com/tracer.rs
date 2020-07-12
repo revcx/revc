@@ -2,6 +2,9 @@ use std::fmt::Display;
 use std::fs::OpenOptions;
 use std::io::Write;
 
+use super::region::*;
+use crate::api::util::*;
+
 pub(crate) type Tracer = (Box<dyn Write>, isize);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -61,7 +64,7 @@ pub(crate) fn TRACE_COEF(
     coef: &[i16],
 ) {
     EVC_TRACE_COUNTER(tracer);
-    EVC_TRACE(tracer, "Coeff for ");
+    EVC_TRACE(tracer, "Coef for ");
     EVC_TRACE(tracer, ch_type);
     EVC_TRACE(tracer, " : ");
     for i in 0..cuw * cuh {
@@ -82,7 +85,7 @@ pub(crate) fn TRACE_RESI(
     resi: &[i16],
 ) {
     EVC_TRACE_COUNTER(tracer);
-    EVC_TRACE(tracer, "Residue for ");
+    EVC_TRACE(tracer, "Resi for ");
     EVC_TRACE(tracer, ch_type);
     EVC_TRACE(tracer, " : ");
     for i in 0..cuw * cuh {
@@ -103,7 +106,7 @@ pub(crate) fn TRACE_PRED(
     pred: &[u16],
 ) {
     EVC_TRACE_COUNTER(tracer);
-    EVC_TRACE(tracer, "Predictor for ");
+    EVC_TRACE(tracer, "Pred for ");
     EVC_TRACE(tracer, ch_type);
     EVC_TRACE(tracer, " : ");
     for i in 0..cuw * cuh {
@@ -111,6 +114,31 @@ pub(crate) fn TRACE_PRED(
             EVC_TRACE(tracer, " , ");
         }
         EVC_TRACE(tracer, pred[i]);
+    }
+    EVC_TRACE(tracer, " \n");
+}
+
+#[cfg(feature = "trace_reco")]
+pub(crate) fn TRACE_RECO(
+    tracer: &mut Option<Tracer>,
+    ch_type: usize,
+    x: usize,
+    y: usize,
+    cuw: usize,
+    cuh: usize,
+    reco: &PlaneRegionMut<'_, pel>,
+) {
+    EVC_TRACE_COUNTER(tracer);
+    EVC_TRACE(tracer, "Reco for ");
+    EVC_TRACE(tracer, ch_type);
+    EVC_TRACE(tracer, " : ");
+    for i in 0..cuh {
+        for j in 0..cuw {
+            if !(i == 0 && j == 0) {
+                EVC_TRACE(tracer, " , ");
+            }
+            EVC_TRACE(tracer, reco[y + i][x + j]);
+        }
     }
     EVC_TRACE(tracer, " \n");
 }
@@ -160,5 +188,17 @@ pub(crate) fn TRACE_PRED(
     cuw: usize,
     cuh: usize,
     pred: &[u16],
+) {
+}
+
+#[cfg(not(feature = "trace_reco"))]
+pub(crate) fn TRACE_RECO(
+    tracer: &mut Option<Tracer>,
+    ch_type: usize,
+    x: usize,
+    y: usize,
+    cuw: usize,
+    cuh: usize,
+    reco: &PlaneRegionMut<'_, pel>,
 ) {
 }

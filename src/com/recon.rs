@@ -1,5 +1,6 @@
 use super::plane::*;
 use super::region::*;
+use super::tracer::*;
 use super::util::*;
 use super::*;
 use crate::api::util::*;
@@ -40,6 +41,7 @@ fn evc_recon(
 }
 
 pub(crate) fn evc_recon_yuv(
+    tracer: &mut Option<Tracer>,
     mut x: usize,
     mut y: usize,
     mut cuw: usize,
@@ -54,6 +56,7 @@ pub(crate) fn evc_recon_yuv(
         /* Y */
         let rec = &mut planes[Y_C].as_region_mut();
         evc_recon(&coef[Y_C], &pred[Y_C], nnz[Y_C], x, y, cuw, cuh, rec);
+        TRACE_RECO(tracer, Y_C, x, y, cuw, cuh, rec);
     }
     if evc_check_chroma(tree_cons) {
         /* chroma */
@@ -65,10 +68,12 @@ pub(crate) fn evc_recon_yuv(
         {
             let rec = &mut planes[U_C].as_region_mut();
             evc_recon(&coef[U_C], &pred[U_C], nnz[U_C], x, y, cuw, cuh, rec);
+            TRACE_RECO(tracer, U_C, x, y, cuw, cuh, rec);
         }
         {
             let rec = &mut planes[V_C].as_region_mut();
             evc_recon(&coef[V_C], &pred[V_C], nnz[V_C], x, y, cuw, cuh, rec);
+            TRACE_RECO(tracer, V_C, x, y, cuw, cuh, rec);
         }
     }
 }

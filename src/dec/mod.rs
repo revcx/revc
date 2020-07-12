@@ -1072,6 +1072,7 @@ impl EvcdCtx {
         /* reconstruction */
         if let Some(pic) = &self.pic {
             evc_recon_yuv(
+                &mut self.bs.tracer,
                 x as usize,
                 y as usize,
                 cuw as usize,
