@@ -9,7 +9,7 @@ use std::rc::Rc;
 /* picture store structure */
 //#[derive(Default)]
 pub(crate) struct EvcPic {
-    pub(crate) frame: Frame<pel>,
+    pub(crate) frame: Rc<RefCell<Frame<pel>>>,
 
     /* presentation temporal reference of this picture */
     pub(crate) poc: u32,
@@ -19,13 +19,10 @@ pub(crate) struct EvcPic {
     pub(crate) need_for_out: bool,
     /* scalable layer id */
     pub(crate) temporal_id: u8,
-    /*
-        s16            (*map_mv)[REFP_NUM][MV_D];
-    #if DMVR_LAG
-        s16            (*map_unrefined_mv)[REFP_NUM][MV_D];
-    #endif
-        s8             (*map_refi)[REFP_NUM];
-        */
+
+    pub(crate) map_mv: Rc<RefCell<Vec<[[i16; MV_D]; REFP_NUM]>>>,
+    pub(crate) map_refi: Rc<RefCell<Vec<[i8; REFP_NUM]>>>,
+
     pub(crate) list_poc: [u32; MAX_NUM_REF_PICS],
 
     pub(crate) pic_deblock_alpha_offset: i8,
@@ -37,12 +34,19 @@ pub(crate) struct EvcPic {
 
 impl EvcPic {
     fn new(width: usize, height: usize, chroma_sampling: ChromaSampling) -> Self {
+        /* allocate maps */
+        let w_scu = (width + ((1 << MIN_CU_LOG2) - 1)) >> MIN_CU_LOG2;
+        let h_scu = (height + ((1 << MIN_CU_LOG2) - 1)) >> MIN_CU_LOG2;
+        let f_scu = w_scu * h_scu;
+
         EvcPic {
-            frame: Frame::new(width, height, chroma_sampling),
+            frame: Rc::new(RefCell::new(Frame::new(width, height, chroma_sampling))),
             poc: 0,
             is_ref: false,
             need_for_out: false,
             temporal_id: 0,
+            map_mv: Rc::new(RefCell::new(vec![[[0; MV_D]; REFP_NUM]; f_scu])),
+            map_refi: Rc::new(RefCell::new(vec![[0; REFP_NUM]; f_scu])),
             list_poc: [0; MAX_NUM_REF_PICS],
             pic_deblock_alpha_offset: 0,
             pic_deblock_beta_offset: 0,

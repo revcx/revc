@@ -1,3 +1,4 @@
+use std::cell::RefCell;
 use std::rc::Rc;
 use std::vec::Vec;
 use std::{cmp, fmt, io};
@@ -336,7 +337,7 @@ impl Context {
         self.evcd_ctx.decode_nalu(pkt)
     }
 
-    pub fn pull(&mut self) -> Result<Frame<pel>, EvcError> {
+    pub fn pull(&mut self) -> Result<Rc<RefCell<Frame<pel>>>, EvcError> {
         self.evcd_ctx.pull_frm()
     }
 }

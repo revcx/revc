@@ -239,7 +239,7 @@ fn main() -> io::Result<()> {
         if state != EvcdState::STATE_DECODING {
             let ret = ctx.pull();
             match ret {
-                Ok(frame) => cli.muxer.write(&frame, cli.bitdepth)?,
+                Ok(frame) => cli.muxer.write(&*frame.borrow(), cli.bitdepth)?,
                 Err(err) => {
                     if err == EvcError::EVC_OK_FRM_DELAYED {
                         //do nothing, expected

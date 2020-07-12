@@ -1,7 +1,8 @@
+use super::picman::*;
 use super::tbl::*;
 use super::*;
-
 use crate::dec::LcuSplitMode;
+
 use std::cmp::*;
 
 /* clipping within min and max */
@@ -158,6 +159,73 @@ pub(crate) fn evc_check_nev_avail(
     }
 
     return avail_lr;
+}
+
+pub(crate) fn evc_get_avail_inter(
+    x_scu: usize,
+    y_scu: usize,
+    w_scu: usize,
+    h_scu: usize,
+    scup: usize,
+    cuw: usize,
+    cuh: usize,
+    map_scu: &[MCU],
+) -> u16 {
+    let mut avail = 0;
+    let scuw = cuw >> MIN_CU_LOG2;
+    let scuh = cuh >> MIN_CU_LOG2;
+    let curr_scup = x_scu + y_scu * w_scu;
+
+    if x_scu > 0 && map_scu[scup - 1].GET_IF() == 0 && map_scu[scup - 1].GET_COD() != 0 {
+        SET_AVAIL(&mut avail, AVAIL_LE);
+
+        if y_scu + scuh < h_scu
+            && map_scu[scup + (scuh * w_scu) - 1].GET_COD() != 0
+            && map_scu[scup + (scuh * w_scu) - 1].GET_IF() == 0
+        {
+            SET_AVAIL(&mut avail, AVAIL_LO_LE);
+        }
+    }
+
+    if y_scu > 0 {
+        if map_scu[scup - w_scu].GET_IF() == 0 {
+            SET_AVAIL(&mut avail, AVAIL_UP);
+        }
+
+        if map_scu[scup - w_scu + scuw - 1].GET_IF() == 0 {
+            SET_AVAIL(&mut avail, AVAIL_RI_UP);
+        }
+
+        if x_scu > 0
+            && map_scu[scup - w_scu - 1].GET_IF() == 0
+            && map_scu[scup - w_scu - 1].GET_COD() != 0
+        {
+            SET_AVAIL(&mut avail, AVAIL_UP_LE);
+        }
+        // xxu check??
+        if x_scu + scuw < w_scu
+            && map_scu[scup - w_scu + scuw].IS_COD_NIF()
+            && map_scu[scup - w_scu + scuw].GET_COD() != 0
+        {
+            SET_AVAIL(&mut avail, AVAIL_UP_RI);
+        }
+    }
+
+    if x_scu + scuw < w_scu
+        && map_scu[scup + scuw].GET_IF() == 0
+        && map_scu[scup + scuw].GET_COD() != 0
+    {
+        SET_AVAIL(&mut avail, AVAIL_RI);
+
+        if y_scu + scuh < h_scu
+            && map_scu[scup + (scuh * w_scu) + scuw].GET_COD() != 0
+            && map_scu[scup + (scuh * w_scu) + scuw].GET_IF() == 0
+        {
+            SET_AVAIL(&mut avail, AVAIL_LO_RI);
+        }
+    }
+
+    return avail;
 }
 
 pub(crate) fn evc_get_avail_intra(
@@ -333,4 +401,54 @@ pub(crate) fn evc_init_multi_inv_tbl(c: usize) -> Box<[i16]> {
     }
 
     tm
+}
+
+pub(crate) fn evc_get_motion(
+    scup: usize,
+    lidx: usize,
+    map_refi: &[i8; REFP_NUM],
+    map_mv: &[[i16; MV_D]; REFP_NUM],
+    refp: &Vec<Vec<EvcRefP>>,
+    cuw: usize,
+    cuh: usize,
+    w_scu: usize,
+    avail: u16,
+    refi: &mut [i8; MAX_NUM_MVP],
+    mvp: &mut [[i16; MV_D]; MAX_NUM_MVP],
+) {
+    /*
+    if IS_AVAIL(avail, AVAIL_LE) {
+        refi[0] = 0;
+        mvp[0][MV_X] = map_mv[scup - 1][lidx][MV_X];
+        mvp[0][MV_Y] = map_mv[scup - 1][lidx][MV_Y];
+    } else {
+        refi[0] = 0;
+        mvp[0][MV_X] = 1;
+        mvp[0][MV_Y] = 1;
+    }
+
+    if IS_AVAIL(avail, AVAIL_UP) {
+        refi[1] = 0;
+        mvp[1][MV_X] = map_mv[scup - w_scu][lidx][MV_X];
+        mvp[1][MV_Y] = map_mv[scup - w_scu][lidx][MV_Y];
+    } else {
+        refi[1] = 0;
+        mvp[1][MV_X] = 1;
+        mvp[1][MV_Y] = 1;
+    }
+
+    if IS_AVAIL(avail, AVAIL_UP_RI) {
+        refi[2] = 0;
+        mvp[2][MV_X] = map_mv[scup - w_scu + (cuw >> MIN_CU_LOG2)][lidx][MV_X];
+        mvp[2][MV_Y] = map_mv[scup - w_scu + (cuw >> MIN_CU_LOG2)][lidx][MV_Y];
+    } else {
+        refi[2] = 0;
+        mvp[2][MV_X] = 1;
+        mvp[2][MV_Y] = 1;
+    }
+    refi[3] = 0;
+    mvp[3][MV_X] = refp[0][lidx].map_mv[scup][0][MV_X];
+    mvp[3][MV_Y] = refp[0][lidx].map_mv[scup][0][MV_Y];
+
+     */
 }

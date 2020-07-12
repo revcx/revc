@@ -851,7 +851,8 @@ impl EvcdCtx {
         if evc_check_luma(&self.core.tree_cons) {
             if let Some(pic) = &self.pic {
                 /* Y */
-                let rec = &mut pic.borrow_mut().frame.planes[Y_C];
+                let frame = &mut pic.borrow_mut().frame;
+                let rec = &mut frame.borrow_mut().planes[Y_C];
                 evc_get_nbr_b(
                     x as usize,
                     y as usize,
@@ -878,7 +879,8 @@ impl EvcdCtx {
 
                 {
                     /* U */
-                    let rec = &mut pic.borrow_mut().frame.planes[U_C];
+                    let frame = &mut pic.borrow_mut().frame;
+                    let rec = &mut frame.borrow_mut().planes[U_C];
                     evc_get_nbr_b(
                         x as usize,
                         y as usize,
@@ -898,7 +900,8 @@ impl EvcdCtx {
 
                 {
                     /* V */
-                    let rec = &mut pic.borrow_mut().frame.planes[V_C];
+                    let frame = &mut pic.borrow_mut().frame;
+                    let rec = &mut frame.borrow_mut().planes[V_C];
                     evc_get_nbr_b(
                         x as usize,
                         y as usize,
@@ -917,6 +920,58 @@ impl EvcdCtx {
                 }
             }
         }
+    }
+
+    fn evcd_get_skip_motion(&mut self, cuw: u8, cuh: u8) {
+        let mut srefi: [[i8; MAX_NUM_MVP]; REFP_NUM];
+        let mut smvp: [[[i16; MV_D]; MAX_NUM_MVP]; REFP_NUM];
+
+        let core = &mut self.core;
+        /*
+               evc_get_motion(
+                   core.scup as usize,
+                   REFP_0,
+                   &self.map_refi,
+                   &self.map_mv,
+                   &self.refp,
+                   cuw as usize,
+                   cuh as usize,
+                   self.w_scu as usize,
+                   core.avail_cu,
+                   &mut srefi[REFP_0],
+                   &mut smvp[REFP_0],
+               );
+
+               core.refi[REFP_0] = srefi[REFP_0][core.mvp_idx[REFP_0]];
+
+               core.mv[REFP_0][MV_X] = smvp[REFP_0][core.mvp_idx[REFP_0]][MV_X];
+               core.mv[REFP_0][MV_Y] = smvp[REFP_0][core.mvp_idx[REFP_0]][MV_Y];
+
+               if self.sh.slice_type == SliceType::EVC_ST_P {
+                   core.refi[REFP_1] = REFI_INVALID;
+                   core.mv[REFP_1][MV_X] = 0;
+                   core.mv[REFP_1][MV_Y] = 0;
+               } else {
+                   evc_get_motion(
+                       core.scup as usize,
+                       REFP_1,
+                       &self.map_refi,
+                       &self.map_mv,
+                       &self.refp,
+                       cuw as usize,
+                       cuh as usize,
+                       self.w_scu as usize,
+                       core.avail_cu,
+                       &mut srefi[REFP_1],
+                       &mut smvp[REFP_1],
+                   );
+
+                   core.refi[REFP_1] = srefi[REFP_1][core.mvp_idx[REFP_1]];
+                   core.mv[REFP_1][MV_X] = smvp[REFP_1][core.mvp_idx[REFP_1]][MV_X];
+                   core.mv[REFP_1][MV_Y] = smvp[REFP_1][core.mvp_idx[REFP_1]][MV_Y];
+               }
+
+        */
     }
 
     fn evcd_eco_unit(
@@ -974,34 +1029,41 @@ impl EvcdCtx {
 
         /* prediction */
         if self.core.pred_mode != PredMode::MODE_INTRA {
-            //TODO
-            /*core->avail_cu = evc_get_avail_inter(core->x_scu, core->y_scu, ctx->w_scu, ctx->h_scu, core->scup, cuw, cuh, ctx->map_scu, ctx->map_tidx);
-            if (core->pred_mode == MODE_SKIP)
-            {
-                evcd_get_skip_motion(ctx, core);
-            }else
-            {
-                if (core->inter_dir == PRED_DIR)
-                {
-                    if(ctx->sps.tool_admvp == 0)
-                    {
-                        evc_get_mv_dir(ctx->refp[0], ctx->poc.poc_val, core->scup + ((1 << (core->log2_cuw - MIN_CU_LOG2)) - 1) + ((1 << (core->log2_cuh - MIN_CU_LOG2)) - 1) * ctx->w_scu, core->scup, ctx->w_scu, ctx->h_scu, core->mv
-                        , ctx->sps.tool_admvp
-                        );
-                        core->refi[REFP_0] = 0;
-                        core->refi[REFP_1] = 0;
-                    }
-                    else if (core->mvr_idx == 0)
-                    {
-                        evcd_get_direct_motion(ctx, core);
-                    }
-                } else
-                {
-                    evcd_get_inter_motion(ctx, core);
-                }
-            }
-            evc_mc(x, y, ctx->w, ctx->h, cuw, cuh, core->refi, core->mv, ctx->refp, core->pred, ctx->poc.poc_val);
-             */
+            self.core.avail_cu = evc_get_avail_inter(
+                self.core.x_scu as usize,
+                self.core.y_scu as usize,
+                self.w_scu as usize,
+                self.h_scu as usize,
+                self.core.scup as usize,
+                cuw as usize,
+                cuh as usize,
+                &self.map_scu,
+            );
+            if self.core.pred_mode == PredMode::MODE_SKIP {
+                self.evcd_get_skip_motion(cuw, cuh);
+            } /*else
+              {
+                  if (core->inter_dir == PRED_DIR)
+                  {
+                      if(ctx->sps.tool_admvp == 0)
+                      {
+                          evc_get_mv_dir(ctx->refp[0], ctx->poc.poc_val, core->scup + ((1 << (core->log2_cuw - MIN_CU_LOG2)) - 1) + ((1 << (core->log2_cuh - MIN_CU_LOG2)) - 1) * ctx->w_scu, core->scup, ctx->w_scu, ctx->h_scu, core->mv
+                          , ctx->sps.tool_admvp
+                          );
+                          core->refi[REFP_0] = 0;
+                          core->refi[REFP_1] = 0;
+                      }
+                      else if (core->mvr_idx == 0)
+                      {
+                          evcd_get_direct_motion(ctx, core);
+                      }
+                  } else
+                  {
+                      evcd_get_inter_motion(ctx, core);
+                  }
+              }
+              evc_mc(x, y, ctx->w, ctx->h, cuw, cuh, core->refi, core->mv, ctx->refp, core->pred, ctx->poc.poc_val);
+               */
         } else {
             self.core.avail_cu = evc_get_avail_intra(
                 self.core.x_scu as usize,
@@ -1080,7 +1142,7 @@ impl EvcdCtx {
                 &self.core.coef.data,
                 &self.core.pred[0].data,
                 &self.core.is_coef,
-                &mut pic.borrow_mut().frame.planes,
+                &mut pic.borrow_mut().frame.borrow_mut().planes,
                 &self.core.tree_cons,
             );
         }
@@ -1459,12 +1521,10 @@ impl EvcdCtx {
         Ok(stat)
     }
 
-    pub(crate) fn pull_frm(&mut self) -> Result<Frame<pel>, EvcError> {
+    pub(crate) fn pull_frm(&mut self) -> Result<Rc<RefCell<Frame<pel>>>, EvcError> {
         let pic = self.dpm.as_mut().unwrap().evc_picman_out_pic()?;
         if let Some(p) = &pic {
-            //TODO: optimize it without clone
-            let frame = p.borrow().frame.clone();
-            Ok(frame)
+            Ok(Rc::clone(&p.borrow().frame))
         } else {
             Err(EvcError::EVC_OK_FRM_DELAYED)
         }
