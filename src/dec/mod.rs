@@ -1090,16 +1090,16 @@ impl EvcdCtx {
                 }
             }
             evc_mc(
-                x,
-                y,
-                self.w,
-                self.h,
-                cuw,
-                cuh,
+                x as i16,
+                y as i16,
+                self.w as i16,
+                self.h as i16,
+                cuw as i16,
+                cuh as i16,
                 &self.core.refi,
                 &self.core.mv,
                 &self.refp,
-                &self.core.pred,
+                &mut self.core.pred,
                 self.poc.poc_val,
             );
         } else {
