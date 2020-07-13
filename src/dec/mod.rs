@@ -139,21 +139,14 @@ pub(crate) struct EvcdCore {
     /* split mode map for current LCU */
     split_mode: LcuSplitMode,
 
-    /* platform specific data, if needed */
-    //void          *pf;
-    //s16            mmvd_idx;
-    //u8             mmvd_flag;
-
-    /* temporal pixel buffer for inter prediction */
-    //pel            eif_tmp_buffer[ (MAX_CU_SIZE + 2) * (MAX_CU_SIZE + 2) ];
-    mvr_idx: u8,
-
     mvp_idx: [u8; REFP_NUM],
     mvd: [[i16; MV_D]; REFP_NUM],
     inter_dir: InterPredDir,
     bi_idx: i16,
     ctx_flags: [u8; NUM_CNID],
     tree_cons: TREE_CONS,
+
+    evc_tbl_qp_chroma_dynamic_ext: [Vec<i8>; 2], // [[i8; MAX_QP_TABLE_SIZE_EXT]; 2],
 }
 
 /******************************************************************************
@@ -429,6 +422,19 @@ impl EvcdCtx {
         )?;
         self.dpm = Some(dpm);
 
+        self.core.evc_tbl_qp_chroma_dynamic_ext[0] = vec![0; MAX_QP_TABLE_SIZE_EXT];
+        self.core.evc_tbl_qp_chroma_dynamic_ext[1] = vec![0; MAX_QP_TABLE_SIZE_EXT];
+        if self.sps.chroma_qp_table_struct.chroma_qp_table_present_flag {
+            evc_derived_chroma_qp_mapping_tables(
+                &self.sps.chroma_qp_table_struct,
+                &mut self.core.evc_tbl_qp_chroma_dynamic_ext,
+            );
+        } else {
+            self.core.evc_tbl_qp_chroma_dynamic_ext[0]
+                .copy_from_slice(&evc_tbl_qp_chroma_ajudst_base);
+            self.core.evc_tbl_qp_chroma_dynamic_ext[1]
+                .copy_from_slice(&evc_tbl_qp_chroma_ajudst_base);
+        }
         Ok(())
     }
 
@@ -438,11 +444,12 @@ impl EvcdCtx {
         self.core.y_lcu = 0;
         self.core.x_pel = 0;
         self.core.y_pel = 0;
+        self.core.qp = self.sh.qp;
         self.core.qp_y = self.sh.qp + (6 * (BIT_DEPTH - 8)) as u8;
-        self.core.qp_u = (evc_tbl_qp_chroma_dynamic_ext[0]
+        self.core.qp_u = (self.core.evc_tbl_qp_chroma_dynamic_ext[0]
             [(EVC_TBL_CHROMA_QP_OFFSET + self.sh.qp_u as i8) as usize]
             + (6 * (BIT_DEPTH - 8)) as i8) as u8;
-        self.core.qp_v = (evc_tbl_qp_chroma_dynamic_ext[1]
+        self.core.qp_v = (self.core.evc_tbl_qp_chroma_dynamic_ext[1]
             [(EVC_TBL_CHROMA_QP_OFFSET + self.sh.qp_v as i8) as usize]
             + (6 * (BIT_DEPTH - 8)) as i8) as u8;
 
@@ -593,15 +600,12 @@ impl EvcdCtx {
                         || (core.cu_qp_delta_code == 2 && !core.cu_qp_delta_is_coded))
                 {
                     dqp = evcd_eco_dqp(bs, sbac, sbac_ctx)?;
-                    core.qp = GET_QP(core.qp as i8, dqp) as u8; //GET_QP(ctx->tile[core->tile_num].qp_prev_eco, dqp);
-                    core.qp_y = GET_LUMA_QP(core.qp as i8) as u8;
                     core.cu_qp_delta_is_coded = true;
-                //ctx->tile[core->tile_num].qp_prev_eco = core->qp;
                 } else {
                     dqp = 0;
-                    //core.qp = //GET_QP(ctx->tile[core->tile_num].qp_prev_eco, dqp);
-                    core.qp_y = GET_LUMA_QP(core.qp as i8) as u8;
                 }
+                core.qp = GET_QP(core.qp as i8, dqp) as u8;
+                core.qp_y = GET_LUMA_QP(core.qp as i8) as u8;
 
                 let qp_i_cb = EVC_CLIP3(
                     -6 * (BIT_DEPTH as i8 - 8),
@@ -613,10 +617,10 @@ impl EvcdCtx {
                     57,
                     (core.qp as i8 + self.sh.qp_v_offset) as i8,
                 );
-                core.qp_u = (evc_tbl_qp_chroma_dynamic_ext[0]
+                core.qp_u = (core.evc_tbl_qp_chroma_dynamic_ext[0]
                     [(EVC_TBL_CHROMA_QP_OFFSET + qp_i_cb) as usize]
                     + (6 * (BIT_DEPTH - 8)) as i8) as u8;
-                core.qp_v = (evc_tbl_qp_chroma_dynamic_ext[1]
+                core.qp_v = (core.evc_tbl_qp_chroma_dynamic_ext[1]
                     [(EVC_TBL_CHROMA_QP_OFFSET + qp_i_cr) as usize]
                     + (6 * (BIT_DEPTH - 8)) as i8) as u8;
 
@@ -745,11 +749,10 @@ impl EvcdCtx {
                 core.qp as i8 + self.sh.qp_v_offset,
             );
 
-            //TODO: fix negative array index
-            core.qp_u = (evc_tbl_qp_chroma_dynamic_ext[0]
+            core.qp_u = (core.evc_tbl_qp_chroma_dynamic_ext[0]
                 [(EVC_TBL_CHROMA_QP_OFFSET + qp_i_cb) as usize]
                 + (6 * (BIT_DEPTH - 8)) as i8) as u8;
-            core.qp_v = (evc_tbl_qp_chroma_dynamic_ext[1]
+            core.qp_v = (core.evc_tbl_qp_chroma_dynamic_ext[1]
                 [(EVC_TBL_CHROMA_QP_OFFSET + qp_i_cr) as usize]
                 + (6 * (BIT_DEPTH - 8)) as i8) as u8;
         } else {

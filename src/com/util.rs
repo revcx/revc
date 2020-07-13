@@ -486,3 +486,76 @@ pub(crate) fn evc_get_mv_dir(
         mvp[REFP_1][MV_Y] = (-dpoc_L1 * mvc[MV_Y] as i32 / dpoc_co) as i16;
     }
 }
+
+pub(crate) fn evc_derived_chroma_qp_mapping_tables(
+    structChromaQP: &EvcChromaTable,
+    p_evc_tbl_qp_chroma_dynamic: &mut [Vec<i8>; 2],
+) {
+    let MAX_QP = MAX_QP_TABLE_SIZE as i8 - 1;
+    let mut qpInVal = [0i8; MAX_QP_TABLE_SIZE_EXT];
+    let mut qpOutVal = [0i8; MAX_QP_TABLE_SIZE_EXT];
+
+    let startQp = if structChromaQP.global_offset_flag {
+        16
+    } else {
+        -EVC_TBL_CHROMA_QP_OFFSET
+    };
+
+    for i in 0..if structChromaQP.same_qp_table_for_chroma {
+        1
+    } else {
+        2
+    } {
+        qpInVal[0] = startQp + structChromaQP.delta_qp_in_val_minus1[i][0];
+        qpOutVal[0] = startQp
+            + structChromaQP.delta_qp_in_val_minus1[i][0]
+            + structChromaQP.delta_qp_out_val[i][0];
+        for j in 1..=structChromaQP.num_points_in_qp_table_minus1[i] {
+            qpInVal[j] = qpInVal[j - 1] + structChromaQP.delta_qp_in_val_minus1[i][j] + 1;
+            qpOutVal[j] = qpOutVal[j - 1]
+                + (structChromaQP.delta_qp_in_val_minus1[i][j]
+                    + 1
+                    + structChromaQP.delta_qp_out_val[i][j]);
+        }
+
+        for j in 0..=structChromaQP.num_points_in_qp_table_minus1[i] {
+            assert!(qpInVal[j] >= -EVC_TBL_CHROMA_QP_OFFSET && qpInVal[j] <= MAX_QP);
+            assert!(qpOutVal[j] >= -EVC_TBL_CHROMA_QP_OFFSET && qpOutVal[j] <= MAX_QP);
+        }
+
+        p_evc_tbl_qp_chroma_dynamic[i][(EVC_TBL_CHROMA_QP_OFFSET + qpInVal[0]) as usize] =
+            qpOutVal[0];
+        let mut k = qpInVal[0] - 1;
+        while k >= -EVC_TBL_CHROMA_QP_OFFSET {
+            p_evc_tbl_qp_chroma_dynamic[i][(EVC_TBL_CHROMA_QP_OFFSET + k) as usize] = EVC_CLIP3(
+                -EVC_TBL_CHROMA_QP_OFFSET,
+                MAX_QP,
+                p_evc_tbl_qp_chroma_dynamic[i][(EVC_TBL_CHROMA_QP_OFFSET + k + 1) as usize] - 1,
+            );
+            k -= 1;
+        }
+        for j in 0..structChromaQP.num_points_in_qp_table_minus1[i] {
+            let sh = (structChromaQP.delta_qp_in_val_minus1[i][j + 1] + 1) >> 1;
+            let mut m = 1;
+            for k in qpInVal[j] + 1..=qpInVal[j + 1] {
+                p_evc_tbl_qp_chroma_dynamic[i][(EVC_TBL_CHROMA_QP_OFFSET + k) as usize] =
+                    p_evc_tbl_qp_chroma_dynamic[i]
+                        [(EVC_TBL_CHROMA_QP_OFFSET + qpInVal[j]) as usize]
+                        + ((qpOutVal[j + 1] - qpOutVal[j]) * m + sh)
+                            / (structChromaQP.delta_qp_in_val_minus1[i][j + 1] + 1);
+                m += 1;
+            }
+        }
+        for k in qpInVal[structChromaQP.num_points_in_qp_table_minus1[i]] + 1..=MAX_QP {
+            p_evc_tbl_qp_chroma_dynamic[i][(EVC_TBL_CHROMA_QP_OFFSET + k) as usize] = EVC_CLIP3(
+                -EVC_TBL_CHROMA_QP_OFFSET,
+                MAX_QP,
+                p_evc_tbl_qp_chroma_dynamic[i][(EVC_TBL_CHROMA_QP_OFFSET + k - 1) as usize] + 1,
+            );
+        }
+    }
+    if structChromaQP.same_qp_table_for_chroma {
+        let (p0, p1) = p_evc_tbl_qp_chroma_dynamic.split_at_mut(1);
+        p1[0].copy_from_slice(&p0[0]);
+    }
+}
