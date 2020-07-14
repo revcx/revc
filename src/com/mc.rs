@@ -635,24 +635,6 @@ pub(crate) fn evc_mc(
 
     mv_clip(x, y, pic_w, pic_h, cuw, cuh, refi, mv, &mut mv_t);
 
-    let mv_refine = [
-        [mv[REFP_0][MV_X], mv[REFP_0][MV_Y]],
-        [mv[REFP_1][MV_X], mv[REFP_1][MV_Y]],
-    ];
-
-    let inital_mv = [
-        [mv[REFP_0][MV_X], mv[REFP_0][MV_Y]],
-        [mv[REFP_1][MV_X], mv[REFP_1][MV_Y]],
-    ];
-    /*
-                s32          extend_width = (DMVR_NEW_VERSION_ITER_COUNT + 1) * REF_PRED_EXTENTION_PEL_COUNT;
-                s32          extend_width_minus1 = DMVR_NEW_VERSION_ITER_COUNT * REF_PRED_EXTENTION_PEL_COUNT;
-                int          stride = w + (extend_width << 1);
-                s16          mv_offsets[REFP_NUM][MV_D] = { {0,}, };
-                s32          center_point_avgs_l0_l1[2 * REFP_NUM] = { 0, 0, 0, 0 }; // center_point_avgs_l0_l1[2,3] for "A" and "B" current center point average
-                int iterations_count = DMVR_ITER_COUNT;
-                g_mc_ftr = MC_FILTER_BASE;
-    */
     if REFI_IS_VALID(refi[REFP_0]) {
         /* forward */
         if let Some(ref_pic) = &refp[refi[REFP_0] as usize][REFP_0].pic {
