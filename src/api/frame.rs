@@ -19,27 +19,23 @@ pub struct Frame<T: Pixel> {
 
 impl<T: Pixel> Frame<T> {
     pub fn new(width: usize, height: usize, chroma_sampling: ChromaSampling) -> Self {
-        let (chroma_sampling_period_x, chroma_sampling_period_y) =
-            chroma_sampling.sampling_period();
-        let chroma_decimation_x = chroma_sampling_period_x - 1;
-        let chroma_decimation_y = chroma_sampling_period_y - 1;
-
+        //TODO: support Monochrome
         Frame {
             planes: [
                 Plane::new(width, height, 0, 0, PIC_PAD_SIZE_L, MIN_CU_LOG2),
                 Plane::new(
                     (width + 1) >> 1,
                     (height + 1) >> 1,
-                    chroma_decimation_x,
-                    chroma_decimation_y,
+                    1,
+                    1,
                     PIC_PAD_SIZE_C,
                     MIN_CU_LOG2 - 1,
                 ),
                 Plane::new(
                     (width + 1) >> 1,
                     (height + 1) >> 1,
-                    chroma_decimation_x,
-                    chroma_decimation_y,
+                    1,
+                    1,
                     PIC_PAD_SIZE_C,
                     MIN_CU_LOG2 - 1,
                 ),

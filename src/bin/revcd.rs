@@ -8,6 +8,7 @@ use clap::{App, AppSettings, Arg};
 use revc::api::*;
 
 use std::io;
+use std::time::Instant;
 
 struct CLISettings {
     pub demuxer: Box<dyn demuxer::Demuxer>,
@@ -177,7 +178,7 @@ fn main() -> io::Result<()> {
     let mut ctx = Context::new(&cfg);
 
     let mut pic_cnt: usize = 0;
-    let mut clk_tot = 1;
+    let mut clk_tot = 0;
     let mut bs_cnt = 0;
     let mut w = 0;
     let mut h = 0;
@@ -201,7 +202,11 @@ fn main() -> io::Result<()> {
                             0
                         };
 
+                        let start = Instant::now();
                         let ret = ctx.decode(&mut pkt);
+                        let duration = start.elapsed();
+                        clk_tot += duration.as_millis() as usize;
+
                         match ret {
                             Ok(stat) => {
                                 if stat.fnum >= 0 {
@@ -239,7 +244,13 @@ fn main() -> io::Result<()> {
         if state != EvcdState::STATE_DECODING {
             let ret = ctx.pull();
             match ret {
-                Ok(frame) => cli.muxer.write(&*frame.borrow(), cli.bitdepth)?,
+                Ok(frame) => {
+                    let f = frame.borrow();
+                    w = f.planes[0].cfg.width;
+                    h = f.planes[0].cfg.height;
+                    pic_cnt += 1;
+                    cli.muxer.write(&*f, cli.bitdepth)?
+                }
                 Err(err) => {
                     if err == EvcError::EVC_OK_FRM_DELAYED {
                         //do nothing, expected

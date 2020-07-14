@@ -1449,7 +1449,7 @@ impl EvcdCtx {
                     self.core.y_lcu += 1;
                 }
             }
-            eprint!("{} ", self.num_ctb);
+            //eprint!("{} ", self.num_ctb);
         }
 
         Ok(())
