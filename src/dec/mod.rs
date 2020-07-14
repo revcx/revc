@@ -482,8 +482,6 @@ impl EvcdCtx {
         } else {
             0
         };
-        //let mut map_refi = &mut map_refi[scup..];
-        //let mut map_mv = &mut map_mv[scup..];
 
         if evc_check_luma(&self.core.tree_cons) {
             for i in 0..h_cu {
@@ -514,6 +512,37 @@ impl EvcdCtx {
                     map_scu[j].SET_IF_COD_SN_QP(flag, self.slice_num as u32, self.core.qp);
 
                     map_ipm[j] = self.core.ipm[0];
+                }
+            }
+        }
+    }
+
+    fn evcd_set_dec_inter_info(&mut self) {
+        let w_scu = self.w_scu as usize;
+        let scup = self.core.scup as usize;
+        let w_cu = (1 << self.core.log2_cuw as usize) >> MIN_CU_LOG2;
+        let h_cu = (1 << self.core.log2_cuh as usize) >> MIN_CU_LOG2;
+        let flag = if self.core.pred_mode == PredMode::MODE_INTRA {
+            1
+        } else {
+            0
+        };
+
+        if let (Some(map_refi), Some(map_mv)) = (&mut self.map_refi, &mut self.map_mv) {
+            let (mut refis, mut mvs) = (map_refi.borrow_mut(), map_mv.borrow_mut());
+
+            if evc_check_luma(&self.core.tree_cons) {
+                for i in 0..h_cu {
+                    let refi = &mut refis[scup + i * w_scu..];
+                    let mv = &mut mvs[scup + i * w_scu..];
+                    for j in 0..w_cu {
+                        refi[j][REFP_0] = self.core.refi[REFP_0];
+                        refi[j][REFP_1] = self.core.refi[REFP_1];
+                        mv[j][REFP_0][MV_X] = self.core.mv[REFP_0][MV_X];
+                        mv[j][REFP_0][MV_Y] = self.core.mv[REFP_0][MV_Y];
+                        mv[j][REFP_1][MV_X] = self.core.mv[REFP_1][MV_X];
+                        mv[j][REFP_1][MV_Y] = self.core.mv[REFP_1][MV_Y];
+                    }
                 }
             }
         }
@@ -1092,6 +1121,20 @@ impl EvcdCtx {
                     self.evcd_get_inter_motion(cuw, cuh);
                 }
             }
+
+            EVC_TRACE_COUNTER(&mut self.bs.tracer);
+            EVC_TRACE(&mut self.bs.tracer, "Inter: ");
+            EVC_TRACE(&mut self.bs.tracer, self.core.inter_dir as isize);
+            EVC_TRACE(&mut self.bs.tracer, " , mv[REFP_0]:( ");
+            EVC_TRACE(&mut self.bs.tracer, self.core.mv[REFP_0][MV_X]);
+            EVC_TRACE(&mut self.bs.tracer, " , ");
+            EVC_TRACE(&mut self.bs.tracer, self.core.mv[REFP_0][MV_Y]);
+            EVC_TRACE(&mut self.bs.tracer, " ), mv[REFP_1]:( ");
+            EVC_TRACE(&mut self.bs.tracer, self.core.mv[REFP_1][MV_X]);
+            EVC_TRACE(&mut self.bs.tracer, " , ");
+            EVC_TRACE(&mut self.bs.tracer, self.core.mv[REFP_1][MV_Y]);
+            EVC_TRACE(&mut self.bs.tracer, " )\n");
+
             evc_mc(
                 x as i16,
                 y as i16,
@@ -1105,6 +1148,8 @@ impl EvcdCtx {
                 &mut self.core.pred,
                 self.poc.poc_val,
             );
+
+            self.evcd_set_dec_inter_info();
         } else {
             self.core.avail_cu = evc_get_avail_intra(
                 self.core.x_scu as usize,
@@ -1117,6 +1162,14 @@ impl EvcdCtx {
                 &self.map_scu,
             );
             self.get_nbr_yuv(x, y, cuw, cuh);
+
+            EVC_TRACE_COUNTER(&mut self.bs.tracer);
+            EVC_TRACE(&mut self.bs.tracer, "Intra: ");
+            EVC_TRACE(&mut self.bs.tracer, self.core.ipm[0] as isize);
+            EVC_TRACE(&mut self.bs.tracer, " , ");
+            EVC_TRACE(&mut self.bs.tracer, self.core.ipm[1] as isize);
+            EVC_TRACE(&mut self.bs.tracer, " \n");
+
             if evc_check_luma(&self.core.tree_cons) {
                 evc_ipred_b(
                     &self.core.nb.data[Y_C][0][2..],
