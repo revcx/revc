@@ -5,6 +5,8 @@ use super::*;
 use crate::api::util::*;
 use crate::dec::CUBuffer; //TODO: move CUBuffer to com
 
+use std::cmp::max;
+
 /* padding for store intermediate values, which should be larger than
 1+ half of filter tap */
 const MC_IBUF_PAD_C: usize = 4;
@@ -278,6 +280,7 @@ fn evc_mc_l_00(
 ) {
     let gmv_x = gmv_x >> 4;
     let gmv_y = gmv_y >> 4;
+
     for y in 0..cuh {
         for x in 0..cuw {
             pred[(y * cuw + x) as usize] = r[(y + gmv_y) as usize][(x + gmv_x) as usize];
@@ -295,20 +298,18 @@ fn evc_mc_l_n0(
     let dx = gmv_x & 15;
     let gmv_x = (gmv_x >> 4) - 3;
     let gmv_y = gmv_y >> 4;
-    let rect = r.rect();
-    let (yh, xw) = (rect.y + rect.height as isize, rect.x + rect.width as isize);
 
     for y in 0..cuh {
         for x in 0..cuw {
-            let ry0 = EVC_CLIP3(rect.y, yh, (y + gmv_y + 0) as isize) as usize;
-            let rx0 = EVC_CLIP3(rect.x, xw, (x + gmv_x + 0) as isize) as usize;
-            let rx1 = EVC_CLIP3(rect.x, xw, (x + gmv_x + 1) as isize) as usize;
-            let rx2 = EVC_CLIP3(rect.x, xw, (x + gmv_x + 2) as isize) as usize;
-            let rx3 = EVC_CLIP3(rect.x, xw, (x + gmv_x + 3) as isize) as usize;
-            let rx4 = EVC_CLIP3(rect.x, xw, (x + gmv_x + 4) as isize) as usize;
-            let rx5 = EVC_CLIP3(rect.x, xw, (x + gmv_x + 5) as isize) as usize;
-            let rx6 = EVC_CLIP3(rect.x, xw, (x + gmv_x + 6) as isize) as usize;
-            let rx7 = EVC_CLIP3(rect.x, xw, (x + gmv_x + 7) as isize) as usize;
+            let ry0 = max(0, y + gmv_y + 0) as usize;
+            let rx0 = max(0, x + gmv_x + 0) as usize;
+            let rx1 = max(0, x + gmv_x + 1) as usize;
+            let rx2 = max(0, x + gmv_x + 2) as usize;
+            let rx3 = max(0, x + gmv_x + 3) as usize;
+            let rx4 = max(0, x + gmv_x + 4) as usize;
+            let rx5 = max(0, x + gmv_x + 5) as usize;
+            let rx6 = max(0, x + gmv_x + 6) as usize;
+            let rx7 = max(0, x + gmv_x + 7) as usize;
 
             let pt = MAC_8TAP_N0(
                 &tbl_mc_l_coeff[dx as usize],
@@ -338,20 +339,18 @@ fn evc_mc_l_0n(
     let dy = gmv_y & 15;
     let gmv_x = gmv_x >> 4;
     let gmv_y = (gmv_y >> 4) - 3;
-    let rect = r.rect();
-    let (yh, xw) = (rect.y + rect.height as isize, rect.x + rect.width as isize);
 
     for y in 0..cuh {
         for x in 0..cuw {
-            let rx0 = EVC_CLIP3(rect.x, xw, (x + gmv_x + 0) as isize) as usize;
-            let ry0 = EVC_CLIP3(rect.y, yh, (y + gmv_y + 0) as isize) as usize;
-            let ry1 = EVC_CLIP3(rect.y, yh, (y + gmv_y + 1) as isize) as usize;
-            let ry2 = EVC_CLIP3(rect.y, yh, (y + gmv_y + 2) as isize) as usize;
-            let ry3 = EVC_CLIP3(rect.y, yh, (y + gmv_y + 3) as isize) as usize;
-            let ry4 = EVC_CLIP3(rect.y, yh, (y + gmv_y + 4) as isize) as usize;
-            let ry5 = EVC_CLIP3(rect.y, yh, (y + gmv_y + 5) as isize) as usize;
-            let ry6 = EVC_CLIP3(rect.y, yh, (y + gmv_y + 6) as isize) as usize;
-            let ry7 = EVC_CLIP3(rect.y, yh, (y + gmv_y + 7) as isize) as usize;
+            let rx0 = max(0, x + gmv_x + 0) as usize;
+            let ry0 = max(0, y + gmv_y + 0) as usize;
+            let ry1 = max(0, y + gmv_y + 1) as usize;
+            let ry2 = max(0, y + gmv_y + 2) as usize;
+            let ry3 = max(0, y + gmv_y + 3) as usize;
+            let ry4 = max(0, y + gmv_y + 4) as usize;
+            let ry5 = max(0, y + gmv_y + 5) as usize;
+            let ry6 = max(0, y + gmv_y + 6) as usize;
+            let ry7 = max(0, y + gmv_y + 7) as usize;
 
             let pt = MAC_8TAP_0N(
                 &tbl_mc_l_coeff[dy as usize],
@@ -384,20 +383,18 @@ fn evc_mc_l_nn(
     let dy = gmv_y & 15;
     let gmv_x = (gmv_x >> 4) - 3;
     let gmv_y = (gmv_y >> 4) - 3;
-    let rect = r.rect();
-    let (yh, xw) = (rect.y + rect.height as isize, rect.x + rect.width as isize);
 
     for y in 0..(cuh + 7) {
         for x in 0..cuw {
-            let ry0 = EVC_CLIP3(rect.y, yh, (y + gmv_y + 0) as isize) as usize;
-            let rx0 = EVC_CLIP3(rect.x, xw, (x + gmv_x + 0) as isize) as usize;
-            let rx1 = EVC_CLIP3(rect.x, xw, (x + gmv_x + 1) as isize) as usize;
-            let rx2 = EVC_CLIP3(rect.x, xw, (x + gmv_x + 2) as isize) as usize;
-            let rx3 = EVC_CLIP3(rect.x, xw, (x + gmv_x + 3) as isize) as usize;
-            let rx4 = EVC_CLIP3(rect.x, xw, (x + gmv_x + 4) as isize) as usize;
-            let rx5 = EVC_CLIP3(rect.x, xw, (x + gmv_x + 5) as isize) as usize;
-            let rx6 = EVC_CLIP3(rect.x, xw, (x + gmv_x + 6) as isize) as usize;
-            let rx7 = EVC_CLIP3(rect.x, xw, (x + gmv_x + 7) as isize) as usize;
+            let ry0 = max(0, y + gmv_y + 0) as usize;
+            let rx0 = max(0, x + gmv_x + 0) as usize;
+            let rx1 = max(0, x + gmv_x + 1) as usize;
+            let rx2 = max(0, x + gmv_x + 2) as usize;
+            let rx3 = max(0, x + gmv_x + 3) as usize;
+            let rx4 = max(0, x + gmv_x + 4) as usize;
+            let rx5 = max(0, x + gmv_x + 5) as usize;
+            let rx6 = max(0, x + gmv_x + 6) as usize;
+            let rx7 = max(0, x + gmv_x + 7) as usize;
 
             buf[(y * cuw + x) as usize] = MAC_8TAP_NN_S1(
                 &tbl_mc_l_coeff[dx as usize],
@@ -460,16 +457,14 @@ fn evc_mc_c_n0(
     let dx = gmv_x & 31;
     let gmv_x = (gmv_x >> 5) - 1;
     let gmv_y = gmv_y >> 5;
-    let rect = r.rect();
-    let (yh, xw) = (rect.y + rect.height as isize, rect.x + rect.width as isize);
 
     for y in 0..cuh {
         for x in 0..cuw {
-            let ry0 = EVC_CLIP3(rect.y, yh, (y + gmv_y + 0) as isize) as usize;
-            let rx0 = EVC_CLIP3(rect.x, xw, (x + gmv_x + 0) as isize) as usize;
-            let rx1 = EVC_CLIP3(rect.x, xw, (x + gmv_x + 1) as isize) as usize;
-            let rx2 = EVC_CLIP3(rect.x, xw, (x + gmv_x + 2) as isize) as usize;
-            let rx3 = EVC_CLIP3(rect.x, xw, (x + gmv_x + 3) as isize) as usize;
+            let ry0 = max(0, y + gmv_y + 0) as usize;
+            let rx0 = max(0, x + gmv_x + 0) as usize;
+            let rx1 = max(0, x + gmv_x + 1) as usize;
+            let rx2 = max(0, x + gmv_x + 2) as usize;
+            let rx3 = max(0, x + gmv_x + 3) as usize;
 
             let pt = MAC_4TAP_N0(
                 &tbl_mc_c_coeff[dx as usize],
@@ -495,16 +490,14 @@ fn evc_mc_c_0n(
     let dy = gmv_y & 31;
     let gmv_x = gmv_x >> 5;
     let gmv_y = (gmv_y >> 5) - 1;
-    let rect = r.rect();
-    let (yh, xw) = (rect.y + rect.height as isize, rect.x + rect.width as isize);
 
     for y in 0..cuh {
         for x in 0..cuw {
-            let rx0 = EVC_CLIP3(rect.x, xw, (x + gmv_x + 0) as isize) as usize;
-            let ry0 = EVC_CLIP3(rect.y, yh, (y + gmv_y + 0) as isize) as usize;
-            let ry1 = EVC_CLIP3(rect.y, yh, (y + gmv_y + 1) as isize) as usize;
-            let ry2 = EVC_CLIP3(rect.y, yh, (y + gmv_y + 2) as isize) as usize;
-            let ry3 = EVC_CLIP3(rect.y, yh, (y + gmv_y + 3) as isize) as usize;
+            let rx0 = max(0, x + gmv_x + 0) as usize;
+            let ry0 = max(0, y + gmv_y + 0) as usize;
+            let ry1 = max(0, y + gmv_y + 1) as usize;
+            let ry2 = max(0, y + gmv_y + 2) as usize;
+            let ry3 = max(0, y + gmv_y + 3) as usize;
 
             let pt = MAC_4TAP_0N(
                 &tbl_mc_c_coeff[dy as usize],
@@ -533,16 +526,14 @@ fn evc_mc_c_nn(
     let dy = gmv_y & 31;
     let gmv_x = (gmv_x >> 5) - 1;
     let gmv_y = (gmv_y >> 5) - 1;
-    let rect = r.rect();
-    let (yh, xw) = (rect.y + rect.height as isize, rect.x + rect.width as isize);
 
     for y in 0..(cuh + 3) {
         for x in 0..cuw {
-            let ry0 = EVC_CLIP3(rect.y, yh, (y + gmv_y + 0) as isize) as usize;
-            let rx0 = EVC_CLIP3(rect.x, xw, (x + gmv_x + 0) as isize) as usize;
-            let rx1 = EVC_CLIP3(rect.x, xw, (x + gmv_x + 1) as isize) as usize;
-            let rx2 = EVC_CLIP3(rect.x, xw, (x + gmv_x + 2) as isize) as usize;
-            let rx3 = EVC_CLIP3(rect.x, xw, (x + gmv_x + 3) as isize) as usize;
+            let ry0 = max(0, y + gmv_y + 0) as usize;
+            let rx0 = max(0, x + gmv_x + 0) as usize;
+            let rx1 = max(0, x + gmv_x + 1) as usize;
+            let rx2 = max(0, x + gmv_x + 2) as usize;
+            let rx3 = max(0, x + gmv_x + 3) as usize;
 
             buf[(y * cuw + x) as usize] = MAC_4TAP_NN_S1(
                 &tbl_mc_c_coeff[dx as usize],
