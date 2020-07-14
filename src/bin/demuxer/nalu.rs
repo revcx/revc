@@ -1,7 +1,5 @@
 use super::Demuxer;
 
-use byteorder::{BigEndian, LittleEndian, ReadBytesExt, WriteBytesExt};
-
 use std::fs::File;
 use std::io;
 use std::io::Read;
@@ -25,8 +23,11 @@ impl NaluDemuxer {
 
 impl Demuxer for NaluDemuxer {
     fn read(&mut self) -> io::Result<Packet> {
-        //TODO: To be confirmed with ETM, is it ok from endianness perspective?
-        let nal_unit_length = self.reader.read_u32::<LittleEndian>()?;
+        let mut buf = [0u8; 4];
+        self.reader.read_exact(&mut buf)?;
+        let nal_unit_length =
+            (buf[3] as u32) << 24 | (buf[2] as u32) << 16 | (buf[1] as u32) << 8 | buf[0] as u32;
+
         let mut data: Vec<u8> = vec![0; nal_unit_length as usize];
         self.reader.read_exact(&mut data)?;
 

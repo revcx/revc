@@ -3,7 +3,6 @@ use std::rc::Rc;
 use std::vec::Vec;
 use std::{cmp, fmt, io};
 
-use arg_enum_proc_macro::ArgEnum;
 use num_derive::FromPrimitive;
 use num_traits::FromPrimitive;
 
@@ -272,7 +271,7 @@ impl ChromaSampling {
     }
 }
 
-#[derive(ArgEnum, Debug, Clone, Copy, PartialEq, FromPrimitive)]
+#[derive(Debug, Clone, Copy, PartialEq, FromPrimitive)]
 #[repr(C)]
 pub enum PixelRange {
     Unspecified = 0,
