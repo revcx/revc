@@ -716,6 +716,13 @@ impl EvcdCtx {
         let sbac = &mut self.sbac_dec;
         let sbac_ctx = &mut self.sbac_ctx;
 
+        core.refi[REFP_0] = 0;
+        core.refi[REFP_1] = 0;
+        core.mv[REFP_0][MV_X] = 0;
+        core.mv[REFP_0][MV_Y] = 0;
+        core.mv[REFP_1][MV_X] = 0;
+        core.mv[REFP_1][MV_Y] = 0;
+
         core.pred_mode = PredMode::MODE_INTRA;
         core.mvp_idx[REFP_0] = 0;
         core.mvp_idx[REFP_1] = 0;
@@ -1085,7 +1092,7 @@ impl EvcdCtx {
             self.evcd_itdq();
         }
 
-        self.evcd_set_dec_info();
+        //self.evcd_set_dec_info(); //move to after prediction
 
         /* prediction */
         if self.core.pred_mode != PredMode::MODE_INTRA {
@@ -1148,8 +1155,6 @@ impl EvcdCtx {
                 &mut self.core.pred,
                 self.poc.poc_val,
             );
-
-            self.evcd_set_dec_inter_info();
         } else {
             self.core.avail_cu = evc_get_avail_intra(
                 self.core.x_scu as usize,
@@ -1202,6 +1207,8 @@ impl EvcdCtx {
                 );
             }
         }
+        self.evcd_set_dec_info();
+        self.evcd_set_dec_inter_info();
 
         TRACE_PRED(
             &mut self.bs.tracer,
