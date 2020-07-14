@@ -265,25 +265,6 @@ macro_rules! plane_region_common {
       ///
       /// It is described by an `Area`, relative to this region.
       ///
-      /// # Example
-      ///
-      /// ```
-      /// # use rav1e::tiling::*;
-      /// # fn f(region: &PlaneRegion<'_, u16>) {
-      /// // a subregion from (10, 8) to the end of the region
-      /// let subregion = region.subregion(Area::StartingAt { x: 10, y: 8 });
-      /// # }
-      /// ```
-      ///
-      /// ```
-      /// # use rav1e::context::*;
-      /// # use rav1e::tiling::*;
-      /// # fn f(region: &PlaneRegion<'_, u16>) {
-      /// // a subregion from the top-left of block (2, 3) having size (64, 64)
-      /// let bo = BlockOffset { x: 2, y: 3 };
-      /// let subregion = region.subregion(Area::BlockRect { bo, width: 64, height: 64 });
-      /// # }
-      /// ```
       #[inline(always)]
       pub fn subregion(&self, area: Area) -> PlaneRegion<'_, T> {
         let rect = area.to_rect(
@@ -398,26 +379,6 @@ impl<'a, T: Pixel> PlaneRegionMut<'a, T> {
     /// The subregion must be included in (i.e. must not exceed) this region.
     ///
     /// It is described by an `Area`, relative to this region.
-    ///
-    /// # Example
-    ///
-    /// ```
-    /// # use rav1e::tiling::*;
-    /// # fn f(region: &mut PlaneRegionMut<'_, u16>) {
-    /// // a mutable subregion from (10, 8) having size (32, 32)
-    /// let subregion = region.subregion_mut(Area::Rect { x: 10, y: 8, width: 32, height: 32 });
-    /// # }
-    /// ```
-    ///
-    /// ```
-    /// # use rav1e::context::*;
-    /// # use rav1e::tiling::*;
-    /// # fn f(region: &mut PlaneRegionMut<'_, u16>) {
-    /// // a mutable subregion from the top-left of block (2, 3) to the end of the region
-    /// let bo = BlockOffset { x: 2, y: 3 };
-    /// let subregion = region.subregion_mut(Area::BlockStartingAt { bo });
-    /// # }
-    /// ```
     #[inline(always)]
     pub fn subregion_mut(&mut self, area: Area) -> PlaneRegionMut<'_, T> {
         let rect = area.to_rect(

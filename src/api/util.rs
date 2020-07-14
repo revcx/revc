@@ -30,17 +30,6 @@ macro_rules! cdf_size {
 pub struct Align32;
 
 /// A 16 byte aligned array.
-/// # Examples
-/// ```
-/// extern crate rav1e;
-/// use rav1e::util::*;
-///
-/// let mut x: AlignedArray<[i16; 64 * 64]> = AlignedArray([0; 64 * 64]);
-/// assert!(x.array.as_ptr() as usize % 16 == 0);
-///
-/// let mut x: AlignedArray<[i16; 64 * 64]> = UninitializedAlignedArray();
-/// assert!(x.array.as_ptr() as usize % 16 == 0);
-/// ```
 #[derive(Clone, Default)]
 pub struct AlignedArray<ARRAY> {
     _alignment: [Align32; 0],

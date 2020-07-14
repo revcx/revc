@@ -155,23 +155,20 @@ where
 }
 
 impl<T: Pixel> Plane<T> {
-    /// Stride alignment in bytes.
-    const STRIDE_ALIGNMENT_LOG2: usize = 5;
-
     pub fn new(
         width: usize,
         height: usize,
         xdec: usize,
         ydec: usize,
-        xpad: usize,
-        ypad: usize,
+        pad: usize,
+        align_log2: usize,
     ) -> Self {
-        let xorigin =
-            xpad.align_power_of_two(Self::STRIDE_ALIGNMENT_LOG2 + 1 - mem::size_of::<T>());
-        let yorigin = ypad;
-        let stride = (xorigin + width + xpad)
-            .align_power_of_two(Self::STRIDE_ALIGNMENT_LOG2 + 1 - mem::size_of::<T>());
-        let alloc_height = yorigin + height + ypad;
+        let xpad = pad;
+        let ypad = pad;
+        let xorigin = pad;
+        let yorigin = pad;
+        let stride = xorigin + xpad + (width.align_power_of_two(align_log2));
+        let alloc_height = yorigin + ypad + (height.align_power_of_two(align_log2));
         let data = PlaneData::new(stride * alloc_height);
 
         Plane {
@@ -213,13 +210,13 @@ impl<T: Pixel> Plane<T> {
         }
     }
 
-    pub fn pad(&mut self, w: usize, h: usize) {
+    pub fn pad(&mut self) {
         let xorigin = self.cfg.xorigin;
         let yorigin = self.cfg.yorigin;
         let stride = self.cfg.stride;
         let alloc_height = self.cfg.alloc_height;
-        let width = w >> self.cfg.xdec;
-        let height = h >> self.cfg.ydec;
+        let width = self.cfg.width;
+        let height = self.cfg.height;
 
         if xorigin > 0 {
             for y in 0..height {
@@ -742,7 +739,7 @@ pub mod test {
                 yorigin: 3,
             },
         };
-        plane.pad(4, 4);
+        plane.pad();
         assert_eq!(
             &[
                 1u8, 1, 1, 2, 3, 4, 4, 4, 1, 1, 1, 2, 3, 4, 4, 4, 1, 1, 1, 2, 3, 4, 4, 4, 1, 1, 1,

@@ -11,50 +11,50 @@ use std::fmt;
 pub struct Frame<T: Pixel> {
     pub planes: [Plane<T>; N_C],
     pub chroma_sampling: ChromaSampling,
+    pub crop_l: i16,
+    pub crop_r: i16,
+    pub crop_t: i16,
+    pub crop_b: i16,
 }
 
 impl<T: Pixel> Frame<T> {
     pub fn new(width: usize, height: usize, chroma_sampling: ChromaSampling) -> Self {
-        let luma_width = width.align_power_of_two(3);
-        let luma_height = height.align_power_of_two(3);
-        let luma_padding = PIC_PAD_SIZE_L;
-
         let (chroma_sampling_period_x, chroma_sampling_period_y) =
             chroma_sampling.sampling_period();
-        let chroma_width = luma_width / chroma_sampling_period_x;
-        let chroma_height = luma_height / chroma_sampling_period_y;
-        let chroma_padding_x = luma_padding / chroma_sampling_period_x;
-        let chroma_padding_y = luma_padding / chroma_sampling_period_y;
         let chroma_decimation_x = chroma_sampling_period_x - 1;
         let chroma_decimation_y = chroma_sampling_period_y - 1;
 
         Frame {
             planes: [
-                Plane::new(luma_width, luma_height, 0, 0, luma_padding, luma_padding),
+                Plane::new(width, height, 0, 0, PIC_PAD_SIZE_L, MIN_CU_LOG2),
                 Plane::new(
-                    chroma_width,
-                    chroma_height,
+                    (width + 1) >> 1,
+                    (height + 1) >> 1,
                     chroma_decimation_x,
                     chroma_decimation_y,
-                    chroma_padding_x,
-                    chroma_padding_y,
+                    PIC_PAD_SIZE_C,
+                    MIN_CU_LOG2 - 1,
                 ),
                 Plane::new(
-                    chroma_width,
-                    chroma_height,
+                    (width + 1) >> 1,
+                    (height + 1) >> 1,
                     chroma_decimation_x,
                     chroma_decimation_y,
-                    chroma_padding_x,
-                    chroma_padding_y,
+                    PIC_PAD_SIZE_C,
+                    MIN_CU_LOG2 - 1,
                 ),
             ],
             chroma_sampling,
+            crop_l: 0,
+            crop_r: 0,
+            crop_t: 0,
+            crop_b: 0,
         }
     }
 
-    pub fn pad(&mut self, w: usize, h: usize) {
+    pub fn pad(&mut self) {
         for p in self.planes.iter_mut() {
-            p.pad(w, h);
+            p.pad();
         }
     }
 

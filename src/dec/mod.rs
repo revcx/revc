@@ -1590,7 +1590,10 @@ impl EvcdCtx {
 
             if self.num_ctb == 0 {
                 /* expand pixels to padding area */
-                //TODO
+                if let Some(pic) = &self.pic {
+                    let frame = &pic.borrow().frame;
+                    frame.borrow_mut().pad();
+                }
 
                 /* put decoded picture to DPB */
                 self.dpm.as_mut().unwrap().evc_picman_put_pic(
