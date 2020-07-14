@@ -10,9 +10,7 @@ homepage = "https://github.com/revcx/revc"
 repository = "https://github.com/revcx/revc"
 
 [features]
-binaries = [
-    "clap",
-]
+binaries = ["clap"]
 default = ["binaries"]
 trace = []
 trace_bin = ["trace"]
