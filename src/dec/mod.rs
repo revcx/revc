@@ -112,7 +112,6 @@ pub(crate) struct EvcdCore {
     log2_cuh: u8,
     /* is there coefficient? */
     is_coef: [bool; N_C],
-    is_coef_sub: [[bool; MAX_SUB_TB_NUM]; N_C],
 
     /* QP for Luma of current encoding MB */
     qp_y: u8,
@@ -500,14 +499,6 @@ impl EvcdCtx {
                             map_scu[j].CLR_SF();
                         }
 
-                        let ii = if i & 32 == 0 { 0 } else { 1 };
-                        let jj = if j & 32 == 0 { 0 } else { 1 };
-                        let sub_idx = (ii << 1) | jj;
-                        if self.core.is_coef_sub[Y_C][sub_idx] {
-                            map_scu[j].SET_CBFL();
-                        } else {
-                            map_scu[j].CLR_CBFL();
-                        }
                         map_cu_mode[j].SET_LOGW(self.core.log2_cuw as u32);
                         map_cu_mode[j].SET_LOGH(self.core.log2_cuh as u32);
 
@@ -539,152 +530,83 @@ impl EvcdCtx {
         let mut cbf = [false; N_C];
         let mut b_no_cbf = false;
 
-        let log2_tuw = core.log2_cuw;
-        let log2_tuh = core.log2_cuh;
+        let log2_cuw = core.log2_cuw;
+        let log2_cuh = core.log2_cuh;
 
-        let mut coef_temp_buf = [[0i16; MAX_TR_DIM]; N_C];
-        let log2_w_sub = if core.log2_cuw > MAX_TR_LOG2 as u8 {
-            MAX_TR_LOG2 as u8
-        } else {
-            core.log2_cuw
-        };
-        let log2_h_sub = if core.log2_cuh > MAX_TR_LOG2 as u8 {
-            MAX_TR_LOG2 as u8
-        } else {
-            core.log2_cuh
-        };
-        let loop_w = if core.log2_cuw > MAX_TR_LOG2 as u8 {
-            1 << (core.log2_cuw - MAX_TR_LOG2 as u8)
-        } else {
-            1
-        };
-        let loop_h = if core.log2_cuh > MAX_TR_LOG2 as u8 {
-            1 << (core.log2_cuh - MAX_TR_LOG2 as u8)
-        } else {
-            1
-        };
-        let stride = (1 << core.log2_cuw);
-        let sub_stride = (1 << log2_w_sub);
         let mut tmp_coef = [0; N_C];
-        let is_sub = if loop_h + loop_w > 2 { true } else { false };
+        let is_sub = false;
         let mut cbf_all = true;
 
-        let is_intra = if core.pred_mode == PredMode::MODE_INTRA {
-            true
+        if cbf_all {
+            eco_cbf(
+                bs,
+                sbac,
+                sbac_ctx,
+                core.pred_mode,
+                &mut cbf,
+                b_no_cbf,
+                is_sub,
+                0,
+                &mut cbf_all,
+                &core.tree_cons,
+            )?;
         } else {
-            false
-        };
+            cbf[Y_C] = false;
+            cbf[U_C] = false;
+            cbf[V_C] = false;
+        }
 
-        for i in 0..N_C {
-            for j in 0..MAX_SUB_TB_NUM {
-                core.is_coef_sub[i][j] = false;
+        let mut dqp = 0;
+        if self.pps.cu_qp_delta_enabled_flag
+            && (((!(self.sps.dquant_flag)
+                || (core.cu_qp_delta_code == 1 && !core.cu_qp_delta_is_coded))
+                && (cbf[Y_C] || cbf[U_C] || cbf[V_C]))
+                || (core.cu_qp_delta_code == 2 && !core.cu_qp_delta_is_coded))
+        {
+            dqp = evcd_eco_dqp(bs, sbac, sbac_ctx)?;
+            core.cu_qp_delta_is_coded = true;
+        } else {
+            dqp = 0;
+        }
+        core.qp = GET_QP(core.qp as i8, dqp) as u8;
+        core.qp_y = GET_LUMA_QP(core.qp as i8) as u8;
+
+        let qp_i_cb = EVC_CLIP3(
+            -6 * (BIT_DEPTH as i8 - 8),
+            57,
+            (core.qp as i8 + self.sh.qp_u_offset) as i8,
+        );
+        let qp_i_cr = EVC_CLIP3(
+            -6 * (BIT_DEPTH as i8 - 8),
+            57,
+            (core.qp as i8 + self.sh.qp_v_offset) as i8,
+        );
+        core.qp_u = (core.evc_tbl_qp_chroma_dynamic_ext[0]
+            [(EVC_TBL_CHROMA_QP_OFFSET + qp_i_cb) as usize]
+            + (6 * (BIT_DEPTH - 8)) as i8) as u8;
+        core.qp_v = (core.evc_tbl_qp_chroma_dynamic_ext[1]
+            [(EVC_TBL_CHROMA_QP_OFFSET + qp_i_cr) as usize]
+            + (6 * (BIT_DEPTH - 8)) as i8) as u8;
+
+        for c in 0..N_C {
+            if cbf[c] {
+                let chroma = if c > 0 { 1 } else { 0 };
+                evcd_eco_xcoef(
+                    bs,
+                    sbac,
+                    sbac_ctx,
+                    &mut core.coef.data[c],
+                    log2_cuw - chroma,
+                    log2_cuh - chroma,
+                    c,
+                )?;
+
+                tmp_coef[c] += 1;
+            } else {
+                tmp_coef[c] += 0;
             }
         }
 
-        for j in 0..loop_h {
-            for i in 0..loop_w {
-                if cbf_all {
-                    eco_cbf(
-                        bs,
-                        sbac,
-                        sbac_ctx,
-                        core.pred_mode,
-                        &mut cbf,
-                        b_no_cbf,
-                        is_sub,
-                        j + i,
-                        &mut cbf_all,
-                        &core.tree_cons,
-                    )?;
-                } else {
-                    cbf[Y_C] = false;
-                    cbf[U_C] = false;
-                    cbf[V_C] = false;
-                }
-
-                let mut dqp = 0;
-                //int qp_i_cb, qp_i_cr;
-                if self.pps.cu_qp_delta_enabled_flag
-                    && (((!(self.sps.dquant_flag)
-                        || (core.cu_qp_delta_code == 1 && !core.cu_qp_delta_is_coded))
-                        && (cbf[Y_C] || cbf[U_C] || cbf[V_C]))
-                        || (core.cu_qp_delta_code == 2 && !core.cu_qp_delta_is_coded))
-                {
-                    dqp = evcd_eco_dqp(bs, sbac, sbac_ctx)?;
-                    core.cu_qp_delta_is_coded = true;
-                } else {
-                    dqp = 0;
-                }
-                core.qp = GET_QP(core.qp as i8, dqp) as u8;
-                core.qp_y = GET_LUMA_QP(core.qp as i8) as u8;
-
-                let qp_i_cb = EVC_CLIP3(
-                    -6 * (BIT_DEPTH as i8 - 8),
-                    57,
-                    (core.qp as i8 + self.sh.qp_u_offset) as i8,
-                );
-                let qp_i_cr = EVC_CLIP3(
-                    -6 * (BIT_DEPTH as i8 - 8),
-                    57,
-                    (core.qp as i8 + self.sh.qp_v_offset) as i8,
-                );
-                core.qp_u = (core.evc_tbl_qp_chroma_dynamic_ext[0]
-                    [(EVC_TBL_CHROMA_QP_OFFSET + qp_i_cb) as usize]
-                    + (6 * (BIT_DEPTH - 8)) as i8) as u8;
-                core.qp_v = (core.evc_tbl_qp_chroma_dynamic_ext[1]
-                    [(EVC_TBL_CHROMA_QP_OFFSET + qp_i_cr) as usize]
-                    + (6 * (BIT_DEPTH - 8)) as i8) as u8;
-
-                for c in 0..N_C {
-                    if cbf[c] {
-                        let chroma = if c > 0 { 1 } else { 0 };
-                        let pos_sub_x = i * (1 << (log2_w_sub - chroma));
-                        let pos_sub_y = j * (1 << (log2_h_sub - chroma)) * (stride >> chroma);
-
-                        let coef_temp = if is_sub {
-                            evc_block_copy(
-                                &core.coef.data[c][(pos_sub_x + pos_sub_y) as usize..],
-                                (stride >> chroma) as usize,
-                                &mut coef_temp_buf[c][..],
-                                (sub_stride >> chroma) as usize,
-                                log2_w_sub - chroma,
-                                log2_h_sub - chroma,
-                            );
-                            &mut coef_temp_buf[c][..]
-                        } else {
-                            &mut core.coef.data[c][..]
-                        };
-
-                        evcd_eco_xcoef(
-                            bs,
-                            sbac,
-                            sbac_ctx,
-                            coef_temp,
-                            log2_w_sub - chroma,
-                            log2_h_sub - chroma,
-                            c,
-                        )?;
-
-                        core.is_coef_sub[c][((j << 1) | i) as usize] = true;
-                        tmp_coef[c] += 1;
-
-                        if is_sub {
-                            evc_block_copy(
-                                &coef_temp_buf[c],
-                                (sub_stride >> chroma) as usize,
-                                &mut core.coef.data[c][(pos_sub_x + pos_sub_y) as usize..],
-                                (stride >> chroma) as usize,
-                                log2_w_sub - chroma,
-                                log2_h_sub - chroma,
-                            );
-                        }
-                    } else {
-                        core.is_coef_sub[c][((j << 1) | i) as usize] = false;
-                        tmp_coef[c] += 0;
-                    }
-                }
-            }
-        }
         for c in 0..N_C {
             core.is_coef[c] = if tmp_coef[c] != 0 { true } else { false };
         }
@@ -745,12 +667,7 @@ impl EvcdCtx {
 
             core.is_coef[Y_C] = false;
             core.is_coef[U_C] = false;
-            core.is_coef[V_C] = false; //TODO: Tim why we need to duplicate code here?
-            for i in 0..N_C {
-                for j in 0..MAX_SUB_TB_NUM {
-                    core.is_coef_sub[i][j] = false;
-                }
-            }
+            core.is_coef[V_C] = false;
 
             core.qp = self.sh.qp;
             core.qp_y = GET_LUMA_QP(core.qp as i8) as u8;
@@ -856,7 +773,6 @@ impl EvcdCtx {
             core.qp_u,
             core.qp_v,
             &core.is_coef,
-            &core.is_coef_sub,
         );
     }
 
@@ -1448,7 +1364,7 @@ impl EvcdCtx {
                     self.core.y_lcu += 1;
                 }
             }
-            //eprint!("{} ", self.num_ctb);
+            eprint!("{} ", self.num_ctb);
         }
 
         Ok(())

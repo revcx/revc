@@ -46,80 +46,29 @@ pub(crate) fn evc_sub_block_itdq(
     qp_u: u8,
     qp_v: u8,
     flag: &[bool],
-    nnz_sub: &[[bool; MAX_SUB_TB_NUM]],
 ) {
-    let mut coef_temp_buf = vec![[0i16; MAX_TR_DIM]; N_C];
-    let log2_w_sub = if log2_cuw as usize > MAX_TR_LOG2 {
-        MAX_TR_LOG2
-    } else {
-        log2_cuw as usize
-    };
-    let log2_h_sub = if log2_cuh as usize > MAX_TR_LOG2 {
-        MAX_TR_LOG2
-    } else {
-        log2_cuh as usize
-    };
-    let loop_w = if log2_cuw as usize > MAX_TR_LOG2 {
-        (1 << (log2_cuw as usize - MAX_TR_LOG2))
-    } else {
-        1
-    };
-    let loop_h = if log2_cuh as usize > MAX_TR_LOG2 {
-        (1 << (log2_cuh as usize - MAX_TR_LOG2))
-    } else {
-        1
-    };
-    let stride = 1 << log2_cuw as usize;
-    let sub_stride = 1 << log2_w_sub as usize;
     let qp: [u8; N_C] = [qp_y, qp_u, qp_v];
     let mut scale = 0;
 
-    for j in 0..loop_h {
-        for i in 0..loop_w {
-            for c in 0..N_C {
-                let chroma = if c > 0 { 1 } else { 0 };
-                if nnz_sub[c][(j << 1) | i] {
-                    let pos_sub_x = i * (1 << (log2_w_sub - chroma));
-                    let pos_sub_y = j * (1 << (log2_h_sub - chroma)) * (stride >> chroma);
+    for c in 0..N_C {
+        let chroma = if c > 0 { 1 } else { 0 };
+        if flag[c] {
+            scale = evc_tbl_dq_scale_b[qp[c] as usize % 6] << (qp[c] / 6) as i16;
 
-                    let coef_temp = if loop_h + loop_w > 2 {
-                        evc_block_copy(
-                            &coef[c][pos_sub_x + pos_sub_y..],
-                            stride >> chroma,
-                            &mut coef_temp_buf[c][..],
-                            sub_stride >> chroma,
-                            (log2_w_sub - chroma) as u8,
-                            (log2_h_sub - chroma) as u8,
-                        );
-                        &mut coef_temp_buf[c][..]
-                    } else {
-                        &mut coef[c][..]
-                    };
+            evc_itdq(
+                &mut coef[c],
+                (log2_cuw - chroma) as usize,
+                (log2_cuh - chroma) as usize,
+                scale,
+            );
 
-                    scale = evc_tbl_dq_scale_b[qp[c] as usize % 6] << (qp[c] / 6) as i16;
-
-                    evc_itdq(coef_temp, log2_w_sub - chroma, log2_h_sub - chroma, scale);
-
-                    if loop_h + loop_w > 2 {
-                        evc_block_copy(
-                            &coef_temp_buf[c][..],
-                            sub_stride >> chroma,
-                            &mut coef[c][pos_sub_x + pos_sub_y..],
-                            stride >> chroma,
-                            (log2_w_sub - chroma) as u8,
-                            (log2_h_sub - chroma) as u8,
-                        );
-                    }
-
-                    TRACE_RESI(
-                        tracer,
-                        c,
-                        1 << (log2_w_sub - chroma) as usize,
-                        1 << (log2_h_sub - chroma) as usize,
-                        &coef[c],
-                    );
-                }
-            }
+            TRACE_RESI(
+                tracer,
+                c,
+                1 << (log2_cuw - chroma) as usize,
+                1 << (log2_cuh - chroma) as usize,
+                &coef[c],
+            );
         }
     }
 }
@@ -367,84 +316,84 @@ fn itx_pb64b0(src: &[i16], dst: &mut [i32], shift: usize, line: usize) {
     let mut EEEEO = [0i64; 2];
     for j in 0..line {
         for k in 0..32 {
-            O[k] = evc_tbl_tm64[1][k] as i64 * src[line] as i64
-                + evc_tbl_tm64[3][k] as i64 * src[3 * line] as i64
-                + evc_tbl_tm64[5][k] as i64 * src[5 * line] as i64
-                + evc_tbl_tm64[7][k] as i64 * src[7 * line] as i64
-                + evc_tbl_tm64[9][k] as i64 * src[9 * line] as i64
-                + evc_tbl_tm64[11][k] as i64 * src[11 * line] as i64
-                + evc_tbl_tm64[13][k] as i64 * src[13 * line] as i64
-                + evc_tbl_tm64[15][k] as i64 * src[15 * line] as i64
-                + evc_tbl_tm64[17][k] as i64 * src[17 * line] as i64
-                + evc_tbl_tm64[19][k] as i64 * src[19 * line] as i64
-                + evc_tbl_tm64[21][k] as i64 * src[21 * line] as i64
-                + evc_tbl_tm64[23][k] as i64 * src[23 * line] as i64
-                + evc_tbl_tm64[25][k] as i64 * src[25 * line] as i64
-                + evc_tbl_tm64[27][k] as i64 * src[27 * line] as i64
-                + evc_tbl_tm64[29][k] as i64 * src[29 * line] as i64
-                + evc_tbl_tm64[31][k] as i64 * src[31 * line] as i64
-                + evc_tbl_tm64[33][k] as i64 * src[33 * line] as i64
-                + evc_tbl_tm64[35][k] as i64 * src[35 * line] as i64
-                + evc_tbl_tm64[37][k] as i64 * src[37 * line] as i64
-                + evc_tbl_tm64[39][k] as i64 * src[39 * line] as i64
-                + evc_tbl_tm64[41][k] as i64 * src[41 * line] as i64
-                + evc_tbl_tm64[43][k] as i64 * src[43 * line] as i64
-                + evc_tbl_tm64[45][k] as i64 * src[45 * line] as i64
-                + evc_tbl_tm64[47][k] as i64 * src[47 * line] as i64
-                + evc_tbl_tm64[49][k] as i64 * src[49 * line] as i64
-                + evc_tbl_tm64[51][k] as i64 * src[51 * line] as i64
-                + evc_tbl_tm64[53][k] as i64 * src[53 * line] as i64
-                + evc_tbl_tm64[55][k] as i64 * src[55 * line] as i64
-                + evc_tbl_tm64[57][k] as i64 * src[57 * line] as i64
-                + evc_tbl_tm64[59][k] as i64 * src[59 * line] as i64
-                + evc_tbl_tm64[61][k] as i64 * src[61 * line] as i64
-                + evc_tbl_tm64[63][k] as i64 * src[63 * line] as i64;
+            O[k] = evc_tbl_tm64[1][k] as i64 * src[1 * line + j] as i64
+                + evc_tbl_tm64[3][k] as i64 * src[3 * line + j] as i64
+                + evc_tbl_tm64[5][k] as i64 * src[5 * line + j] as i64
+                + evc_tbl_tm64[7][k] as i64 * src[7 * line + j] as i64
+                + evc_tbl_tm64[9][k] as i64 * src[9 * line + j] as i64
+                + evc_tbl_tm64[11][k] as i64 * src[11 * line + j] as i64
+                + evc_tbl_tm64[13][k] as i64 * src[13 * line + j] as i64
+                + evc_tbl_tm64[15][k] as i64 * src[15 * line + j] as i64
+                + evc_tbl_tm64[17][k] as i64 * src[17 * line + j] as i64
+                + evc_tbl_tm64[19][k] as i64 * src[19 * line + j] as i64
+                + evc_tbl_tm64[21][k] as i64 * src[21 * line + j] as i64
+                + evc_tbl_tm64[23][k] as i64 * src[23 * line + j] as i64
+                + evc_tbl_tm64[25][k] as i64 * src[25 * line + j] as i64
+                + evc_tbl_tm64[27][k] as i64 * src[27 * line + j] as i64
+                + evc_tbl_tm64[29][k] as i64 * src[29 * line + j] as i64
+                + evc_tbl_tm64[31][k] as i64 * src[31 * line + j] as i64
+                + evc_tbl_tm64[33][k] as i64 * src[33 * line + j] as i64
+                + evc_tbl_tm64[35][k] as i64 * src[35 * line + j] as i64
+                + evc_tbl_tm64[37][k] as i64 * src[37 * line + j] as i64
+                + evc_tbl_tm64[39][k] as i64 * src[39 * line + j] as i64
+                + evc_tbl_tm64[41][k] as i64 * src[41 * line + j] as i64
+                + evc_tbl_tm64[43][k] as i64 * src[43 * line + j] as i64
+                + evc_tbl_tm64[45][k] as i64 * src[45 * line + j] as i64
+                + evc_tbl_tm64[47][k] as i64 * src[47 * line + j] as i64
+                + evc_tbl_tm64[49][k] as i64 * src[49 * line + j] as i64
+                + evc_tbl_tm64[51][k] as i64 * src[51 * line + j] as i64
+                + evc_tbl_tm64[53][k] as i64 * src[53 * line + j] as i64
+                + evc_tbl_tm64[55][k] as i64 * src[55 * line + j] as i64
+                + evc_tbl_tm64[57][k] as i64 * src[57 * line + j] as i64
+                + evc_tbl_tm64[59][k] as i64 * src[59 * line + j] as i64
+                + evc_tbl_tm64[61][k] as i64 * src[61 * line + j] as i64
+                + evc_tbl_tm64[63][k] as i64 * src[63 * line + j] as i64;
         }
 
         for k in 0..16 {
-            EO[k] = evc_tbl_tm64[2][k] as i64 * src[2 * line] as i64
-                + evc_tbl_tm64[6][k] as i64 * src[6 * line] as i64
-                + evc_tbl_tm64[10][k] as i64 * src[10 * line] as i64
-                + evc_tbl_tm64[14][k] as i64 * src[14 * line] as i64
-                + evc_tbl_tm64[18][k] as i64 * src[18 * line] as i64
-                + evc_tbl_tm64[22][k] as i64 * src[22 * line] as i64
-                + evc_tbl_tm64[26][k] as i64 * src[26 * line] as i64
-                + evc_tbl_tm64[30][k] as i64 * src[30 * line] as i64
-                + evc_tbl_tm64[34][k] as i64 * src[34 * line] as i64
-                + evc_tbl_tm64[38][k] as i64 * src[38 * line] as i64
-                + evc_tbl_tm64[42][k] as i64 * src[42 * line] as i64
-                + evc_tbl_tm64[46][k] as i64 * src[46 * line] as i64
-                + evc_tbl_tm64[50][k] as i64 * src[50 * line] as i64
-                + evc_tbl_tm64[54][k] as i64 * src[54 * line] as i64
-                + evc_tbl_tm64[58][k] as i64 * src[58 * line] as i64
-                + evc_tbl_tm64[62][k] as i64 * src[62 * line] as i64;
+            EO[k] = evc_tbl_tm64[2][k] as i64 * src[2 * line + j] as i64
+                + evc_tbl_tm64[6][k] as i64 * src[6 * line + j] as i64
+                + evc_tbl_tm64[10][k] as i64 * src[10 * line + j] as i64
+                + evc_tbl_tm64[14][k] as i64 * src[14 * line + j] as i64
+                + evc_tbl_tm64[18][k] as i64 * src[18 * line + j] as i64
+                + evc_tbl_tm64[22][k] as i64 * src[22 * line + j] as i64
+                + evc_tbl_tm64[26][k] as i64 * src[26 * line + j] as i64
+                + evc_tbl_tm64[30][k] as i64 * src[30 * line + j] as i64
+                + evc_tbl_tm64[34][k] as i64 * src[34 * line + j] as i64
+                + evc_tbl_tm64[38][k] as i64 * src[38 * line + j] as i64
+                + evc_tbl_tm64[42][k] as i64 * src[42 * line + j] as i64
+                + evc_tbl_tm64[46][k] as i64 * src[46 * line + j] as i64
+                + evc_tbl_tm64[50][k] as i64 * src[50 * line + j] as i64
+                + evc_tbl_tm64[54][k] as i64 * src[54 * line + j] as i64
+                + evc_tbl_tm64[58][k] as i64 * src[58 * line + j] as i64
+                + evc_tbl_tm64[62][k] as i64 * src[62 * line + j] as i64;
         }
 
         for k in 0..8 {
-            EEO[k] = evc_tbl_tm64[4][k] as i64 * src[4 * line] as i64
-                + evc_tbl_tm64[12][k] as i64 * src[12 * line] as i64
-                + evc_tbl_tm64[20][k] as i64 * src[20 * line] as i64
-                + evc_tbl_tm64[28][k] as i64 * src[28 * line] as i64
-                + evc_tbl_tm64[36][k] as i64 * src[36 * line] as i64
-                + evc_tbl_tm64[44][k] as i64 * src[44 * line] as i64
-                + evc_tbl_tm64[52][k] as i64 * src[52 * line] as i64
-                + evc_tbl_tm64[60][k] as i64 * src[60 * line] as i64;
+            EEO[k] = evc_tbl_tm64[4][k] as i64 * src[4 * line + j] as i64
+                + evc_tbl_tm64[12][k] as i64 * src[12 * line + j] as i64
+                + evc_tbl_tm64[20][k] as i64 * src[20 * line + j] as i64
+                + evc_tbl_tm64[28][k] as i64 * src[28 * line + j] as i64
+                + evc_tbl_tm64[36][k] as i64 * src[36 * line + j] as i64
+                + evc_tbl_tm64[44][k] as i64 * src[44 * line + j] as i64
+                + evc_tbl_tm64[52][k] as i64 * src[52 * line + j] as i64
+                + evc_tbl_tm64[60][k] as i64 * src[60 * line + j] as i64;
         }
 
         for k in 0..4 {
-            EEEO[k] = evc_tbl_tm64[8][k] as i64 * src[8 * line] as i64
-                + evc_tbl_tm64[24][k] as i64 * src[24 * line] as i64
-                + evc_tbl_tm64[40][k] as i64 * src[40 * line] as i64
-                + evc_tbl_tm64[56][k] as i64 * src[56 * line] as i64;
+            EEEO[k] = evc_tbl_tm64[8][k] as i64 * src[8 * line + j] as i64
+                + evc_tbl_tm64[24][k] as i64 * src[24 * line + j] as i64
+                + evc_tbl_tm64[40][k] as i64 * src[40 * line + j] as i64
+                + evc_tbl_tm64[56][k] as i64 * src[56 * line + j] as i64;
         }
-        EEEEO[0] = evc_tbl_tm64[16][0] as i64 * src[16 * line] as i64
-            + evc_tbl_tm64[48][0] as i64 * src[48 * line] as i64;
-        EEEEO[1] = evc_tbl_tm64[16][1] as i64 * src[16 * line] as i64
-            + evc_tbl_tm64[48][1] as i64 * src[48 * line] as i64;
-        EEEEE[0] = evc_tbl_tm64[0][0] as i64 * src[0] as i64
-            + evc_tbl_tm64[32][0] as i64 * src[32 * line] as i64;
-        EEEEE[1] = evc_tbl_tm64[0][1] as i64 * src[0] as i64
-            + evc_tbl_tm64[32][1] as i64 * src[32 * line] as i64;
+        EEEEO[0] = evc_tbl_tm64[16][0] as i64 * src[16 * line + j] as i64
+            + evc_tbl_tm64[48][0] as i64 * src[48 * line + j] as i64;
+        EEEEO[1] = evc_tbl_tm64[16][1] as i64 * src[16 * line + j] as i64
+            + evc_tbl_tm64[48][1] as i64 * src[48 * line + j] as i64;
+        EEEEE[0] = evc_tbl_tm64[0][0] as i64 * src[0 * line + j] as i64
+            + evc_tbl_tm64[32][0] as i64 * src[32 * line + j] as i64;
+        EEEEE[1] = evc_tbl_tm64[0][1] as i64 * src[0 * line + j] as i64
+            + evc_tbl_tm64[32][1] as i64 * src[32 * line + j] as i64;
 
         for k in 0..2 {
             EEEE[k] = EEEEE[k] + EEEEO[k];
@@ -464,8 +413,8 @@ fn itx_pb64b0(src: &[i16], dst: &mut [i32], shift: usize, line: usize) {
         }
 
         for k in 0..32 {
-            dst[k] = ITX_CLIP_32((E[k] + O[k] + add) >> shift as i64);
-            dst[k + 32] = ITX_CLIP_32((E[31 - k] - O[31 - k] + add) >> shift as i64);
+            dst[j * 64 + k] = ITX_CLIP_32((E[k] + O[k] + add) >> shift as i64);
+            dst[j * 64 + k + 32] = ITX_CLIP_32((E[31 - k] - O[31 - k] + add) >> shift as i64);
         }
     }
 }
@@ -704,84 +653,84 @@ fn itx_pb64b1(src: &[i32], dst: &mut [i16], shift: usize, line: usize) {
     let mut EEEEO = [0i64; 2];
     for j in 0..line {
         for k in 0..32 {
-            O[k] = evc_tbl_tm64[1][k] as i64 * src[line] as i64
-                + evc_tbl_tm64[3][k] as i64 * src[3 * line] as i64
-                + evc_tbl_tm64[5][k] as i64 * src[5 * line] as i64
-                + evc_tbl_tm64[7][k] as i64 * src[7 * line] as i64
-                + evc_tbl_tm64[9][k] as i64 * src[9 * line] as i64
-                + evc_tbl_tm64[11][k] as i64 * src[11 * line] as i64
-                + evc_tbl_tm64[13][k] as i64 * src[13 * line] as i64
-                + evc_tbl_tm64[15][k] as i64 * src[15 * line] as i64
-                + evc_tbl_tm64[17][k] as i64 * src[17 * line] as i64
-                + evc_tbl_tm64[19][k] as i64 * src[19 * line] as i64
-                + evc_tbl_tm64[21][k] as i64 * src[21 * line] as i64
-                + evc_tbl_tm64[23][k] as i64 * src[23 * line] as i64
-                + evc_tbl_tm64[25][k] as i64 * src[25 * line] as i64
-                + evc_tbl_tm64[27][k] as i64 * src[27 * line] as i64
-                + evc_tbl_tm64[29][k] as i64 * src[29 * line] as i64
-                + evc_tbl_tm64[31][k] as i64 * src[31 * line] as i64
-                + evc_tbl_tm64[33][k] as i64 * src[33 * line] as i64
-                + evc_tbl_tm64[35][k] as i64 * src[35 * line] as i64
-                + evc_tbl_tm64[37][k] as i64 * src[37 * line] as i64
-                + evc_tbl_tm64[39][k] as i64 * src[39 * line] as i64
-                + evc_tbl_tm64[41][k] as i64 * src[41 * line] as i64
-                + evc_tbl_tm64[43][k] as i64 * src[43 * line] as i64
-                + evc_tbl_tm64[45][k] as i64 * src[45 * line] as i64
-                + evc_tbl_tm64[47][k] as i64 * src[47 * line] as i64
-                + evc_tbl_tm64[49][k] as i64 * src[49 * line] as i64
-                + evc_tbl_tm64[51][k] as i64 * src[51 * line] as i64
-                + evc_tbl_tm64[53][k] as i64 * src[53 * line] as i64
-                + evc_tbl_tm64[55][k] as i64 * src[55 * line] as i64
-                + evc_tbl_tm64[57][k] as i64 * src[57 * line] as i64
-                + evc_tbl_tm64[59][k] as i64 * src[59 * line] as i64
-                + evc_tbl_tm64[61][k] as i64 * src[61 * line] as i64
-                + evc_tbl_tm64[63][k] as i64 * src[63 * line] as i64;
+            O[k] = evc_tbl_tm64[1][k] as i64 * src[1 * line + j] as i64
+                + evc_tbl_tm64[3][k] as i64 * src[3 * line + j] as i64
+                + evc_tbl_tm64[5][k] as i64 * src[5 * line + j] as i64
+                + evc_tbl_tm64[7][k] as i64 * src[7 * line + j] as i64
+                + evc_tbl_tm64[9][k] as i64 * src[9 * line + j] as i64
+                + evc_tbl_tm64[11][k] as i64 * src[11 * line + j] as i64
+                + evc_tbl_tm64[13][k] as i64 * src[13 * line + j] as i64
+                + evc_tbl_tm64[15][k] as i64 * src[15 * line + j] as i64
+                + evc_tbl_tm64[17][k] as i64 * src[17 * line + j] as i64
+                + evc_tbl_tm64[19][k] as i64 * src[19 * line + j] as i64
+                + evc_tbl_tm64[21][k] as i64 * src[21 * line + j] as i64
+                + evc_tbl_tm64[23][k] as i64 * src[23 * line + j] as i64
+                + evc_tbl_tm64[25][k] as i64 * src[25 * line + j] as i64
+                + evc_tbl_tm64[27][k] as i64 * src[27 * line + j] as i64
+                + evc_tbl_tm64[29][k] as i64 * src[29 * line + j] as i64
+                + evc_tbl_tm64[31][k] as i64 * src[31 * line + j] as i64
+                + evc_tbl_tm64[33][k] as i64 * src[33 * line + j] as i64
+                + evc_tbl_tm64[35][k] as i64 * src[35 * line + j] as i64
+                + evc_tbl_tm64[37][k] as i64 * src[37 * line + j] as i64
+                + evc_tbl_tm64[39][k] as i64 * src[39 * line + j] as i64
+                + evc_tbl_tm64[41][k] as i64 * src[41 * line + j] as i64
+                + evc_tbl_tm64[43][k] as i64 * src[43 * line + j] as i64
+                + evc_tbl_tm64[45][k] as i64 * src[45 * line + j] as i64
+                + evc_tbl_tm64[47][k] as i64 * src[47 * line + j] as i64
+                + evc_tbl_tm64[49][k] as i64 * src[49 * line + j] as i64
+                + evc_tbl_tm64[51][k] as i64 * src[51 * line + j] as i64
+                + evc_tbl_tm64[53][k] as i64 * src[53 * line + j] as i64
+                + evc_tbl_tm64[55][k] as i64 * src[55 * line + j] as i64
+                + evc_tbl_tm64[57][k] as i64 * src[57 * line + j] as i64
+                + evc_tbl_tm64[59][k] as i64 * src[59 * line + j] as i64
+                + evc_tbl_tm64[61][k] as i64 * src[61 * line + j] as i64
+                + evc_tbl_tm64[63][k] as i64 * src[63 * line + j] as i64;
         }
 
         for k in 0..16 {
-            EO[k] = evc_tbl_tm64[2][k] as i64 * src[2 * line] as i64
-                + evc_tbl_tm64[6][k] as i64 * src[6 * line] as i64
-                + evc_tbl_tm64[10][k] as i64 * src[10 * line] as i64
-                + evc_tbl_tm64[14][k] as i64 * src[14 * line] as i64
-                + evc_tbl_tm64[18][k] as i64 * src[18 * line] as i64
-                + evc_tbl_tm64[22][k] as i64 * src[22 * line] as i64
-                + evc_tbl_tm64[26][k] as i64 * src[26 * line] as i64
-                + evc_tbl_tm64[30][k] as i64 * src[30 * line] as i64
-                + evc_tbl_tm64[34][k] as i64 * src[34 * line] as i64
-                + evc_tbl_tm64[38][k] as i64 * src[38 * line] as i64
-                + evc_tbl_tm64[42][k] as i64 * src[42 * line] as i64
-                + evc_tbl_tm64[46][k] as i64 * src[46 * line] as i64
-                + evc_tbl_tm64[50][k] as i64 * src[50 * line] as i64
-                + evc_tbl_tm64[54][k] as i64 * src[54 * line] as i64
-                + evc_tbl_tm64[58][k] as i64 * src[58 * line] as i64
-                + evc_tbl_tm64[62][k] as i64 * src[62 * line] as i64;
+            EO[k] = evc_tbl_tm64[2][k] as i64 * src[2 * line + j] as i64
+                + evc_tbl_tm64[6][k] as i64 * src[6 * line + j] as i64
+                + evc_tbl_tm64[10][k] as i64 * src[10 * line + j] as i64
+                + evc_tbl_tm64[14][k] as i64 * src[14 * line + j] as i64
+                + evc_tbl_tm64[18][k] as i64 * src[18 * line + j] as i64
+                + evc_tbl_tm64[22][k] as i64 * src[22 * line + j] as i64
+                + evc_tbl_tm64[26][k] as i64 * src[26 * line + j] as i64
+                + evc_tbl_tm64[30][k] as i64 * src[30 * line + j] as i64
+                + evc_tbl_tm64[34][k] as i64 * src[34 * line + j] as i64
+                + evc_tbl_tm64[38][k] as i64 * src[38 * line + j] as i64
+                + evc_tbl_tm64[42][k] as i64 * src[42 * line + j] as i64
+                + evc_tbl_tm64[46][k] as i64 * src[46 * line + j] as i64
+                + evc_tbl_tm64[50][k] as i64 * src[50 * line + j] as i64
+                + evc_tbl_tm64[54][k] as i64 * src[54 * line + j] as i64
+                + evc_tbl_tm64[58][k] as i64 * src[58 * line + j] as i64
+                + evc_tbl_tm64[62][k] as i64 * src[62 * line + j] as i64;
         }
 
         for k in 0..8 {
-            EEO[k] = evc_tbl_tm64[4][k] as i64 * src[4 * line] as i64
-                + evc_tbl_tm64[12][k] as i64 * src[12 * line] as i64
-                + evc_tbl_tm64[20][k] as i64 * src[20 * line] as i64
-                + evc_tbl_tm64[28][k] as i64 * src[28 * line] as i64
-                + evc_tbl_tm64[36][k] as i64 * src[36 * line] as i64
-                + evc_tbl_tm64[44][k] as i64 * src[44 * line] as i64
-                + evc_tbl_tm64[52][k] as i64 * src[52 * line] as i64
-                + evc_tbl_tm64[60][k] as i64 * src[60 * line] as i64;
+            EEO[k] = evc_tbl_tm64[4][k] as i64 * src[4 * line + j] as i64
+                + evc_tbl_tm64[12][k] as i64 * src[12 * line + j] as i64
+                + evc_tbl_tm64[20][k] as i64 * src[20 * line + j] as i64
+                + evc_tbl_tm64[28][k] as i64 * src[28 * line + j] as i64
+                + evc_tbl_tm64[36][k] as i64 * src[36 * line + j] as i64
+                + evc_tbl_tm64[44][k] as i64 * src[44 * line + j] as i64
+                + evc_tbl_tm64[52][k] as i64 * src[52 * line + j] as i64
+                + evc_tbl_tm64[60][k] as i64 * src[60 * line + j] as i64;
         }
 
         for k in 0..4 {
-            EEEO[k] = evc_tbl_tm64[8][k] as i64 * src[8 * line] as i64
-                + evc_tbl_tm64[24][k] as i64 * src[24 * line] as i64
-                + evc_tbl_tm64[40][k] as i64 * src[40 * line] as i64
-                + evc_tbl_tm64[56][k] as i64 * src[56 * line] as i64;
+            EEEO[k] = evc_tbl_tm64[8][k] as i64 * src[8 * line + j] as i64
+                + evc_tbl_tm64[24][k] as i64 * src[24 * line + j] as i64
+                + evc_tbl_tm64[40][k] as i64 * src[40 * line + j] as i64
+                + evc_tbl_tm64[56][k] as i64 * src[56 * line + j] as i64;
         }
-        EEEEO[0] = evc_tbl_tm64[16][0] as i64 * src[16 * line] as i64
-            + evc_tbl_tm64[48][0] as i64 * src[48 * line] as i64;
-        EEEEO[1] = evc_tbl_tm64[16][1] as i64 * src[16 * line] as i64
-            + evc_tbl_tm64[48][1] as i64 * src[48 * line] as i64;
-        EEEEE[0] = evc_tbl_tm64[0][0] as i64 * src[0] as i64
-            + evc_tbl_tm64[32][0] as i64 * src[32 * line] as i64;
-        EEEEE[1] = evc_tbl_tm64[0][1] as i64 * src[0] as i64
-            + evc_tbl_tm64[32][1] as i64 * src[32 * line] as i64;
+        EEEEO[0] = evc_tbl_tm64[16][0] as i64 * src[16 * line + j] as i64
+            + evc_tbl_tm64[48][0] as i64 * src[48 * line + j] as i64;
+        EEEEO[1] = evc_tbl_tm64[16][1] as i64 * src[16 * line + j] as i64
+            + evc_tbl_tm64[48][1] as i64 * src[48 * line + j] as i64;
+        EEEEE[0] = evc_tbl_tm64[0][0] as i64 * src[0 * line + j] as i64
+            + evc_tbl_tm64[32][0] as i64 * src[32 * line + j] as i64;
+        EEEEE[1] = evc_tbl_tm64[0][1] as i64 * src[0 * line + j] as i64
+            + evc_tbl_tm64[32][1] as i64 * src[32 * line + j] as i64;
 
         for k in 0..2 {
             EEEE[k] = EEEEE[k] + EEEEO[k];
@@ -801,8 +750,8 @@ fn itx_pb64b1(src: &[i32], dst: &mut [i16], shift: usize, line: usize) {
         }
 
         for k in 0..32 {
-            dst[k] = ITX_CLIP((E[k] + O[k] + add) >> shift as i64);
-            dst[k + 32] = ITX_CLIP((E[31 - k] - O[31 - k] + add) >> shift as i64);
+            dst[j * 64 + k] = ITX_CLIP((E[k] + O[k] + add) >> shift as i64);
+            dst[j * 64 + k + 32] = ITX_CLIP((E[31 - k] - O[31 - k] + add) >> shift as i64);
         }
     }
 }
