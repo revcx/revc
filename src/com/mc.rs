@@ -282,7 +282,9 @@ fn evc_mc_l_00(
 
     for y in 0..cuh {
         for x in 0..cuw {
-            pred[(y * cuw + x) as usize] = r[(y + gmv_y) as usize][(x + gmv_x) as usize];
+            let ry0 = max(0, y + gmv_y) as usize;
+            let rx0 = max(0, x + gmv_x) as usize;
+            pred[(y * cuw + x) as usize] = r[ry0][rx0];
         }
     }
 }
@@ -441,7 +443,9 @@ fn evc_mc_c_00(
 
     for y in 0..cuh {
         for x in 0..cuw {
-            pred[(y * cuw + x) as usize] = r[(y + gmv_y) as usize][(x + gmv_x) as usize];
+            let ry0 = max(0, y + gmv_y) as usize;
+            let rx0 = max(0, x + gmv_x) as usize;
+            pred[(y * cuw + x) as usize] = r[ry0][rx0];
         }
     }
 }
