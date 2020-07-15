@@ -48,12 +48,12 @@ pub(crate) fn evc_sub_block_itdq(
     flag: &[bool],
 ) {
     let qp: [u8; N_C] = [qp_y, qp_u, qp_v];
-    let mut scale = 0;
+    let mut scale = 0i32;
 
     for c in 0..N_C {
         let chroma = if c > 0 { 1 } else { 0 };
         if flag[c] {
-            scale = evc_tbl_dq_scale_b[qp[c] as usize % 6] << (qp[c] / 6) as i16;
+            scale = (evc_tbl_dq_scale_b[qp[c] as usize % 6] as i32) << (qp[c] / 6) as i32;
 
             evc_itdq(
                 &mut coef[c],
@@ -73,7 +73,7 @@ pub(crate) fn evc_sub_block_itdq(
     }
 }
 
-fn evc_dquant(coef: &mut [i16], log2_w: usize, log2_h: usize, scale: i16, offset: i32, shift: u8) {
+fn evc_dquant(coef: &mut [i16], log2_w: usize, log2_h: usize, scale: i32, offset: i32, shift: u8) {
     let ns_scale: i64 = if (log2_w + log2_h) & 1 != 0 { 181 } else { 1 };
     for i in 0..1 << (log2_w + log2_h) {
         let lev = (coef[i] as i64 * (scale as i64 * ns_scale) + offset as i64) >> shift as i64;
@@ -772,7 +772,7 @@ fn evc_itrans(coef: &mut [i16], log2_cuw: usize, log2_cuh: usize) {
     tbl_itxb1[log2_cuw - 1](&tb, coef, (ITX_SHIFT1 + ITX_SHIFT2), 1 << log2_cuh);
 }
 
-fn evc_itdq(coef: &mut [i16], log2_w: usize, log2_h: usize, scale: i16) {
+fn evc_itdq(coef: &mut [i16], log2_w: usize, log2_h: usize, scale: i32) {
     let log2_size = (log2_w + log2_h) >> 1;
     let ns_shift = if (log2_w + log2_h) & 1 != 0 { 8 } else { 0 };
 
