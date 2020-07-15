@@ -124,14 +124,7 @@ pub(crate) fn evc_sub_block_itdq(
     }
 }
 
-fn evc_dquant(
-    coef: &mut [i16],
-    log2_w: usize,
-    log2_h: usize,
-    scale: i16,
-    offset: usize,
-    shift: usize,
-) {
+fn evc_dquant(coef: &mut [i16], log2_w: usize, log2_h: usize, scale: i16, offset: i32, shift: u8) {
     let ns_scale: i64 = if (log2_w + log2_h) & 1 != 0 { 181 } else { 1 };
     for i in 0..1 << (log2_w + log2_h) {
         let lev = (coef[i] as i64 * (scale as i64 * ns_scale) + offset as i64) >> shift as i64;
@@ -834,9 +827,13 @@ fn evc_itdq(coef: &mut [i16], log2_w: usize, log2_h: usize, scale: i16) {
     let log2_size = (log2_w + log2_h) >> 1;
     let ns_shift = if (log2_w + log2_h) & 1 != 0 { 8 } else { 0 };
 
-    let tr_shift = MAX_TX_DYNAMIC_RANGE as usize - BIT_DEPTH - log2_size;
-    let shift = QUANT_IQUANT_SHIFT - QUANT_SHIFT - tr_shift + ns_shift;
-    let offset = if shift == 0 { 0 } else { 1 << (shift - 1) };
+    let tr_shift: i8 = MAX_TX_DYNAMIC_RANGE as i8 - BIT_DEPTH as i8 - log2_size as i8;
+    let shift: u8 = (QUANT_IQUANT_SHIFT as i8 - QUANT_SHIFT as i8 - tr_shift + ns_shift) as u8;
+    let offset: i32 = if shift == 0 {
+        0
+    } else {
+        1 << (shift as i32 - 1)
+    };
 
     evc_dquant(coef, log2_w, log2_h, scale, offset, shift);
     evc_itrans(coef, log2_w, log2_h);
