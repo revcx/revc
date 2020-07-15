@@ -3,7 +3,7 @@ use std::fs::OpenOptions;
 use std::io::Write;
 
 use super::region::*;
-use crate::api::util::*;
+use super::*;
 
 pub(crate) type Tracer = (Box<dyn Write>, isize);
 

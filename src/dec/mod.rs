@@ -1,5 +1,4 @@
 use super::api::frame::*;
-use super::api::util::*;
 use super::api::*;
 use super::com::ipred::*;
 use super::com::itdq::*;

@@ -7,12 +7,10 @@ use num_derive::FromPrimitive;
 use num_traits::FromPrimitive;
 
 pub mod frame;
-pub mod util;
 
-use frame::Frame;
-use util::*;
-
+use crate::com::*;
 use crate::dec::*;
+use frame::*;
 
 /*****************************************************************************
  * return values and error code

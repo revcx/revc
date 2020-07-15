@@ -7,7 +7,6 @@ use std::io::Write;
 use std::slice;
 
 use revc::api::frame::*;
-use revc::api::util::*;
 
 /* clipping within min and max */
 #[inline]

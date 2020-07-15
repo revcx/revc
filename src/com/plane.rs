@@ -6,8 +6,7 @@ use std::mem;
 use std::ops::{Index, IndexMut, Range};
 
 use super::region::*;
-
-use crate::api::util::*;
+use crate::api::frame::*;
 
 pub enum PlaneType {
     PLANE_TYPE_Y,

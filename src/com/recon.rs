@@ -3,7 +3,6 @@ use super::region::*;
 use super::tracer::*;
 use super::util::*;
 use super::*;
-use crate::api::util::*;
 
 fn evc_recon(
     coef: &[i16],

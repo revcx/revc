@@ -1,7 +1,6 @@
 use super::region::*;
 use super::tbl::*;
 use super::*;
-use crate::api::util::*;
 
 pub(crate) fn evc_get_mpm_b(
     x_scu: u16,

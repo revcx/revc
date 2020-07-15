@@ -25,6 +25,7 @@ pub(crate) fn evc_assert_rv(x: bool, r: EvcError) -> Result<(), EvcError> {
 }
 
 /********* Conditional tools definition ********/
+pub type pel = u16;
 
 /* number of picture order count lsb bit */
 pub(crate) const POC_LSB_BIT: usize = (11);
