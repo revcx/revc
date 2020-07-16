@@ -1,3 +1,4 @@
+pub(crate) mod df;
 pub(crate) mod ipred;
 pub(crate) mod itdq;
 pub(crate) mod mc;

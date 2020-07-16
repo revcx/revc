@@ -23,8 +23,6 @@ pub(crate) struct EvcPic {
     pub(crate) map_refi: Rc<RefCell<Vec<[i8; REFP_NUM]>>>,
     pub(crate) list_poc: [u32; MAX_NUM_REF_PICS],
 
-    pub(crate) pic_deblock_alpha_offset: i8,
-    pub(crate) pic_deblock_beta_offset: i8,
     pub(crate) pic_qp_u_offset: i8,
     pub(crate) pic_qp_v_offset: i8,
     pub(crate) digest: [[u8; 16]; N_C],
@@ -46,8 +44,6 @@ impl EvcPic {
             map_mv: Rc::new(RefCell::new(vec![[[0; MV_D]; REFP_NUM]; f_scu])),
             map_refi: Rc::new(RefCell::new(vec![[0; REFP_NUM]; f_scu])),
             list_poc: [0; MAX_NUM_REF_PICS],
-            pic_deblock_alpha_offset: 0,
-            pic_deblock_beta_offset: 0,
             pic_qp_u_offset: 0,
             pic_qp_v_offset: 0,
             digest: [[0; 16]; N_C],

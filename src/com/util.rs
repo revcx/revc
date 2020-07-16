@@ -4,6 +4,7 @@ use super::*;
 use crate::dec::LcuSplitMode;
 
 use std::cmp::*;
+use std::ops::Neg;
 
 /* clipping within min and max */
 #[inline]
@@ -11,6 +12,7 @@ pub(crate) fn EVC_CLIP3<T: Ord>(min_x: T, max_x: T, value: T) -> T {
     max(min_x, min(max_x, value))
 }
 
+#[inline]
 pub(crate) fn CONV_LOG2(v: usize) -> u8 {
     evc_tbl_log2[v]
 }
@@ -557,5 +559,24 @@ pub(crate) fn evc_derived_chroma_qp_mapping_tables(
     if structChromaQP.same_qp_table_for_chroma {
         let (p0, p1) = p_evc_tbl_qp_chroma_dynamic.split_at_mut(1);
         p1[0].copy_from_slice(&p0[0]);
+    }
+}
+
+pub(crate) fn evc_get_split_mode(
+    cud: u16,
+    cup: u16,
+    cuw: u16,
+    cuh: u16,
+    lcu_s: u16,
+    split_mode_buf: &LcuSplitMode,
+) -> SplitMode {
+    if cuw < 8 && cuh < 8 {
+        SplitMode::NO_SPLIT
+    } else {
+        let pos = cup
+            + (((cuh >> 1) >> MIN_CU_LOG2) * (lcu_s >> MIN_CU_LOG2) + ((cuw >> 1) >> MIN_CU_LOG2));
+        let shape = (BlockShape::SQUARE as i8 + CONV_LOG2(cuw as usize) as i8
+            - CONV_LOG2(cuh as usize) as i8) as usize;
+        split_mode_buf.data[cud as usize][shape][pos as usize]
     }
 }

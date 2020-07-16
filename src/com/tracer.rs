@@ -143,6 +143,48 @@ pub(crate) fn TRACE_RECO(
     EVC_TRACE(tracer, " \n");
 }
 
+#[cfg(feature = "trace_dbf")]
+pub(crate) fn TRACE_DBF(
+    tracer: &mut Option<Tracer>,
+    ch_type: usize,
+    x: usize,
+    y: usize,
+    size: usize,
+    is_hor_edge: bool,
+    dbf: &PlaneRegionMut<'_, pel>,
+) {
+    EVC_TRACE_COUNTER(tracer);
+    EVC_TRACE(tracer, "Dbf for ");
+    EVC_TRACE(tracer, if ch_type == 0 { 1 } else { 0 });
+    EVC_TRACE(tracer, " size ");
+    EVC_TRACE(tracer, size);
+    EVC_TRACE(tracer, " is_hor_edge ");
+    EVC_TRACE(tracer, is_hor_edge as u8);
+    EVC_TRACE(tracer, " : ");
+    for k in 0..size {
+        if is_hor_edge {
+            EVC_TRACE(tracer, dbf[y - 2][x + k]);
+            EVC_TRACE(tracer, " , ");
+            EVC_TRACE(tracer, dbf[y - 1][x + k]);
+            EVC_TRACE(tracer, " , ");
+            EVC_TRACE(tracer, dbf[y + 0][x + k]);
+            EVC_TRACE(tracer, " , ");
+            EVC_TRACE(tracer, dbf[y + 1][x + k]);
+            EVC_TRACE(tracer, " , ");
+        } else {
+            EVC_TRACE(tracer, dbf[y + k][x - 2]);
+            EVC_TRACE(tracer, " , ");
+            EVC_TRACE(tracer, dbf[y + k][x - 1]);
+            EVC_TRACE(tracer, " , ");
+            EVC_TRACE(tracer, dbf[y + k][x + 0]);
+            EVC_TRACE(tracer, " , ");
+            EVC_TRACE(tracer, dbf[y + k][x + 1]);
+            EVC_TRACE(tracer, " , ");
+        }
+    }
+    EVC_TRACE(tracer, "\n");
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[cfg(not(feature = "trace"))]
@@ -200,5 +242,17 @@ pub(crate) fn TRACE_RECO(
     cuw: usize,
     cuh: usize,
     reco: &PlaneRegionMut<'_, pel>,
+) {
+}
+
+#[cfg(not(feature = "trace_dbf"))]
+pub(crate) fn TRACE_DBF(
+    tracer: &mut Option<Tracer>,
+    ch_type: usize,
+    x: usize,
+    y: usize,
+    size: usize,
+    is_hor_edge: bool,
+    dbf: &PlaneRegionMut<'_, pel>,
 ) {
 }
