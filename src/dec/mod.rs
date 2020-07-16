@@ -499,6 +499,11 @@ impl EvcdCtx {
                         } else {
                             map_scu[j].CLR_SF();
                         }
+                        if self.core.is_coef[Y_C] {
+                            map_scu[j].SET_CBFL();
+                        } else {
+                            map_scu[j].CLR_CBFL();
+                        }
 
                         map_cu_mode[j].SET_LOGW(self.core.log2_cuw as u32);
                         map_cu_mode[j].SET_LOGH(self.core.log2_cuh as u32);
