@@ -119,7 +119,7 @@ pub(crate) fn evc_deblock_cu_ver(
 
     /* vertical filtering */
     if x_pel > 0 && map_scu[offset - 1].GET_COD() != 0 {
-        for i in 0..h {
+        for j in 0..h {
             let tbl_qp_to_st = get_tbl_qp_to_st(
                 map_scu[offset + 0],
                 map_scu[offset - 1],
@@ -129,7 +129,7 @@ pub(crate) fn evc_deblock_cu_ver(
                 &map_mv[offset - 1],
             );
             let qp = map_scu[offset + 0].GET_QP();
-            let t = (i << MIN_CU_LOG2);
+            let t = (j << MIN_CU_LOG2);
 
             if evc_check_luma(tree_cons) {
                 deblock_scu_ver(
@@ -179,7 +179,7 @@ pub(crate) fn evc_deblock_cu_ver(
     }
 
     if x_pel + cuw < pic_w && map_scu[offset + w].GET_COD() != 0 {
-        for i in 0..h {
+        for j in 0..h {
             let tbl_qp_to_st = get_tbl_qp_to_st(
                 map_scu[offset + w],
                 map_scu[offset + w - 1],
@@ -189,7 +189,7 @@ pub(crate) fn evc_deblock_cu_ver(
                 &map_mv[offset + w - 1],
             );
             let qp = map_scu[offset + w].GET_QP();
-            let t = (i << MIN_CU_LOG2);
+            let t = (j << MIN_CU_LOG2);
 
             if evc_check_luma(tree_cons) {
                 deblock_scu_ver(

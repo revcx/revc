@@ -1424,6 +1424,11 @@ impl EvcdCtx {
             &self.map_split[lcu_num as usize],
         );
 
+        EVC_TRACE_COUNTER(&mut self.bs.tracer);
+        EVC_TRACE(&mut self.bs.tracer, "split_mod ");
+        EVC_TRACE(&mut self.bs.tracer, split_mode as u8);
+        EVC_TRACE(&mut self.bs.tracer, " \n");
+
         if split_mode != SplitMode::NO_SPLIT {
             let split_struct = evc_split_get_part_structure(
                 split_mode,
@@ -1591,6 +1596,12 @@ impl EvcdCtx {
         let r_scu = EVC_CLIP3(0, self.w_scu, x_r * scu_in_lcu_wh);
         let t_scu = y_l * scu_in_lcu_wh;
         let b_scu = EVC_CLIP3(0, self.h_scu, y_r * scu_in_lcu_wh);
+
+        for j in t_scu..b_scu {
+            for i in l_scu..r_scu {
+                self.map_scu[(i + j * self.w_scu) as usize].CLR_COD();
+            }
+        }
 
         /* horizontal filtering */
         for j in y_l..y_r {

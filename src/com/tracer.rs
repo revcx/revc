@@ -155,7 +155,11 @@ pub(crate) fn TRACE_DBF(
 ) {
     EVC_TRACE_COUNTER(tracer);
     EVC_TRACE(tracer, "Dbf for ");
-    EVC_TRACE(tracer, if ch_type == 0 { 1 } else { 0 });
+    EVC_TRACE(tracer, ch_type);
+    EVC_TRACE(tracer, " x ");
+    EVC_TRACE(tracer, x);
+    EVC_TRACE(tracer, " y ");
+    EVC_TRACE(tracer, y);
     EVC_TRACE(tracer, " size ");
     EVC_TRACE(tracer, size);
     EVC_TRACE(tracer, " is_hor_edge ");
