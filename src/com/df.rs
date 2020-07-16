@@ -121,14 +121,14 @@ pub(crate) fn evc_deblock_cu_ver(
     if x_pel > 0 && map_scu[offset - 1].GET_COD() != 0 {
         for j in 0..h {
             let tbl_qp_to_st = get_tbl_qp_to_st(
-                map_scu[offset + 0],
-                map_scu[offset - 1],
-                &map_refi[offset + 0],
-                &map_refi[offset - 1],
-                &map_mv[offset + 0],
-                &map_mv[offset - 1],
+                map_scu[offset + j * w_scu + 0],
+                map_scu[offset + j * w_scu - 1],
+                &map_refi[offset + j * w_scu + 0],
+                &map_refi[offset + j * w_scu - 1],
+                &map_mv[offset + j * w_scu + 0],
+                &map_mv[offset + j * w_scu - 1],
             );
-            let qp = map_scu[offset + 0].GET_QP();
+            let qp = map_scu[offset + j * w_scu + 0].GET_QP();
             let t = (j << MIN_CU_LOG2);
 
             if evc_check_luma(tree_cons) {
@@ -181,14 +181,14 @@ pub(crate) fn evc_deblock_cu_ver(
     if x_pel + cuw < pic_w && map_scu[offset + w].GET_COD() != 0 {
         for j in 0..h {
             let tbl_qp_to_st = get_tbl_qp_to_st(
-                map_scu[offset + w],
-                map_scu[offset + w - 1],
-                &map_refi[offset + w],
-                &map_refi[offset + w - 1],
-                &map_mv[offset + w],
-                &map_mv[offset + w - 1],
+                map_scu[offset + j * w_scu + w],
+                map_scu[offset + j * w_scu + w - 1],
+                &map_refi[offset + j * w_scu + w],
+                &map_refi[offset + j * w_scu + w - 1],
+                &map_mv[offset + j * w_scu + w],
+                &map_mv[offset + j * w_scu + w - 1],
             );
-            let qp = map_scu[offset + w].GET_QP();
+            let qp = map_scu[offset + j * w_scu + w].GET_QP();
             let t = (j << MIN_CU_LOG2);
 
             if evc_check_luma(tree_cons) {
