@@ -335,7 +335,7 @@ fn deblock_scu_hor(
             let mut A = buf[y - 2][x + i] as i16;
             let mut B = buf[y - 1][x + i] as i16;
             let mut C = buf[y + 0][x + i] as i16;
-            let mut D = buf[y + 1][x + 1] as i16;
+            let mut D = buf[y + 1][x + i] as i16;
 
             let d = (A - (B << 2) + (C << 2) - D) / 8;
 
@@ -356,7 +356,7 @@ fn deblock_scu_hor(
             buf[y - 2][x + i] = EVC_CLIP3(0, (1 << BIT_DEPTH as i16) - 1, A) as pel;
             buf[y - 1][x + i] = EVC_CLIP3(0, (1 << BIT_DEPTH as i16) - 1, B) as pel;
             buf[y + 0][x + i] = EVC_CLIP3(0, (1 << BIT_DEPTH as i16) - 1, C) as pel;
-            buf[y + 1][x + 1] = EVC_CLIP3(0, (1 << BIT_DEPTH as i16) - 1, D) as pel;
+            buf[y + 1][x + i] = EVC_CLIP3(0, (1 << BIT_DEPTH as i16) - 1, D) as pel;
         }
         TRACE_DBF(tracer, ch_type, x, y, size, true, buf);
     }
@@ -383,7 +383,7 @@ fn deblock_scu_hor_chroma(
             let mut A = buf[y - 2][x + i] as i16;
             let mut B = buf[y - 1][x + i] as i16;
             let mut C = buf[y + 0][x + i] as i16;
-            let mut D = buf[y + 1][x + 1] as i16;
+            let mut D = buf[y + 1][x + i] as i16;
 
             let d = (A - (B << 2) + (C << 2) - D) / 8;
 

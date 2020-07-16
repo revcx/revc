@@ -150,7 +150,7 @@ pub(crate) fn TRACE_DBF(
     x: usize,
     y: usize,
     size: usize,
-    is_hor_edge: bool,
+    hor: bool,
     dbf: &PlaneRegionMut<'_, pel>,
 ) {
     EVC_TRACE_COUNTER(tracer);
@@ -162,11 +162,11 @@ pub(crate) fn TRACE_DBF(
     EVC_TRACE(tracer, y);
     EVC_TRACE(tracer, " size ");
     EVC_TRACE(tracer, size);
-    EVC_TRACE(tracer, " is_hor_edge ");
-    EVC_TRACE(tracer, is_hor_edge as u8);
+    EVC_TRACE(tracer, " hor ");
+    EVC_TRACE(tracer, hor as u8);
     EVC_TRACE(tracer, " : ");
     for k in 0..size {
-        if is_hor_edge {
+        if hor {
             EVC_TRACE(tracer, dbf[y - 2][x + k]);
             EVC_TRACE(tracer, " , ");
             EVC_TRACE(tracer, dbf[y - 1][x + k]);
@@ -256,7 +256,7 @@ pub(crate) fn TRACE_DBF(
     x: usize,
     y: usize,
     size: usize,
-    is_hor_edge: bool,
+    hor: bool,
     dbf: &PlaneRegionMut<'_, pel>,
 ) {
 }
