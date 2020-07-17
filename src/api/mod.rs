@@ -6,6 +6,7 @@ use std::{cmp, fmt, io};
 use num_derive::FromPrimitive;
 use num_traits::FromPrimitive;
 
+pub mod config;
 pub mod frame;
 
 use crate::com::*;
@@ -283,7 +284,7 @@ impl Default for PixelRange {
     }
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Default)]
 #[repr(C)]
 pub struct Rational {
     pub num: u64,

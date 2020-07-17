@@ -4,21 +4,50 @@
 mod demuxer;
 mod muxer;
 
-use clap::{App, AppSettings, Arg};
+use clap::{App, AppSettings, Arg, ArgMatches};
 
+use std::fs::File;
 use std::io;
+use std::io::prelude::*;
 use std::time::Instant;
 
+use revc::api::config::encoder::*;
+
+pub struct EncoderIO {
+    pub input: Box<dyn demuxer::Demuxer>,
+    pub output: Box<dyn muxer::Muxer>,
+    pub rec: Option<Box<dyn muxer::Muxer>>,
+}
+
 struct CLISettings {
-    pub demuxer: Box<dyn demuxer::Demuxer>,
-    pub muxer: Box<dyn muxer::Muxer>,
+    pub io: EncoderIO,
+    pub enc: EncoderConfig,
     pub frames: usize,
+    pub skip: usize,
     pub verbose: bool,
     pub threads: usize,
     pub bitdepth: u8,
 }
 
-fn parse_cli() -> CLISettings {
+pub trait MatchGet {
+    fn value_of_int(&self, name: &str) -> Option<io::Result<i32>>;
+}
+
+impl MatchGet for ArgMatches<'_> {
+    fn value_of_int(&self, name: &str) -> Option<io::Result<i32>> {
+        self.value_of(name).map(|v| {
+            v.parse().map_err(|e: std::num::ParseIntError| {
+                io::Error::new(io::ErrorKind::InvalidInput, e)
+            })
+        })
+    }
+}
+
+fn parse_config(matches: &ArgMatches<'_>) -> io::Result<EncoderConfig> {
+    Ok(EncoderConfig::default())
+}
+
+fn parse_cli() -> io::Result<CLISettings> {
     let mut app = App::new("revce")
         .version(env!("CARGO_PKG_VERSION"))
         .about("Rust EVC Encoder")
@@ -207,10 +236,24 @@ fn parse_cli() -> CLISettings {
         std::process::exit(0);
     }
 
-    CLISettings {
-        demuxer: demuxer::new(matches.value_of("INPUT").unwrap()),
-        muxer: muxer::new(matches.value_of("OUTPUT").unwrap()),
+    let rec = match matches.value_of("RECON") {
+        Some(recon) => Some(muxer::new(recon)),
+        None => None,
+    };
+
+    let enc = parse_config(&matches)?;
+
+    let io = EncoderIO {
+        input: demuxer::new(matches.value_of("INPUT").unwrap()),
+        output: muxer::new(matches.value_of("OUTPUT").unwrap()),
+        rec,
+    };
+
+    Ok(CLISettings {
+        io,
+        enc,
         frames: matches.value_of("FRAMES").unwrap().parse().unwrap(),
+        skip: matches.value_of("SKIP").unwrap().parse().unwrap(),
         verbose: matches.is_present("VERBOSE"),
         threads: matches
             .value_of("THREADS")
@@ -220,7 +263,7 @@ fn parse_cli() -> CLISettings {
             .value_of("BITDEPTH")
             .map(|v| v.parse().expect("Bitdepth must be an integer"))
             .unwrap(),
-    }
+    })
 }
 
 #[derive(PartialEq)]
@@ -230,6 +273,7 @@ enum EvceState {
     STATE_SKIPPING,
 }
 
-fn main() {
-    let mut cli = parse_cli();
+fn main() -> io::Result<()> {
+    let mut cli = parse_cli()?;
+    Ok(())
 }

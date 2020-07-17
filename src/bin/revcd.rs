@@ -19,7 +19,7 @@ struct CLISettings {
     pub bitdepth: u8,
 }
 
-fn parse_cli() -> CLISettings {
+fn parse_cli() -> io::Result<CLISettings> {
     let mut app = App::new("revcd")
         .version(env!("CARGO_PKG_VERSION"))
         .about("Rust EVC Decoder")
@@ -86,7 +86,7 @@ fn parse_cli() -> CLISettings {
         std::process::exit(0);
     }
 
-    CLISettings {
+    Ok(CLISettings {
         demuxer: demuxer::new(matches.value_of("INPUT").unwrap()),
         muxer: muxer::new(matches.value_of("OUTPUT").unwrap()),
         frames: matches.value_of("FRAMES").unwrap().parse().unwrap(),
@@ -99,7 +99,7 @@ fn parse_cli() -> CLISettings {
             .value_of("BITDEPTH")
             .map(|v| v.parse().expect("Bitdepth must be an integer"))
             .unwrap(),
-    }
+    })
 }
 
 #[derive(PartialEq)]
@@ -169,7 +169,7 @@ fn print_summary(w: usize, h: usize, bs_cnt: usize, pic_cnt: usize, clk_tot: usi
 }
 
 fn main() -> io::Result<()> {
-    let mut cli = parse_cli();
+    let mut cli = parse_cli()?;
     let cfg = Config {
         threads: cli.threads,
         ..Default::default()
