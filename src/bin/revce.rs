@@ -221,6 +221,12 @@ fn parse_cli() -> io::Result<CLISettings> {
                 .long("num_slices_in_pic")
                 .takes_value(true),
         )
+        .arg(
+            Arg::with_name("INTER_SLICE_TYPE")
+                .help("Inter slice type (0: SLICE_B 1: SLICE_P)")
+                .long("inter_slice_type")
+                .takes_value(true),
+        )
         // DEBUGGING
         .arg(
             Arg::with_name("VERBOSE")
