@@ -3,10 +3,10 @@ use std::io;
 mod nalu;
 use self::nalu::NaluDemuxer;
 
-use revc::api::Packet;
+use super::Data;
 
 pub trait Demuxer {
-    fn read(&mut self) -> io::Result<Packet>;
+    fn read(&mut self) -> io::Result<Data>;
 }
 
 pub fn new(filename: &str) -> Box<dyn Demuxer> {

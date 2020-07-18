@@ -1,13 +1,12 @@
 #![allow(warnings)]
 #![allow(dead_code)]
 
-mod demuxer;
-mod muxer;
+mod io;
 
 use clap::{App, AppSettings, Arg};
+use io::*;
 use revc::api::*;
 
-use std::io;
 use std::time::Instant;
 
 struct CLISettings {
@@ -19,7 +18,7 @@ struct CLISettings {
     pub bitdepth: u8,
 }
 
-fn parse_cli() -> io::Result<CLISettings> {
+fn parse_cli() -> std::io::Result<CLISettings> {
     let mut app = App::new("revcd")
         .version(env!("CARGO_PKG_VERSION"))
         .about("Rust EVC Decoder")
@@ -168,7 +167,7 @@ fn print_summary(w: usize, h: usize, bs_cnt: usize, pic_cnt: usize, clk_tot: usi
     );
 }
 
-fn main() -> io::Result<()> {
+fn main() -> std::io::Result<()> {
     let mut cli = parse_cli()?;
     let cfg = Config {
         threads: cli.threads,
@@ -196,37 +195,39 @@ fn main() -> io::Result<()> {
             } else {
                 match cli.demuxer.read() {
                     Ok(mut pkt) => {
-                        let bs_size = if let Some(data) = &pkt.data {
-                            data.len()
-                        } else {
-                            0
-                        };
+                        if let Data::Packet(mut pkt) = pkt {
+                            let bs_size = if let Some(data) = &pkt.data {
+                                data.len()
+                            } else {
+                                0
+                            };
 
-                        let start = Instant::now();
-                        let ret = ctx.decode(&mut pkt);
-                        let duration = start.elapsed();
-                        clk_tot += duration.as_millis() as usize;
+                            let start = Instant::now();
+                            let ret = ctx.decode(&mut pkt);
+                            let duration = start.elapsed();
+                            clk_tot += duration.as_millis() as usize;
 
-                        match ret {
-                            Ok(stat) => {
-                                if stat.fnum >= 0 {
-                                    state = EvcdState::STATE_PULLING;
-                                }
-                                if (cli.verbose) {
-                                    print_stat(&stat, bs_cnt);
-                                }
-                                if stat.read - NALU_SIZE_FIELD_IN_BYTES != bs_size {
-                                    eprint!(
-                                        "\t=> different reading of bitstream (in:{}, read:{})\n",
-                                        bs_size, stat.read
-                                    );
-                                }
+                            match ret {
+                                Ok(stat) => {
+                                    if stat.fnum >= 0 {
+                                        state = EvcdState::STATE_PULLING;
+                                    }
+                                    if (cli.verbose) {
+                                        print_stat(&stat, bs_cnt);
+                                    }
+                                    if stat.read - NALU_SIZE_FIELD_IN_BYTES != bs_size {
+                                        eprint!(
+                                            "\t=> different reading of bitstream (in:{}, read:{})\n",
+                                            bs_size, stat.read
+                                        );
+                                    }
 
-                                bs_cnt += 1;
-                            }
-                            Err(err) => {
-                                eprint!("Decoding error = {:?}\n", err);
-                                break;
+                                    bs_cnt += 1;
+                                }
+                                Err(err) => {
+                                    eprint!("Decoding error = {:?}\n", err);
+                                    break;
+                                }
                             }
                         }
                     }
@@ -249,7 +250,7 @@ fn main() -> io::Result<()> {
                     w = f.planes[0].cfg.width;
                     h = f.planes[0].cfg.height;
                     pic_cnt += 1;
-                    cli.muxer.write(&*f, cli.bitdepth)?
+                    cli.muxer.write(Data::Frame(&*f), cli.bitdepth)?
                 }
                 Err(err) => {
                     if err == EvcError::EVC_OK_FRM_DELAYED {

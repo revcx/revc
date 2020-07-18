@@ -1,16 +1,15 @@
 #![allow(warnings)]
 #![allow(dead_code)]
 
-mod demuxer;
-mod muxer;
+mod io;
 
 use clap::{App, AppSettings, Arg, ArgMatches};
 
 use std::fs::File;
-use std::io;
 use std::io::prelude::*;
 use std::time::Instant;
 
+use io::*;
 use revc::api::config::encoder::*;
 use revc::api::*;
 
@@ -31,20 +30,20 @@ struct CLISettings {
 }
 
 pub trait MatchGet {
-    fn value_of_int(&self, name: &str) -> Option<io::Result<i32>>;
+    fn value_of_int(&self, name: &str) -> Option<std::io::Result<i32>>;
 }
 
 impl MatchGet for ArgMatches<'_> {
-    fn value_of_int(&self, name: &str) -> Option<io::Result<i32>> {
+    fn value_of_int(&self, name: &str) -> Option<std::io::Result<i32>> {
         self.value_of(name).map(|v| {
             v.parse().map_err(|e: std::num::ParseIntError| {
-                io::Error::new(io::ErrorKind::InvalidInput, e)
+                std::io::Error::new(std::io::ErrorKind::InvalidInput, e)
             })
         })
     }
 }
 
-fn parse_config(matches: &ArgMatches<'_>) -> io::Result<EncoderConfig> {
+fn parse_config(matches: &ArgMatches<'_>) -> std::io::Result<EncoderConfig> {
     let maybe_quantizer = matches.value_of_int("QP");
     let maybe_bitrate = matches.value_of_int("BITRATE");
     let quantizer = maybe_quantizer.unwrap_or_else(|| {
@@ -149,7 +148,7 @@ fn parse_config(matches: &ArgMatches<'_>) -> io::Result<EncoderConfig> {
     Ok(cfg)
 }
 
-fn parse_cli() -> io::Result<CLISettings> {
+fn parse_cli() -> std::io::Result<CLISettings> {
     let mut app = App::new("revce")
         .version(env!("CARGO_PKG_VERSION"))
         .about("Rust EVC Encoder")
@@ -421,7 +420,7 @@ enum EvceState {
     STATE_SKIPPING,
 }
 
-fn main() -> io::Result<()> {
+fn main() -> std::io::Result<()> {
     let mut cli = parse_cli()?;
     Ok(())
 }

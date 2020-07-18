@@ -1,3 +1,4 @@
+use super::Data;
 use super::Demuxer;
 
 use std::fs::File;
@@ -22,7 +23,7 @@ impl NaluDemuxer {
 }
 
 impl Demuxer for NaluDemuxer {
-    fn read(&mut self) -> io::Result<Packet> {
+    fn read(&mut self) -> io::Result<Data> {
         let mut buf = [0u8; 4];
         self.reader.read_exact(&mut buf)?;
         let nal_unit_length =
@@ -31,9 +32,9 @@ impl Demuxer for NaluDemuxer {
         let mut data: Vec<u8> = vec![0; nal_unit_length as usize];
         self.reader.read_exact(&mut data)?;
 
-        Ok(Packet {
+        Ok(Data::Packet(Packet {
             data: Some(data),
             pts: 0,
-        })
+        }))
     }
 }
