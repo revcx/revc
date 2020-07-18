@@ -12,6 +12,7 @@ use std::io::prelude::*;
 use std::time::Instant;
 
 use revc::api::config::encoder::*;
+use revc::api::*;
 
 pub struct EncoderIO {
     pub input: Box<dyn demuxer::Demuxer>,
@@ -44,7 +45,108 @@ impl MatchGet for ArgMatches<'_> {
 }
 
 fn parse_config(matches: &ArgMatches<'_>) -> io::Result<EncoderConfig> {
-    Ok(EncoderConfig::default())
+    let maybe_quantizer = matches.value_of_int("QP");
+    let maybe_bitrate = matches.value_of_int("BITRATE");
+    let quantizer = maybe_quantizer.unwrap_or_else(|| {
+        if maybe_bitrate.is_some() {
+            // If a bitrate is specified, the quantizer is the maximum allowed (e.g.,
+            //  the minimum quality allowed), which by default should be
+            //  unconstrained.
+            Ok(51)
+        } else {
+            Ok(27)
+        }
+    })? as usize;
+    let bitrate: i32 = maybe_bitrate.unwrap_or(Ok(0))?;
+
+    if quantizer == 0 {
+        unimplemented!("Lossless encoding not yet implemented");
+    } else if quantizer > 51 {
+        panic!("Quantizer must be between 0-51");
+    }
+
+    let max_interval: u64 = matches
+        .value_of("KEYFRAME_INTERVAL")
+        .unwrap()
+        .parse()
+        .unwrap();
+    let mut min_interval: u64 = matches
+        .value_of("MIN_KEYFRAME_INTERVAL")
+        .unwrap()
+        .parse()
+        .unwrap();
+
+    if matches.occurrences_of("MIN_KEYFRAME_INTERVAL") == 0 {
+        min_interval = min_interval.min(max_interval);
+    }
+
+    let mut cfg = EncoderConfig::default();
+
+    cfg.width = matches.value_of("WIDTH").unwrap_or("0").parse().unwrap();
+    cfg.height = matches.value_of("HEIGHT").unwrap_or("0").parse().unwrap();
+    if let Some(frame_rate) = matches.value_of("FRAME_RATE") {
+        cfg.time_base = Rational::new(
+            matches.value_of("TIME_SCALE").unwrap().parse().unwrap(),
+            frame_rate.parse().unwrap(),
+        );
+    }
+    cfg.bit_depth = matches
+        .value_of("BIT_DEPTH")
+        .unwrap_or("8")
+        .parse()
+        .unwrap();
+    cfg.chroma_sampling = ChromaSampling::Cs420;
+    cfg.min_key_frame_interval = min_interval;
+    // Map an input value of 0 to an infinite interval
+    cfg.max_key_frame_interval = if max_interval == 0 {
+        MAX_MAX_KEY_FRAME_INTERVAL
+    } else {
+        max_interval
+    };
+
+    cfg.qp = quantizer as u8;
+    cfg.max_qp = matches.value_of("MAXQP").unwrap_or("0").parse().unwrap();
+    cfg.min_qp = matches.value_of("MINQP").unwrap_or("0").parse().unwrap();
+    cfg.bitrate = bitrate.checked_mul(1000).expect("Bitrate too high");
+
+    cfg.cb_qp_offset = matches
+        .value_of("CB_QP_OFFSET")
+        .unwrap_or("0")
+        .parse()
+        .unwrap();
+    cfg.cr_qp_offset = matches
+        .value_of("CR_QP_OFFSET")
+        .unwrap_or("0")
+        .parse()
+        .unwrap();
+    cfg.use_dqp = matches.value_of("USE_DQP").unwrap_or("0").parse().unwrap();
+    cfg.cu_qp_delta_area = matches
+        .value_of("CU_QP_DELTA_AREA")
+        .unwrap_or("6")
+        .parse()
+        .unwrap();
+    cfg.max_b_frames = matches.value_of("USE_DQP").unwrap_or("0").parse().unwrap();
+    cfg.ref_pic_gap_length = matches
+        .value_of("REF_PIC_GAP_LENGTH")
+        .unwrap_or("0")
+        .parse()
+        .unwrap();
+    cfg.level = matches.value_of("LEVEL").unwrap_or("51").parse().unwrap();
+    cfg.closed_gop = matches.is_present("CLOSED_GOP");
+    cfg.enable_cip = matches.is_present("ENABLE_CIP");
+    cfg.disable_dbf = matches.is_present("DISABLE_DBF");
+    cfg.num_slices_in_pic = matches
+        .value_of("NUM_SLICES_IN_PIC")
+        .unwrap_or("1")
+        .parse()
+        .unwrap();
+    cfg.inter_slice_type = matches
+        .value_of("INTER_SLICE_TYPE")
+        .unwrap_or("0")
+        .parse()
+        .unwrap();
+
+    Ok(cfg)
 }
 
 fn parse_cli() -> io::Result<CLISettings> {
@@ -105,19 +207,41 @@ fn parse_cli() -> io::Result<CLISettings> {
                 .takes_value(true),
         )
         .arg(
-            Arg::with_name("BITDEPTH")
-                .help("output bitdepth (8, 10)")
-                .short("b")
-                .long("bitdepth")
+            Arg::with_name("BIT_DEPTH")
+                .help("output bit depth (8, 10)")
+                .short("d")
+                .long("bit-depth")
                 .takes_value(true)
                 .default_value("8"),
         )
         .arg(
+            Arg::with_name("BITRATE")
+                .help("Bitrate (kbps)")
+                .short("b")
+                .long("bitrate")
+                .takes_value(true),
+        )
+        .arg(
+            Arg::with_name("MINQP")
+                .help("Minimum quantizer (0-51) to use in bitrate mode")
+                .long("minqp")
+                .takes_value(true)
+                .default_value("4"),
+        )
+        .arg(
+            Arg::with_name("MAXQP")
+                .help("Maximum quantizer (0-51) to use in bitrate mode")
+                .long("maxqp")
+                .takes_value(true)
+                .default_value("51"),
+        )
+        .arg(
             Arg::with_name("QP")
-                .help("QP value (0~51)")
+                .help("QP value (0-51)")
                 .short("q")
                 .long("qp")
-                .takes_value(true),
+                .takes_value(true)
+                .default_value("27"),
         )
         .arg(
             Arg::with_name("CB_QP_OFFSET")
@@ -146,17 +270,34 @@ fn parse_cli() -> io::Result<CLISettings> {
                 .default_value("6"),
         )
         .arg(
-            Arg::with_name("HZ")
+            Arg::with_name("FRAME_RATE")
                 .help("frame rate (Hz)")
                 .short("z")
-                .long("hz")
+                .long("frame-rate")
                 .takes_value(true),
         )
         .arg(
-            Arg::with_name("IPERIOD")
-                .help("I-picture period")
+            Arg::with_name("TIME_SCALE")
+                .help(
+                    "The time scale associated with the frame rate if provided (ignored otherwise)",
+                )
+                .long("time-scale")
+                .alias("time_scale")
+                .default_value("1")
+                .takes_value(true),
+        )
+        .arg(
+            Arg::with_name("MIN_KEYFRAME_INTERVAL")
+                .help("Minimum interval between keyframes")
+                .long("min-keyint")
+                .takes_value(true)
+                .default_value("12"),
+        )
+        .arg(
+            Arg::with_name("KEYFRAME_INTERVAL")
+                .help("Maximum interval between keyframes")
                 .short("p")
-                .long("iperiod")
+                .long("keyint")
                 .takes_value(true),
         )
         .arg(
@@ -202,7 +343,8 @@ fn parse_cli() -> io::Result<CLISettings> {
             Arg::with_name("LEVEL")
                 .help("level setting")
                 .long("level")
-                .takes_value(true),
+                .takes_value(true)
+                .default_value("51"),
         )
         .arg(
             Arg::with_name("ENABLE_CIP")
@@ -210,16 +352,16 @@ fn parse_cli() -> io::Result<CLISettings> {
                 .long("enable_cip"),
         )
         .arg(
-            Arg::with_name("DBF")
-                .help("Deblocking filter on/off flag")
-                .long("dbf")
-                .takes_value(true),
+            Arg::with_name("DISABLE_DBF")
+                .help("Disable deblocking filter flag")
+                .long("disable_dbf"),
         )
         .arg(
             Arg::with_name("NUM_SLICES_IN_PIC")
                 .help("Number of slices in the pic")
                 .long("num_slices_in_pic")
-                .takes_value(true),
+                .takes_value(true)
+                .default_value("1"),
         )
         .arg(
             Arg::with_name("INTER_SLICE_TYPE")
