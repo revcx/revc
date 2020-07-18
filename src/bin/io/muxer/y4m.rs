@@ -139,7 +139,7 @@ impl Muxer for Y4mMuxer {
         } else {
             Err(io::Error::new(
                 io::ErrorKind::InvalidData,
-                "Invalid Frame Data for YuvMuxer",
+                "Invalid Frame Data for Y4mMuxer",
             ))
         }
     }
