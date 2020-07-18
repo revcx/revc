@@ -12,13 +12,13 @@ pub struct NaluDemuxer {
 }
 
 impl NaluDemuxer {
-    pub fn new(path: &str) -> Box<dyn Demuxer> {
-        Box::new(NaluDemuxer {
+    pub fn new(path: &str) -> io::Result<Box<dyn Demuxer>> {
+        Ok(Box::new(NaluDemuxer {
             reader: match path {
                 "-" => Box::new(io::stdin()),
                 f => Box::new(File::open(&f).unwrap()),
             },
-        })
+        }))
     }
 }
 

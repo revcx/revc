@@ -32,7 +32,7 @@ impl YuvMuxer {
 
 impl Muxer for YuvMuxer {
     fn write(&mut self, data: Data, bitdepth: u8) -> io::Result<()> {
-        if let Data::Frame(f) = data {
+        if let Data::RefFrame(f) = data {
             let bytes_per_sample = if bitdepth > 8 { 2 } else { 1 };
             let pitch_y = f.planes[0].cfg.width * bytes_per_sample;
             let height = f.planes[0].cfg.height;
@@ -121,8 +121,13 @@ impl Muxer for YuvMuxer {
             self.writer.write_all(&rec_y)?;
             self.writer.write_all(&rec_u)?;
             self.writer.write_all(&rec_v)?;
-        }
 
-        Ok(())
+            Ok(())
+        } else {
+            Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                "Invalid Frame Data for YuvMuxer",
+            ))
+        }
     }
 }

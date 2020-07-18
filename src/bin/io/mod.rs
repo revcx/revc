@@ -4,6 +4,7 @@ pub mod demuxer;
 pub mod muxer;
 
 pub enum Data<'a> {
-    Frame(&'a Frame<u16>),
+    RefFrame(&'a Frame<u16>),
+    Frame(Frame<u16>),
     Packet(Packet),
 }

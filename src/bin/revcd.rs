@@ -86,8 +86,8 @@ fn parse_cli() -> std::io::Result<CLISettings> {
     }
 
     Ok(CLISettings {
-        demuxer: demuxer::new(matches.value_of("INPUT").unwrap()),
-        muxer: muxer::new(matches.value_of("OUTPUT").unwrap()),
+        demuxer: demuxer::new(matches.value_of("INPUT").unwrap())?,
+        muxer: muxer::new(matches.value_of("OUTPUT").unwrap())?,
         frames: matches.value_of("FRAMES").unwrap().parse().unwrap(),
         verbose: matches.is_present("VERBOSE"),
         threads: matches
@@ -229,6 +229,9 @@ fn main() -> std::io::Result<()> {
                                     break;
                                 }
                             }
+                        } else {
+                            eprint!("Invalid Packet Data for NaluDemuxer");
+                            break;
                         }
                     }
                     _ => {
@@ -250,7 +253,7 @@ fn main() -> std::io::Result<()> {
                     w = f.planes[0].cfg.width;
                     h = f.planes[0].cfg.height;
                     pic_cnt += 1;
-                    cli.muxer.write(Data::Frame(&*f), cli.bitdepth)?
+                    cli.muxer.write(Data::RefFrame(&*f), cli.bitdepth)?
                 }
                 Err(err) => {
                     if err == EvcError::EVC_OK_FRM_DELAYED {

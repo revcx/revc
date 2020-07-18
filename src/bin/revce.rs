@@ -384,15 +384,15 @@ fn parse_cli() -> std::io::Result<CLISettings> {
     }
 
     let rec = match matches.value_of("RECON") {
-        Some(recon) => Some(muxer::new(recon)),
+        Some(recon) => Some(muxer::new(recon)?),
         None => None,
     };
 
     let enc = parse_config(&matches)?;
 
     let io = EncoderIO {
-        input: demuxer::new(matches.value_of("INPUT").unwrap()),
-        output: muxer::new(matches.value_of("OUTPUT").unwrap()),
+        input: demuxer::new(matches.value_of("INPUT").unwrap())?,
+        output: muxer::new(matches.value_of("OUTPUT").unwrap())?,
         rec,
     };
 
