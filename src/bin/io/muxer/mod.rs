@@ -4,6 +4,7 @@ mod yuv;
 use std::io;
 use std::path::Path;
 
+use self::y4m::Y4mMuxer;
 use self::yuv::YuvMuxer;
 use super::Data;
 use revc::api::Rational;
@@ -14,7 +15,11 @@ pub trait Muxer {
 
 pub fn new(filename: &str) -> io::Result<Box<dyn Muxer>> {
     if let Some(ext) = Path::new(filename).extension() {
-        Ok(YuvMuxer::new(filename))
+        if ext == "y4m" {
+            Ok(Y4mMuxer::new(filename))
+        } else {
+            Ok(YuvMuxer::new(filename))
+        }
     } else {
         Err(io::Error::new(
             io::ErrorKind::InvalidInput,

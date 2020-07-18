@@ -10,43 +10,41 @@ use std::slice;
 use revc::api::frame::*;
 use revc::api::Rational;
 
-pub struct Y4mMuxer {
-    writer: Option<Box<dyn Write>>,
-    encoder: Option<y4m::Encoder<Box<dyn Write>>>,
+pub enum Y4mMuxer {
+    writer(Option<Box<dyn Write>>),
+    encoder(y4m::Encoder<Box<dyn Write>>),
 }
 
 impl Y4mMuxer {
     pub fn new(path: &str) -> Box<dyn Muxer> {
-        Box::new(Y4mMuxer {
-            writer: Some(match path {
-                "-" => Box::new(io::stdout()),
-                f => Box::new(File::create(&f).unwrap()),
-            }),
-            encoder: None,
-        })
+        Box::new(Y4mMuxer::writer(Some(match path {
+            "-" => Box::new(io::stdout()),
+            f => Box::new(File::create(&f).unwrap()),
+        })))
     }
 }
 
 impl Muxer for Y4mMuxer {
     fn write(&mut self, data: Data, bit_depth: u8, frame_rate: Rational) -> io::Result<()> {
-        if self.encoder.is_none() && self.writer.is_some() {
-            if let Data::RefFrame(f) = data {
-                let width = f.planes[0].cfg.width;
-                let height = f.planes[0].cfg.height;
-                let writer = self.writer.take().unwrap();
-                self.encoder = Some(
-                    y4m::EncoderBuilder::new(
-                        width,
-                        height,
-                        y4m::Ratio::new(frame_rate.num as usize, frame_rate.den as usize),
-                    )
-                    .write_header(writer)
-                    .map_err(|e| map_y4m_error(e))?,
-                );
+        if let Y4mMuxer::writer(writer) = self {
+            if let Some(writer) = writer.take() {
+                if let Data::RefFrame(f) = data {
+                    let width = f.planes[0].cfg.width;
+                    let height = f.planes[0].cfg.height;
+                    *self = Y4mMuxer::encoder(
+                        y4m::EncoderBuilder::new(
+                            width,
+                            height,
+                            y4m::Ratio::new(frame_rate.num as usize, frame_rate.den as usize),
+                        )
+                        .write_header(writer)
+                        .map_err(|e| map_y4m_error(e))?,
+                    );
+                }
             }
         }
 
-        if let (Data::RefFrame(f), Some(encoder)) = (data, &mut self.encoder) {
+        if let (Data::RefFrame(f), Y4mMuxer::encoder(encoder)) = (data, self) {
             let bytes_per_sample = if bit_depth > 8 { 2 } else { 1 };
             let pitch_y = f.planes[0].cfg.width * bytes_per_sample;
             let height = f.planes[0].cfg.height;
