@@ -171,7 +171,7 @@ fn main() -> std::io::Result<()> {
     let mut cli = parse_cli()?;
     let cfg = Config {
         threads: cli.threads,
-        ..Default::default()
+        enc: None,
     };
 
     let mut ctx = Context::new(&cfg);
@@ -203,7 +203,7 @@ fn main() -> std::io::Result<()> {
                             };
 
                             let start = Instant::now();
-                            let ret = ctx.decode(&mut pkt);
+                            let ret = ctx.push(&mut pkt);
                             let duration = start.elapsed();
                             clk_tot += duration.as_millis() as usize;
 

@@ -6,7 +6,6 @@ use std::{cmp, fmt, io};
 use num_derive::FromPrimitive;
 use num_traits::FromPrimitive;
 
-pub mod config;
 pub mod frame;
 
 use crate::com::*;
@@ -304,38 +303,97 @@ pub struct Point {
     pub y: u16,
 }
 
-#[derive(Debug, Clone, Copy)]
+// Due to the math in RCState::new() regarding the reservoir frame delay.
+pub const MAX_MAX_KEY_FRAME_INTERVAL: u64 = i32::max_value() as u64 / 3;
+
+#[derive(Clone, Copy, Debug, Default)]
+pub struct EncoderConfig {
+    // output size
+    // Width of the frames in pixels.
+    pub width: usize,
+    // Height of the frames in pixels.
+    pub height: usize,
+    // Video time base.
+    pub time_base: Rational,
+
+    // Bit depth.
+    pub bit_depth: usize,
+    // Chroma subsampling.
+    pub chroma_sampling: ChromaSampling,
+
+    // encoder configuration
+    // The *minimum* interval between two keyframes
+    pub min_key_frame_interval: u64,
+    // The *maximum* interval between two keyframes
+    pub max_key_frame_interval: u64, //iperiod
+
+    // The base quantizer to use.
+    pub qp: u8,
+    // The minimum allowed base quantizer to use in bitrate mode.
+    pub min_qp: u8,
+    // The maximum allowed base quantizer to use in bitrate mode.
+    pub max_qp: u8,
+    // The target bitrate for the bitrate mode.
+    pub bitrate: i32,
+
+    pub cb_qp_offset: i8,
+    pub cr_qp_offset: i8,
+    pub use_dqp: u8,
+    pub cu_qp_delta_area: u8,
+    pub max_b_frames: u8,
+    pub ref_pic_gap_length: u8,
+    pub closed_gop: bool,
+    pub level: u8,
+    pub enable_cip: bool,
+    pub disable_dbf: bool,
+    pub num_slices_in_pic: usize,
+    pub inter_slice_type: u8,
+    // Settings which affect the enconding speed vs. quality trade-off.
+    //pub speed_settings: SpeedSettings,
+    // Rate control configuration
+    // rate_control: RateControlConfig,
+}
+
+/// Contains the encoder configuration.
+#[derive(Clone, Copy, Debug, Default)]
 pub struct Config {
+    /// The number of threads in the threadpool.
     pub threads: usize,
+
+    /// Encoder configuration (optional)
+    pub enc: Option<EncoderConfig>,
 }
 
-impl Default for Config {
-    fn default() -> Self {
-        Config { threads: 0 }
-    }
-}
+pub struct DecoderContext(EvcdCtx);
+pub struct EncoderContext;
 
-pub struct Context {
-    pub(crate) frame: Option<Frame<pel>>,
-    pub(crate) packet: Option<Packet>,
-
-    evcd_ctx: EvcdCtx,
+pub enum Context {
+    Decoder(DecoderContext),
+    Encoder(EncoderContext),
 }
 
 impl Context {
     pub fn new(cfg: &Config) -> Self {
-        Context {
-            frame: None,
-            packet: None,
-            evcd_ctx: EvcdCtx::new(),
+        if cfg.enc.is_none() {
+            Context::Decoder(DecoderContext(EvcdCtx::new()))
+        } else {
+            Context::Encoder(EncoderContext)
         }
     }
 
-    pub fn decode(&mut self, pkt: &mut Packet) -> Result<EvcdStat, EvcError> {
-        self.evcd_ctx.decode_nalu(pkt)
+    pub fn push(&mut self, pkt: &mut Packet) -> Result<EvcdStat, EvcError> {
+        if let Context::Decoder(ctx) = self {
+            ctx.0.decode_nalu(pkt)
+        } else {
+            Err(EvcError::EVC_ERR_UNSUPPORTED)
+        }
     }
 
     pub fn pull(&mut self) -> Result<Rc<RefCell<Frame<pel>>>, EvcError> {
-        self.evcd_ctx.pull_frm()
+        if let Context::Decoder(ctx) = self {
+            ctx.0.pull_frm()
+        } else {
+            Err(EvcError::EVC_ERR_UNSUPPORTED)
+        }
     }
 }

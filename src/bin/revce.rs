@@ -10,17 +10,12 @@ use std::io::prelude::*;
 use std::time::Instant;
 
 use io::*;
-use revc::api::config::encoder::*;
 use revc::api::*;
 
-pub struct EncoderIO {
+struct CLISettings {
     pub input: Box<dyn demuxer::Demuxer>,
     pub output: Box<dyn muxer::Muxer>,
     pub rec: Option<Box<dyn muxer::Muxer>>,
-}
-
-struct CLISettings {
-    pub io: EncoderIO,
     pub enc: EncoderConfig,
     pub frames: usize,
     pub skip: usize,
@@ -390,14 +385,10 @@ fn parse_cli() -> std::io::Result<CLISettings> {
 
     let enc = parse_config(&matches)?;
 
-    let io = EncoderIO {
+    Ok(CLISettings {
         input: demuxer::new(matches.value_of("INPUT").unwrap())?,
         output: muxer::new(matches.value_of("OUTPUT").unwrap())?,
         rec,
-    };
-
-    Ok(CLISettings {
-        io,
         enc,
         frames: matches.value_of("FRAMES").unwrap().parse().unwrap(),
         skip: matches.value_of("SKIP").unwrap().parse().unwrap(),
