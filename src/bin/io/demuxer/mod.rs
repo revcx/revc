@@ -19,6 +19,7 @@ pub fn new(filename: &str) -> io::Result<Box<dyn Demuxer>> {
         if ext == "y4m" {
             Ok(Y4mDemuxer::new(filename)?)
         } else {
+            // .evc
             Ok(NaluDemuxer::new(filename)?)
         }
     } else {

@@ -8,6 +8,7 @@ use std::path::Path;
 use self::y4m::Y4mMuxer;
 use self::yuv::YuvMuxer;
 use super::Data;
+use crate::io::muxer::nalu::NaluMuxer;
 use revc::api::Rational;
 
 pub trait Muxer {
@@ -18,8 +19,11 @@ pub fn new(filename: &str) -> io::Result<Box<dyn Muxer>> {
     if let Some(ext) = Path::new(filename).extension() {
         if ext == "y4m" {
             Ok(Y4mMuxer::new(filename))
-        } else {
+        } else if ext == "yuv" {
             Ok(YuvMuxer::new(filename))
+        } else {
+            // .evc
+            Ok(NaluMuxer::new(filename))
         }
     } else {
         Err(io::Error::new(
