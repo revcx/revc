@@ -1,5 +1,5 @@
-use super::Data;
 use super::Demuxer;
+use crate::{map_y4m_error, Data};
 
 use std::fs::File;
 use std::io;
@@ -61,20 +61,5 @@ fn map_y4m_color_space(color_space: y4m::Colorspace) -> ChromaSampling {
         C420 | C420p10 | C420p12 => Cs420,
         C422 | C422p10 | C422p12 => Cs422,
         C444 | C444p10 | C444p12 => Cs444,
-    }
-}
-
-fn map_y4m_error(e: y4m::Error) -> io::Error {
-    match e {
-        y4m::Error::EOF => io::Error::new(io::ErrorKind::UnexpectedEof, "y4m: End of File"),
-        y4m::Error::BadInput => io::Error::new(io::ErrorKind::InvalidInput, "y4m: Bad Input"),
-        y4m::Error::UnknownColorspace => {
-            io::Error::new(io::ErrorKind::Other, "y4m: Unknown Color Space")
-        }
-        y4m::Error::ParseError(_) => io::Error::new(io::ErrorKind::Other, "y4m: Parse Error"),
-        y4m::Error::IoError(e) => e,
-        // Note that this error code has nothing to do with the system running out of memory,
-        // it means the y4m decoder has exceeded its memory allocation limit.
-        y4m::Error::OutOfMemory => io::Error::new(io::ErrorKind::Other, "y4m: Out of Memory"),
     }
 }

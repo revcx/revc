@@ -253,7 +253,8 @@ fn main() -> std::io::Result<()> {
                     w = f.planes[0].cfg.width;
                     h = f.planes[0].cfg.height;
                     pic_cnt += 1;
-                    cli.muxer.write(Data::RefFrame(&*f), cli.bitdepth)?
+                    cli.muxer
+                        .write(Data::RefFrame(&*f), cli.bitdepth, Rational::new(30, 1))?
                 }
                 Err(err) => {
                     if err == EvcError::EVC_OK_FRM_DELAYED {

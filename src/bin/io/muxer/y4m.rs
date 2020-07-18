@@ -1,6 +1,7 @@
 use super::Muxer;
-use crate::{Data, IFVCA_CLIP};
+use crate::{map_y4m_error, Data, IFVCA_CLIP};
 
+use std::cmp::*;
 use std::fs::File;
 use std::io;
 use std::io::Write;
@@ -9,25 +10,44 @@ use std::slice;
 use revc::api::frame::*;
 use revc::api::Rational;
 
-pub struct YuvMuxer {
-    writer: Box<dyn Write>,
+pub struct Y4mMuxer {
+    writer: Option<Box<dyn Write>>,
+    encoder: Option<y4m::Encoder<Box<dyn Write>>>,
 }
 
-impl YuvMuxer {
+impl Y4mMuxer {
     pub fn new(path: &str) -> Box<dyn Muxer> {
-        Box::new(YuvMuxer {
-            writer: match path {
+        Box::new(Y4mMuxer {
+            writer: Some(match path {
                 "-" => Box::new(io::stdout()),
                 f => Box::new(File::create(&f).unwrap()),
-            },
+            }),
+            encoder: None,
         })
     }
 }
 
-impl Muxer for YuvMuxer {
-    fn write(&mut self, data: Data, bitdepth: u8, frame_rate: Rational) -> io::Result<()> {
-        if let Data::RefFrame(f) = data {
-            let bytes_per_sample = if bitdepth > 8 { 2 } else { 1 };
+impl Muxer for Y4mMuxer {
+    fn write(&mut self, data: Data, bit_depth: u8, frame_rate: Rational) -> io::Result<()> {
+        if self.encoder.is_none() && self.writer.is_some() {
+            if let Data::RefFrame(f) = data {
+                let width = f.planes[0].cfg.width;
+                let height = f.planes[0].cfg.height;
+                let writer = self.writer.take().unwrap();
+                self.encoder = Some(
+                    y4m::EncoderBuilder::new(
+                        width,
+                        height,
+                        y4m::Ratio::new(frame_rate.num as usize, frame_rate.den as usize),
+                    )
+                    .write_header(writer)
+                    .map_err(|e| map_y4m_error(e))?,
+                );
+            }
+        }
+
+        if let (Data::RefFrame(f), Some(encoder)) = (data, &mut self.encoder) {
+            let bytes_per_sample = if bit_depth > 8 { 2 } else { 1 };
             let pitch_y = f.planes[0].cfg.width * bytes_per_sample;
             let height = f.planes[0].cfg.height;
             let chroma_sampling_period = f.chroma_sampling.sampling_period();
@@ -53,7 +73,7 @@ impl Muxer for YuvMuxer {
                 .chunks(stride_y)
                 .zip(rec_y.chunks_mut(pitch_y))
             {
-                if bitdepth > 8 {
+                if bit_depth > 8 {
                     unsafe {
                         line_out.copy_from_slice(slice::from_raw_parts::<u8>(
                             line.as_ptr() as *const u8,
@@ -74,7 +94,7 @@ impl Muxer for YuvMuxer {
                 .chunks(stride_u)
                 .zip(rec_u.chunks_mut(pitch_uv))
             {
-                if bitdepth > 8 {
+                if bit_depth > 8 {
                     unsafe {
                         line_out.copy_from_slice(slice::from_raw_parts::<u8>(
                             line.as_ptr() as *const u8,
@@ -95,7 +115,7 @@ impl Muxer for YuvMuxer {
                 .chunks(stride_v)
                 .zip(rec_v.chunks_mut(pitch_uv))
             {
-                if bitdepth > 8 {
+                if bit_depth > 8 {
                     unsafe {
                         line_out.copy_from_slice(slice::from_raw_parts::<u8>(
                             line.as_ptr() as *const u8,
@@ -112,9 +132,10 @@ impl Muxer for YuvMuxer {
                 }
             }
 
-            self.writer.write_all(&rec_y)?;
-            self.writer.write_all(&rec_u)?;
-            self.writer.write_all(&rec_v)?;
+            let rec_frame = y4m::Frame::new([&rec_y, &rec_u, &rec_v], None);
+            encoder
+                .write_frame(&rec_frame)
+                .map_err(|e| map_y4m_error(e))?;
 
             Ok(())
         } else {
