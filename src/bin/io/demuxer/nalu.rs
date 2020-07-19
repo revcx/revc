@@ -1,10 +1,8 @@
-use super::Data;
-use super::Demuxer;
-
 use std::fs::File;
 use std::io;
 use std::io::Read;
 
+use super::*;
 use revc::api::*;
 
 pub struct NaluDemuxer {
@@ -36,5 +34,9 @@ impl Demuxer for NaluDemuxer {
             data: Some(data),
             pts: 0,
         }))
+    }
+
+    fn info(&self) -> Option<VideoInfo> {
+        None
     }
 }

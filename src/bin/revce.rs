@@ -1,6 +1,9 @@
 #![allow(warnings)]
 #![allow(dead_code)]
 
+#[macro_use]
+extern crate log;
+
 mod io;
 
 use clap::{App, AppSettings, Arg, ArgMatches};
@@ -13,15 +16,15 @@ use io::*;
 use revc::api::*;
 
 struct CLISettings {
-    pub input: Box<dyn demuxer::Demuxer>,
-    pub output: Box<dyn muxer::Muxer>,
-    pub rec: Option<Box<dyn muxer::Muxer>>,
-    pub enc: EncoderConfig,
-    pub frames: usize,
-    pub skip: usize,
-    pub verbose: bool,
-    pub threads: usize,
-    pub bitdepth: u8,
+    input: Box<dyn demuxer::Demuxer>,
+    output: Box<dyn muxer::Muxer>,
+    rec: Option<Box<dyn muxer::Muxer>>,
+    enc: EncoderConfig,
+    frames: usize,
+    skip: usize,
+    verbose: bool,
+    threads: usize,
+    bitdepth: u8,
 }
 
 pub trait MatchGet {
@@ -59,11 +62,16 @@ fn parse_config(matches: &ArgMatches<'_>) -> std::io::Result<EncoderConfig> {
         panic!("Quantizer must be between 0-51");
     }
 
-    let max_interval: u64 = matches
+    let mut max_interval: u64 = matches
         .value_of("KEYFRAME_INTERVAL")
         .unwrap()
         .parse()
         .unwrap();
+    max_interval = if max_interval == 0 {
+        MAX_MAX_KEY_FRAME_INTERVAL
+    } else {
+        max_interval
+    };
     let mut min_interval: u64 = matches
         .value_of("MIN_KEYFRAME_INTERVAL")
         .unwrap()
@@ -92,11 +100,7 @@ fn parse_config(matches: &ArgMatches<'_>) -> std::io::Result<EncoderConfig> {
     cfg.chroma_sampling = ChromaSampling::Cs420;
     cfg.min_key_frame_interval = min_interval;
     // Map an input value of 0 to an infinite interval
-    cfg.max_key_frame_interval = if max_interval == 0 {
-        MAX_MAX_KEY_FRAME_INTERVAL
-    } else {
-        max_interval
-    };
+    cfg.max_key_frame_interval = max_interval;
 
     cfg.qp = quantizer as u8;
     cfg.max_qp = matches.value_of("MAXQP").unwrap_or("0").parse().unwrap();
@@ -292,7 +296,8 @@ fn parse_cli() -> std::io::Result<CLISettings> {
                 .help("Maximum interval between keyframes")
                 .short("p")
                 .long("keyint")
-                .takes_value(true),
+                .takes_value(true)
+                .default_value("0"),
         )
         .arg(
             Arg::with_name("MAX_B_FRAMES")
@@ -398,7 +403,7 @@ fn parse_cli() -> std::io::Result<CLISettings> {
             .map(|v| v.parse().expect("Threads must be an integer"))
             .unwrap(),
         bitdepth: matches
-            .value_of("BITDEPTH")
+            .value_of("BIT_DEPTH")
             .map(|v| v.parse().expect("Bitdepth must be an integer"))
             .unwrap(),
     })
@@ -413,5 +418,37 @@ enum EvceState {
 
 fn main() -> std::io::Result<()> {
     let mut cli = parse_cli()?;
+
+    if let Some(video_info) = cli.input.info() {
+        cli.enc.width = video_info.width;
+        cli.enc.height = video_info.height;
+        cli.enc.bit_depth = video_info.bit_depth;
+        cli.enc.chroma_sampling = video_info.chroma_sampling;
+        cli.enc.time_base = video_info.time_base;
+    }
+
+    eprint!("Encoding settings: {:?}", cli.enc);
+
+    let cfg = Config {
+        threads: cli.threads,
+        enc: Some(cli.enc),
+    };
+
+    for _ in 0..cli.skip {
+        match cli.input.read() {
+            Ok(f) => f,
+            Err(_) => {
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::InvalidData,
+                    "Skipped more frames than in the input",
+                ))
+            }
+        };
+    }
+
+    let mut ctx = Context::new(&cfg);
+
+    let mut state = EvceState::STATE_ENCODING;
+
     Ok(())
 }

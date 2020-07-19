@@ -10,12 +10,12 @@ use revc::api::*;
 use std::time::Instant;
 
 struct CLISettings {
-    pub demuxer: Box<dyn demuxer::Demuxer>,
-    pub muxer: Box<dyn muxer::Muxer>,
-    pub frames: usize,
-    pub verbose: bool,
-    pub threads: usize,
-    pub bitdepth: u8,
+    demuxer: Box<dyn demuxer::Demuxer>,
+    muxer: Box<dyn muxer::Muxer>,
+    frames: usize,
+    verbose: bool,
+    threads: usize,
+    bitdepth: u8,
 }
 
 fn parse_cli() -> std::io::Result<CLISettings> {
@@ -101,13 +101,6 @@ fn parse_cli() -> std::io::Result<CLISettings> {
     })
 }
 
-#[derive(PartialEq)]
-enum EvcdState {
-    STATE_DECODING,
-    STATE_PULLING,
-    STATE_BUMPING,
-}
-
 fn print_stat(stat: &EvcdStat, bs_cnt: usize) {
     eprint!("[{:4}] NALU --> ", bs_cnt);
     if stat.nalu_type < NaluType::EVC_SPS_NUT {
@@ -167,6 +160,13 @@ fn print_summary(w: usize, h: usize, bs_cnt: usize, pic_cnt: usize, clk_tot: usi
     );
 }
 
+#[derive(PartialEq)]
+enum EvcdState {
+    STATE_DECODING,
+    STATE_PULLING,
+    STATE_BUMPING,
+}
+
 fn main() -> std::io::Result<()> {
     let mut cli = parse_cli()?;
     let cfg = Config {
@@ -185,7 +185,7 @@ fn main() -> std::io::Result<()> {
     let mut state = EvcdState::STATE_DECODING;
 
     loop {
-        if (state == EvcdState::STATE_DECODING) {
+        if state == EvcdState::STATE_DECODING {
             if cli.frames != 0 && pic_cnt == cli.frames {
                 if cli.verbose {
                     eprint!("bumping process starting...\n");
@@ -273,7 +273,7 @@ fn main() -> std::io::Result<()> {
             }
 
             // after pulling, reset state to decoding mode
-            if (state == EvcdState::STATE_PULLING) {
+            if state == EvcdState::STATE_PULLING {
                 state = EvcdState::STATE_DECODING;
             }
         }

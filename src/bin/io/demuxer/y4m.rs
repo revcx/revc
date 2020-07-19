@@ -1,4 +1,4 @@
-use super::Demuxer;
+use super::{Demuxer, VideoInfo};
 use crate::{map_y4m_error, Data};
 
 use std::fs::File;
@@ -48,6 +48,24 @@ impl Demuxer for Y4mDemuxer {
             .map_err(|e| map_y4m_error(e))?;
 
         Ok(Data::Frame(frame))
+    }
+
+    fn info(&self) -> Option<VideoInfo> {
+        let width = self.reader.get_width();
+        let height = self.reader.get_height();
+        let color_space = self.reader.get_colorspace();
+        let bit_depth = color_space.get_bit_depth();
+        let chroma_sampling = map_y4m_color_space(color_space);
+        let framerate = self.reader.get_framerate();
+        let time_base = Rational::new(framerate.den as u64, framerate.num as u64);
+
+        Some(VideoInfo {
+            width,
+            height,
+            bit_depth,
+            chroma_sampling,
+            time_base,
+        })
     }
 }
 

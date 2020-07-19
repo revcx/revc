@@ -10,3 +10,6 @@ do
 ./evca_encoder.exe -i foreman_qcif8.yuv -w 176 -h 144 -z 30 -f 8 -q ${QP} -o ./data/test_ld_b_nodb_q${QP}.evc --config ./cfg/encoder_lowdelay_baseline_nodb.cfg
 ./evca_encoder.exe -i foreman_qcif8.yuv -w 176 -h 144 -z 30 -f 8 -q ${QP} -o ./data/test_ra_b_nodb_q${QP}.evc --config ./cfg/encoder_randomaccess_baseline_nodb.cfg
 done
+
+
+# ./ffmpeg.exe -i foreman_qcif.y4m -vframes 8 -f yuv4mpegpipe foreman_qcif8.y4m
