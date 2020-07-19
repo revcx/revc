@@ -1,0 +1,35 @@
+language: rust
+dist: bionic
+env:
+  - RUST_BACKTRACE=1
+before_install:
+  - export DEPS_DIR="$TRAVIS_HOME/.local"
+  - export ARCH="`uname -m`"
+  - mkdir -p "$DEPS_DIR/bin"
+  - export PATH="$PATH:$DEPS_DIR/bin"
+  - source "$TRAVIS_BUILD_DIR/.travis/install-sccache.sh"
+  - export SCCACHE_CACHE_SIZE=200M
+  - export SCCACHE_DIR="$TRAVIS_HOME/.cache/sccache"
+  - cd "$TRAVIS_BUILD_DIR"
+
+cache:
+  directories:
+    - $TRAVIS_HOME/.cache/sccache
+    - $TRAVIS_HOME/.local
+
+after_script:
+  - sccache -s
+
+jobs:
+  include:
+    - name: "Build & Coveralls"
+      script:
+        - cargo install cargo-kcov
+        - kcov --version
+        - RUSTFLAGS="-C link-dead-code" cargo build --verbose
+    # name: "Doc & Clippy (linter): verifying code quality"
+    # script:
+    #  - cargo doc --verbose --no-deps
+    #  - rustup component add clippy
+    #  - cargo clippy --version
+    #  - cargo clippy -- -D warnings -A clippy::cast_lossless -A clippy::cast_ptr_alignment -A clippy::cognitive_complexity -A clippy::needless_range_loop -A clippy::too_many_arguments -A clippy::verbose_bit_mask --verbose

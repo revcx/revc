@@ -1,5 +1,6 @@
-# revc
-Rust Essential Video Coding (MPEG-5 EVC)
+# revc [![Travis Build Status](https://travis-ci.org/rainliu/revc.svg?branch=master)](https://travis-ci.org/revcx/revc)
+
+Rust Essential Video Coding (MPEG-5 EVC baseline)
 
 # Roadmap
 
