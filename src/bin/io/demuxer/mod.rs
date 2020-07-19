@@ -1,5 +1,6 @@
 mod nalu;
 mod y4m;
+mod yuv;
 
 use std::fs::File;
 use std::io;
@@ -9,6 +10,7 @@ use std::path::Path;
 use self::nalu::NaluDemuxer;
 use self::y4m::Y4mDemuxer;
 use super::Data;
+use crate::io::demuxer::yuv::YuvDemuxer;
 use revc::api::*;
 
 #[derive(Debug, Clone, Copy)]
@@ -36,10 +38,12 @@ pub trait Demuxer {
     fn info(&self) -> Option<VideoInfo>;
 }
 
-pub fn new(filename: &str) -> io::Result<Box<dyn Demuxer>> {
+pub fn new(filename: &str, info: Option<VideoInfo>) -> io::Result<Box<dyn Demuxer>> {
     if let Some(ext) = Path::new(filename).extension() {
         if ext == "y4m" {
             Ok(Y4mDemuxer::new(filename)?)
+        } else if ext == "yuv" {
+            Ok(YuvDemuxer::new(filename, info)?)
         } else {
             // .evc
             Ok(NaluDemuxer::new(filename)?)

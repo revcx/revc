@@ -86,7 +86,7 @@ fn parse_cli() -> std::io::Result<CLISettings> {
     }
 
     Ok(CLISettings {
-        demuxer: demuxer::new(matches.value_of("INPUT").unwrap())?,
+        demuxer: demuxer::new(matches.value_of("INPUT").unwrap(), None)?,
         muxer: muxer::new(matches.value_of("OUTPUT").unwrap())?,
         frames: matches.value_of("FRAMES").unwrap().parse().unwrap(),
         verbose: matches.is_present("VERBOSE"),

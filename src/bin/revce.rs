@@ -12,6 +12,7 @@ use std::fs::File;
 use std::io::prelude::*;
 use std::time::Instant;
 
+use io::demuxer::VideoInfo;
 use io::*;
 use revc::api::*;
 
@@ -389,9 +390,16 @@ fn parse_cli() -> std::io::Result<CLISettings> {
     };
 
     let enc = parse_config(&matches)?;
+    let info = Some(VideoInfo {
+        width: enc.width,
+        height: enc.height,
+        bit_depth: enc.bit_depth,
+        chroma_sampling: enc.chroma_sampling,
+        time_base: enc.time_base,
+    });
 
     Ok(CLISettings {
-        input: demuxer::new(matches.value_of("INPUT").unwrap())?,
+        input: demuxer::new(matches.value_of("INPUT").unwrap(), info)?,
         output: muxer::new(matches.value_of("OUTPUT").unwrap())?,
         rec,
         enc,
