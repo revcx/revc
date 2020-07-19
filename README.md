@@ -1,4 +1,4 @@
-# revc [![Travis Build Status](https://travis-ci.org/revcx/revc.svg?branch=master)](https://travis-ci.org/revcx/revc)
+# revc [![Travis Build Status](https://travis-ci.org/revcx/revc.svg?branch=master)](https://travis-ci.org/revcx/revc) [![Actions Status](https://github.com/revcx/revc/workflows/revc/badge.svg)](https://github.com/revcx/revc/actions) 
 
 Rust Essential Video Coding (MPEG-5 EVC baseline)
 
