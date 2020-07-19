@@ -18,16 +18,11 @@ before_install:
   - export RUSTC_WRAPPER=sccache
   - export SCCACHE_CACHE_SIZE=500M
   - export SCCACHE_DIR=~/.cache/sccache
-  - curl -L https://download.videolan.org/contrib/nasm/nasm-2.14.tar.gz | tar xvz
-  - cd nasm-2.14
+  - curl -L https://www.nasm.us/pub/nasm/releasebuilds/2.15.03/nasm-2.15.03.tar.gz | tar xvz
+  - cd nasm-2.15.03
   - ./configure CC='sccache gcc' && make -j2 && sudo make install
   - nasm --version
   - cd ..
-  - curl -L https://github.com/SimonKagstrom/kcov/archive/v36.tar.gz | tar xvz
-  - cd kcov-36
-  - mkdir .build && cd .build
-  - cmake -GNinja -DCMAKE_C_COMPILER_LAUNCHER=sccache -DCMAKE_CXX_COMPILER_LAUNCHER=sccache .. && ninja && sudo ninja install
-  - cd ../..
 
 cache:
   directories:
@@ -38,14 +33,6 @@ after_script:
 
 jobs:
   include:
-    - name: "Build & Coveralls"
+    - name: "Build"
       script:
-        - cargo install cargo-kcov
-        - kcov --version
-        - RUSTFLAGS="-C link-dead-code" cargo build --verbose
-    # name: "Doc & Clippy (linter): verifying code quality"
-    # script:
-    #  - cargo doc --verbose --no-deps
-    #  - rustup component add clippy
-    #  - cargo clippy --version
-    #  - cargo clippy -- -D warnings -A clippy::cast_lossless -A clippy::cast_ptr_alignment -A clippy::cognitive_complexity -A clippy::needless_range_loop -A clippy::too_many_arguments -A clippy::verbose_bit_mask --verbose
+        - cargo build
