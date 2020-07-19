@@ -1,15 +1,15 @@
 use super::api::frame::*;
 use super::api::*;
-use super::com::df::*;
-use super::com::ipred::*;
-use super::com::itdq::*;
-use super::com::mc::*;
-use super::com::picman::*;
-use super::com::recon::*;
-use super::com::tbl::*;
-use super::com::tracer::*;
-use super::com::util::*;
-use super::com::*;
+use super::def::*;
+use super::df::*;
+use super::ipred::*;
+use super::itdq::*;
+use super::mc::*;
+use super::picman::*;
+use super::recon::*;
+use super::tbl::*;
+use super::tracer::*;
+use super::util::*;
 
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -24,47 +24,6 @@ use sbac::*;
 
 /* evc decoder magic code */
 pub(crate) const EVCD_MAGIC_CODE: u32 = 0x45565944; /* EVYD */
-
-#[derive(Clone)]
-pub(crate) struct LcuSplitMode {
-    pub(crate) data:
-        [[[SplitMode; MAX_CU_CNT_IN_LCU]; BlockShape::NUM_BLOCK_SHAPE as usize]; NUM_CU_DEPTH],
-}
-
-impl Default for LcuSplitMode {
-    fn default() -> Self {
-        LcuSplitMode {
-            data: [[[SplitMode::NO_SPLIT; MAX_CU_CNT_IN_LCU]; BlockShape::NUM_BLOCK_SHAPE as usize];
-                NUM_CU_DEPTH],
-        }
-    }
-}
-
-#[derive(Clone)]
-pub(crate) struct CUBuffer<T: Default + Copy> {
-    pub(crate) data: [[T; MAX_CU_DIM]; N_C],
-}
-
-impl<T: Default + Copy> Default for CUBuffer<T> {
-    fn default() -> Self {
-        CUBuffer {
-            data: [[T::default(); MAX_CU_DIM]; N_C],
-        }
-    }
-}
-
-#[derive(Clone)]
-pub(crate) struct NBBuffer<T: Default + Copy> {
-    pub(crate) data: [[[T; MAX_CU_SIZE * 3]; N_REF]; N_C],
-}
-
-impl<T: Default + Copy> Default for NBBuffer<T> {
-    fn default() -> Self {
-        NBBuffer {
-            data: [[[T::default(); MAX_CU_SIZE * 3]; N_REF]; N_C],
-        }
-    }
-}
 
 /*****************************************************************************
  * CORE information used for decoding process.

@@ -1,8 +1,7 @@
-use crate::com::plane::*;
-use crate::com::region::*;
-use crate::com::*;
-
 use super::*;
+use crate::def::*;
+use crate::plane::*;
+use crate::region::*;
 
 use std::fmt;
 

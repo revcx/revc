@@ -1,8 +1,7 @@
+use super::def::*;
 use super::picman::*;
 use super::region::*;
 use super::util::*;
-use super::*;
-use crate::dec::CUBuffer; //TODO: move CUBuffer to com
 
 use std::cmp::max;
 
@@ -615,7 +614,7 @@ pub(crate) fn evc_mc(
     refi: &[i8],
     mv: &[[i16; MV_D]; REFP_NUM],
     refp: &Vec<Vec<EvcRefP>>,
-    pred: &mut [CUBuffer<pel>; 2], //TODO: move CUBuffer to com
+    pred: &mut [CUBuffer<pel>; 2],
     poc_c: i32,
 ) {
     let mut bidx = 0;

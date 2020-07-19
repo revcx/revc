@@ -8,6 +8,18 @@ extern crate num_derive;
 extern crate lazy_static;
 
 pub mod api;
-pub mod com;
 mod dec;
 mod enc;
+
+mod def;
+mod df;
+mod ipred;
+mod itdq;
+mod mc;
+mod picman;
+mod plane;
+mod recon;
+mod region;
+mod tbl;
+mod tracer;
+mod util;

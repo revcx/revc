@@ -1,7 +1,7 @@
 use log::*;
 
 use crate::api::EvcError;
-use crate::com::tracer::*;
+use crate::tracer::*;
 
 /*
  * bitstream structure for decoder.

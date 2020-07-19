@@ -1,15 +1,3 @@
-pub(crate) mod df;
-pub(crate) mod ipred;
-pub(crate) mod itdq;
-pub(crate) mod mc;
-pub(crate) mod picman;
-pub(crate) mod plane;
-pub(crate) mod recon;
-pub(crate) mod region;
-pub(crate) mod tbl;
-pub(crate) mod tracer;
-pub(crate) mod util;
-
 use crate::api::*;
 
 /*****************************************************************************
@@ -843,4 +831,45 @@ pub(crate) struct TREE_CONS {
 pub(crate) struct TREE_CONS_NEW {
     pub(crate) tree_type: TREE_TYPE,
     pub(crate) mode_cons: MODE_CONS,
+}
+
+#[derive(Clone)]
+pub(crate) struct LcuSplitMode {
+    pub(crate) data:
+        [[[SplitMode; MAX_CU_CNT_IN_LCU]; BlockShape::NUM_BLOCK_SHAPE as usize]; NUM_CU_DEPTH],
+}
+
+impl Default for LcuSplitMode {
+    fn default() -> Self {
+        LcuSplitMode {
+            data: [[[SplitMode::NO_SPLIT; MAX_CU_CNT_IN_LCU]; BlockShape::NUM_BLOCK_SHAPE as usize];
+                NUM_CU_DEPTH],
+        }
+    }
+}
+
+#[derive(Clone)]
+pub(crate) struct CUBuffer<T: Default + Copy> {
+    pub(crate) data: [[T; MAX_CU_DIM]; N_C],
+}
+
+impl<T: Default + Copy> Default for CUBuffer<T> {
+    fn default() -> Self {
+        CUBuffer {
+            data: [[T::default(); MAX_CU_DIM]; N_C],
+        }
+    }
+}
+
+#[derive(Clone)]
+pub(crate) struct NBBuffer<T: Default + Copy> {
+    pub(crate) data: [[[T; MAX_CU_SIZE * 3]; N_REF]; N_C],
+}
+
+impl<T: Default + Copy> Default for NBBuffer<T> {
+    fn default() -> Self {
+        NBBuffer {
+            data: [[[T::default(); MAX_CU_SIZE * 3]; N_REF]; N_C],
+        }
+    }
 }

@@ -1,5 +1,7 @@
 #!/bin/sh
 
+#./run_dec.sh 1>tmp/result.txt 2>&1
+
 for QP in 22 27 32 37
 do
 

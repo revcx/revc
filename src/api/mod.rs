@@ -8,8 +8,8 @@ use num_traits::FromPrimitive;
 
 pub mod frame;
 
-use crate::com::*;
 use crate::dec::*;
+use crate::def::*;
 use frame::*;
 
 /*****************************************************************************

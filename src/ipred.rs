@@ -1,6 +1,6 @@
+use super::def::*;
 use super::region::*;
 use super::tbl::*;
-use super::*;
 
 pub(crate) fn evc_get_mpm_b(
     x_scu: u16,

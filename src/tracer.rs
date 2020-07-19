@@ -2,8 +2,8 @@ use std::fmt::Display;
 use std::fs::OpenOptions;
 use std::io::Write;
 
+use super::def::*;
 use super::region::*;
-use super::*;
 
 pub(crate) type Tracer = (Box<dyn Write>, isize);
 

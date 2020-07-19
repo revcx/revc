@@ -1,7 +1,7 @@
+use super::def::*;
 use super::tbl::*;
 use super::tracer::*;
 use super::util::*;
-use super::*;
 
 use std::ops::{Add, Sub};
 

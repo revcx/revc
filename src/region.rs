@@ -1,6 +1,6 @@
+use super::api::frame::*;
+use super::def::*;
 use super::plane::*;
-use super::*;
-use crate::api::frame::*;
 
 use std::marker::PhantomData;
 use std::ops::{Index, IndexMut};

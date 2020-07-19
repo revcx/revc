@@ -1,7 +1,7 @@
+use super::def::*;
 use super::picman::*;
 use super::tbl::*;
-use super::*;
-use crate::dec::LcuSplitMode;
+use crate::api::*;
 
 use std::cmp::*;
 use std::ops::Neg;

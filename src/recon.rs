@@ -1,8 +1,8 @@
+use super::def::*;
 use super::plane::*;
 use super::region::*;
 use super::tracer::*;
 use super::util::*;
-use super::*;
 
 fn evc_recon(
     coef: &[i16],

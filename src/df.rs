@@ -1,9 +1,9 @@
+use super::def::*;
 use super::picman::*;
+use super::region::PlaneRegionMut;
 use super::tbl::*;
 use super::tracer::*;
 use super::util::*;
-use super::*;
-use crate::com::region::PlaneRegionMut;
 
 use std::cmp::*;
 

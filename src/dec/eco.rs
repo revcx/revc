@@ -1,12 +1,11 @@
 use super::bsr::*;
 use super::sbac::EvcdSbac;
 use super::{EvcdCore, EvcdCtx};
-
 use crate::api::{EvcError, NaluType, SliceType};
-use crate::com::tbl::*;
-use crate::com::tracer::*;
-use crate::com::util::*;
-use crate::com::*;
+use crate::def::*;
+use crate::tbl::*;
+use crate::tracer::*;
+use crate::util::*;
 
 use log::*;
 
@@ -291,7 +290,7 @@ pub(crate) fn evcd_eco_pred_mode(
     tree_cons: &TREE_CONS,
 ) -> Result<PredMode, EvcError> {
     let mut pred_mode_flag = false;
-    let pred_mode_constraint = tree_cons.mode_cons; //TODO: Tim changed place
+    let pred_mode_constraint = tree_cons.mode_cons;
 
     if pred_mode_constraint == MODE_CONS::eAll {
         let ctx_flag = ctx_flags[CtxNevIdx::CNID_PRED_MODE as usize] as usize;
