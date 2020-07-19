@@ -3,19 +3,31 @@ dist: bionic
 env:
   - RUST_BACKTRACE=1
 before_install:
-  - export DEPS_DIR="$TRAVIS_HOME/.local"
-  - export ARCH="`uname -m`"
-  - mkdir -p "$DEPS_DIR/bin"
-  - export PATH="$PATH:$DEPS_DIR/bin"
-  - source "$TRAVIS_BUILD_DIR/.travis/install-sccache.sh"
-  - export SCCACHE_CACHE_SIZE=200M
-  - export SCCACHE_DIR="$TRAVIS_HOME/.cache/sccache"
-  - cd "$TRAVIS_BUILD_DIR"
+  - wget -O cmake.sh https://cmake.org/files/v3.13/cmake-3.13.3-Linux-x86_64.sh
+  - sudo sh cmake.sh --skip-license --exclude-subdir --prefix=/usr
+  - sudo rm -fR /usr/local/cmake*
+  - hash -r
+  - which cmake
+  - cmake --version
+  - curl -L https://github.com/mozilla/sccache/releases/download/0.2.8/sccache-0.2.8-x86_64-unknown-linux-musl.tar.gz | tar xvz
+  - export PATH=$PATH:`pwd`/sccache-0.2.8-x86_64-unknown-linux-musl
+  - export RUSTC_WRAPPER=sccache
+  - export SCCACHE_CACHE_SIZE=500M
+  - export SCCACHE_DIR=~/.cache/sccache
+  - curl -L https://download.videolan.org/contrib/nasm/nasm-2.14.tar.gz | tar xvz
+  - cd nasm-2.14
+  - ./configure CC='sccache gcc' && make -j2 && sudo make install
+  - nasm --version
+  - cd ..
+  - curl -L https://github.com/SimonKagstrom/kcov/archive/v36.tar.gz | tar xvz
+  - cd kcov-36
+  - mkdir .build && cd .build
+  - cmake -GNinja -DCMAKE_C_COMPILER_LAUNCHER=sccache -DCMAKE_CXX_COMPILER_LAUNCHER=sccache .. && ninja && sudo ninja install
+  - cd ../..
 
 cache:
   directories:
-    - $TRAVIS_HOME/.cache/sccache
-    - $TRAVIS_HOME/.local
+    - "$HOME/.cache/sccache"
 
 after_script:
   - sccache -s
