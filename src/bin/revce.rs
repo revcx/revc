@@ -435,7 +435,7 @@ fn main() -> std::io::Result<()> {
         cli.enc.time_base = video_info.time_base;
     }
 
-    eprint!("Encoding settings: {:?}", cli.enc);
+    eprint!("Encoding settings: {:?}\n", cli.enc);
 
     let cfg = Config {
         threads: cli.threads,
