@@ -194,8 +194,8 @@ fn main() -> std::io::Result<()> {
                 continue;
             } else {
                 match cli.demuxer.read() {
-                    Ok(mut pkt) => {
-                        if let Data::Packet(mut pkt) = pkt {
+                    Ok(mut data) => {
+                        if let Data::Packet(mut pkt) = data {
                             let bs_size = if let Some(data) = &pkt.data {
                                 data.len()
                             } else {
@@ -203,7 +203,7 @@ fn main() -> std::io::Result<()> {
                             };
 
                             let start = Instant::now();
-                            let ret = ctx.push(&mut pkt);
+                            let ret = ctx.push(&mut Data::Packet(pkt));
                             let duration = start.elapsed();
                             clk_tot += duration.as_millis() as usize;
 
@@ -246,18 +246,23 @@ fn main() -> std::io::Result<()> {
         }
 
         if state != EvcdState::STATE_DECODING {
+            let start = Instant::now();
             let ret = ctx.pull();
+            let duration = start.elapsed();
+            clk_tot += duration.as_millis() as usize;
+
             match ret {
-                Ok(frame) => {
-                    let f = frame.borrow();
-                    w = f.planes[0].cfg.width;
-                    h = f.planes[0].cfg.height;
+                Ok(data) => {
+                    if let Data::RefFrame(frame) = &data {
+                        let f = frame.borrow();
+                        w = f.planes[0].cfg.width;
+                        h = f.planes[0].cfg.height;
+                    }
                     pic_cnt += 1;
-                    cli.muxer
-                        .write(Data::RefFrame(&*f), cli.bitdepth, Rational::new(30, 1))?
+                    cli.muxer.write(data, cli.bitdepth, Rational::new(30, 1))?
                 }
                 Err(err) => {
-                    if err == EvcError::EVC_OK_FRM_DELAYED {
+                    if err == EvcError::EVC_OK_OUTPUT_DELAYED {
                         //do nothing, expected
                     } else {
                         if err == EvcError::EVC_ERR_UNEXPECTED {

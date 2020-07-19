@@ -6,12 +6,6 @@ use revc::api::{frame::Frame, Packet};
 pub mod demuxer;
 pub mod muxer;
 
-pub enum Data<'a> {
-    RefFrame(&'a Frame<u16>),
-    Frame(Frame<u16>),
-    Packet(Packet),
-}
-
 /* clipping within min and max */
 #[inline]
 pub fn IFVCA_CLIP<T: Ord>(min_x: T, max_x: T, value: T) -> T {

@@ -442,21 +442,102 @@ fn main() -> std::io::Result<()> {
         enc: Some(cli.enc),
     };
 
-    for _ in 0..cli.skip {
-        match cli.input.read() {
-            Ok(f) => f,
-            Err(_) => {
-                return Err(std::io::Error::new(
-                    std::io::ErrorKind::InvalidData,
-                    "Skipped more frames than in the input",
-                ))
-            }
-        };
-    }
-
     let mut ctx = Context::new(&cfg);
 
-    let mut state = EvceState::STATE_ENCODING;
+    let mut clk_tot = 0;
+    let mut pic_cnt = 0;
+    let mut pic_skip = 0;
+
+    let mut state = if cli.skip > 0 {
+        EvceState::STATE_ENCODING
+    } else {
+        EvceState::STATE_SKIPPING
+    };
+
+    loop {
+        if state == EvceState::STATE_SKIPPING {
+            if pic_skip < cli.skip {
+                match cli.input.read() {
+                    Ok(f) => f,
+                    Err(_) => {
+                        return Err(std::io::Error::new(
+                            std::io::ErrorKind::InvalidData,
+                            "Skipped more frames than in the input",
+                        ))
+                    }
+                };
+            } else {
+                state = EvceState::STATE_ENCODING;
+            }
+            pic_skip += 1;
+            continue;
+        }
+
+        if state == EvceState::STATE_ENCODING {
+            if cli.frames != 0 && pic_cnt >= cli.frames {
+                if cli.verbose {
+                    eprint!("bumping process starting...\n");
+                }
+                state = EvceState::STATE_BUMPING;
+                continue;
+            } else {
+                match cli.input.read() {
+                    Ok(mut data) => {
+                        pic_cnt += 1;
+
+                        let start = Instant::now();
+                        let ret = ctx.push(&mut data);
+                        let duration = start.elapsed();
+                        clk_tot += duration.as_millis() as usize;
+
+                        match ret {
+                            Ok(_) => {}
+                            Err(err) => {
+                                eprint!("Encoding error = {:?}\n", err);
+                                break;
+                            }
+                        }
+                    }
+                    _ => {
+                        if cli.verbose {
+                            eprint!("bumping process starting...\n");
+                        }
+                        state = EvceState::STATE_BUMPING;
+                        continue;
+                    }
+                }
+            }
+        }
+
+        let start = Instant::now();
+        let ret = ctx.pull();
+        let duration = start.elapsed();
+        clk_tot += duration.as_millis() as usize;
+
+        match ret {
+            Ok(data) => cli.output.write(
+                data,
+                cli.bitdepth,
+                Rational::new(cli.enc.time_base.den, cli.enc.time_base.num),
+            )?,
+            Err(err) => {
+                if err == EvcError::EVC_OK_OUTPUT_NOT_AVAILABLE {
+                    //do nothing, expected
+                } else if err == EvcError::EVC_OK_NO_MORE_OUTPUT {
+                    break;
+                } else {
+                    if err == EvcError::EVC_ERR_UNEXPECTED {
+                        if cli.verbose {
+                            eprint!("bumping process completed\n");
+                        }
+                    } else {
+                        eprint!("failed to pull the decoded image\n");
+                    }
+                    break;
+                }
+            }
+        }
+    }
 
     Ok(())
 }

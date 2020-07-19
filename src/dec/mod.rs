@@ -1783,7 +1783,7 @@ impl EvcdCtx {
         if let Some(p) = &pic {
             Ok(Rc::clone(&p.borrow().frame))
         } else {
-            Err(EvcError::EVC_OK_FRM_DELAYED)
+            Err(EvcError::EVC_OK_OUTPUT_DELAYED)
         }
     }
 }

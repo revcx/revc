@@ -9,7 +9,6 @@ use std::path::Path;
 
 use self::nalu::NaluDemuxer;
 use self::y4m::Y4mDemuxer;
-use super::Data;
 use crate::io::demuxer::yuv::YuvDemuxer;
 use revc::api::*;
 

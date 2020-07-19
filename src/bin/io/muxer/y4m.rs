@@ -28,7 +28,8 @@ impl Muxer for Y4mMuxer {
     fn write(&mut self, data: Data, bit_depth: u8, frame_rate: Rational) -> io::Result<()> {
         if let Y4mMuxer::writer(writer) = self {
             if let Some(writer) = writer.take() {
-                if let Data::RefFrame(f) = data {
+                if let Data::RefFrame(frame) = &data {
+                    let f = frame.borrow();
                     let width = f.planes[0].cfg.width;
                     let height = f.planes[0].cfg.height;
                     *self = Y4mMuxer::encoder(
@@ -44,7 +45,8 @@ impl Muxer for Y4mMuxer {
             }
         }
 
-        if let (Data::RefFrame(f), Y4mMuxer::encoder(encoder)) = (data, self) {
+        if let (Data::RefFrame(frame), Y4mMuxer::encoder(encoder)) = (&data, self) {
+            let f = frame.borrow();
             let bytes_per_sample = if bit_depth > 8 { 2 } else { 1 };
             let pitch_y = f.planes[0].cfg.width * bytes_per_sample;
             let height = f.planes[0].cfg.height;

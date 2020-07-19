@@ -7,9 +7,8 @@ use std::path::Path;
 
 use self::y4m::Y4mMuxer;
 use self::yuv::YuvMuxer;
-use super::Data;
 use crate::io::muxer::nalu::NaluMuxer;
-use revc::api::Rational;
+use revc::api::*;
 
 pub trait Muxer {
     fn write(&mut self, data: Data, bitdepth: u8, frame_rate: Rational) -> io::Result<()>;

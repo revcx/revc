@@ -23,14 +23,14 @@ pub const EVC_OK: usize = 0;
 
 #[derive(Debug, FromPrimitive, ToPrimitive, PartialOrd, Ord, PartialEq, Eq)]
 pub enum EvcError {
-    /* no more frames, but it is OK */
-    EVC_OK_NO_MORE_FRM = 205,
+    /* no more output, but it is OK */
+    EVC_OK_NO_MORE_OUTPUT = 205,
     /* progress success, but output is not available temporarily */
-    EVC_OK_OUT_NOT_AVAILABLE = 204,
+    EVC_OK_OUTPUT_NOT_AVAILABLE = 204,
     /* frame dimension (width or height) has been changed */
     EVC_OK_DIM_CHANGED = 203,
-    /* decoding success, but output frame has been delayed */
-    EVC_OK_FRM_DELAYED = 202,
+    /* decoding success, but output has been delayed */
+    EVC_OK_OUTPUT_DELAYED = 202,
 
     EVC_ERR = (-1), /* generic error */
     EVC_ERR_INVALID_ARGUMENT = (-101),
@@ -213,6 +213,13 @@ impl Default for EvcChromaTable {
     }
 }
 
+pub enum Data {
+    RefFrame(Rc<RefCell<Frame<pel>>>),
+    Frame(Frame<pel>),
+    RefPacket(Rc<RefCell<Packet>>),
+    Packet(Packet),
+}
+
 pub struct Packet {
     pub data: Option<Vec<u8>>,
     pub pts: u64,
@@ -381,17 +388,26 @@ impl Context {
         }
     }
 
-    pub fn push(&mut self, pkt: &mut Packet) -> Result<EvcdStat, EvcError> {
+    pub fn push(&mut self, data: &mut Data) -> Result<EvcdStat, EvcError> {
         if let Context::Decoder(ctx) = self {
-            ctx.0.decode_nalu(pkt)
+            if let Data::Packet(pkt) = data {
+                ctx.0.decode_nalu(pkt)
+            } else {
+                Err(EvcError::EVC_ERR_EMPTY_PACKET)
+            }
         } else {
-            Err(EvcError::EVC_ERR_UNSUPPORTED)
+            if let Data::Frame(frm) = data {
+                Err(EvcError::EVC_ERR_UNSUPPORTED)
+            } else {
+                Err(EvcError::EVC_ERR_EMPTY_PACKET)
+            }
         }
     }
 
-    pub fn pull(&mut self) -> Result<Rc<RefCell<Frame<pel>>>, EvcError> {
+    pub fn pull(&mut self) -> Result<Data, EvcError> {
         if let Context::Decoder(ctx) = self {
-            ctx.0.pull_frm()
+            let frame = ctx.0.pull_frm()?;
+            Ok(Data::RefFrame(frame))
         } else {
             Err(EvcError::EVC_ERR_UNSUPPORTED)
         }
