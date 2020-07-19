@@ -35,4 +35,4 @@ jobs:
   include:
     - name: "Build"
       script:
-        - cargo build
+        - cargo build --color=never --all --all-targets --verbose
