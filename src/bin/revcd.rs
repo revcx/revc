@@ -163,7 +163,6 @@ fn print_summary(w: usize, h: usize, bs_cnt: usize, pic_cnt: usize, clk_tot: usi
 #[derive(PartialEq)]
 enum EvcdState {
     STATE_DECODING,
-    STATE_PULLING,
     STATE_BUMPING,
 }
 
@@ -195,43 +194,17 @@ fn main() -> std::io::Result<()> {
             } else {
                 match cli.demuxer.read() {
                     Ok(mut data) => {
-                        if let Data::Packet(mut pkt) = data {
-                            let bs_size = if let Some(data) = &pkt.data {
-                                data.len()
-                            } else {
-                                0
-                            };
+                        let start = Instant::now();
+                        let ret = ctx.push(&mut data);
+                        let duration = start.elapsed();
+                        clk_tot += duration.as_millis() as usize;
 
-                            let start = Instant::now();
-                            let ret = ctx.push(&mut Data::Packet(pkt));
-                            let duration = start.elapsed();
-                            clk_tot += duration.as_millis() as usize;
-
-                            match ret {
-                                Ok(stat) => {
-                                    if stat.fnum >= 0 {
-                                        state = EvcdState::STATE_PULLING;
-                                    }
-                                    if (cli.verbose) {
-                                        print_stat(&stat, bs_cnt);
-                                    }
-                                    if stat.read - NALU_SIZE_FIELD_IN_BYTES != bs_size {
-                                        eprint!(
-                                            "\t=> different reading of bitstream (in:{}, read:{})\n",
-                                            bs_size, stat.read
-                                        );
-                                    }
-
-                                    bs_cnt += 1;
-                                }
-                                Err(err) => {
-                                    eprint!("Decoding error = {:?}\n", err);
-                                    break;
-                                }
+                        match ret {
+                            Ok(_) => {}
+                            Err(err) => {
+                                eprint!("Decoding error = {:?}\n", err);
+                                break;
                             }
-                        } else {
-                            eprint!("Invalid Packet Data for NaluDemuxer");
-                            break;
                         }
                     }
                     _ => {
@@ -245,41 +218,42 @@ fn main() -> std::io::Result<()> {
             }
         }
 
-        if state != EvcdState::STATE_DECODING {
-            let start = Instant::now();
-            let ret = ctx.pull();
-            let duration = start.elapsed();
-            clk_tot += duration.as_millis() as usize;
+        let mut data = Data::Empty;
+        let start = Instant::now();
+        let ret = ctx.pull(&mut data);
+        let duration = start.elapsed();
+        clk_tot += duration.as_millis() as usize;
 
-            match ret {
-                Ok(data) => {
-                    if let Data::RefFrame(frame) = &data {
-                        let f = frame.borrow();
-                        w = f.planes[0].cfg.width;
-                        h = f.planes[0].cfg.height;
+        match ret {
+            Ok(st) => {
+                if let Some(stat) = st {
+                    if cli.verbose {
+                        print_stat(&stat, bs_cnt);
                     }
+                    bs_cnt += 1;
+                }
+
+                let mut has_frame = false;
+                if let Data::RefFrame(frame) = &data {
+                    let f = frame.borrow();
+                    w = f.planes[0].cfg.width;
+                    h = f.planes[0].cfg.height;
+                    has_frame = true;
+                }
+                if has_frame {
                     pic_cnt += 1;
                     cli.muxer.write(data, cli.bitdepth, Rational::new(30, 1))?
                 }
-                Err(err) => {
-                    if err == EvcError::EVC_OK_OUTPUT_DELAYED {
-                        //do nothing, expected
-                    } else {
-                        if err == EvcError::EVC_ERR_UNEXPECTED {
-                            if cli.verbose {
-                                eprint!("bumping process completed\n");
-                            }
-                        } else {
-                            eprint!("failed to pull the decoded image\n");
-                        }
-                        break;
-                    }
-                }
             }
-
-            // after pulling, reset state to decoding mode
-            if state == EvcdState::STATE_PULLING {
-                state = EvcdState::STATE_DECODING;
+            Err(err) => {
+                if err == EvcError::EVC_ERR_UNEXPECTED {
+                    if cli.verbose {
+                        eprint!("bumping process completed\n");
+                    }
+                } else {
+                    eprint!("failed to pull the decoded image\n");
+                }
+                break;
             }
         }
     }

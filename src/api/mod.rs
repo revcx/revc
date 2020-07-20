@@ -23,6 +23,7 @@ pub const EVC_OK: usize = 0;
 
 #[derive(Debug, FromPrimitive, ToPrimitive, PartialOrd, Ord, PartialEq, Eq)]
 pub enum EvcError {
+    EVC_OK_FLUSH = 206,
     /* no more output, but it is OK */
     EVC_OK_NO_MORE_OUTPUT = 205,
     /* progress success, but output is not available temporarily */
@@ -214,12 +215,14 @@ impl Default for EvcChromaTable {
 }
 
 pub enum Data {
+    Empty,
     RefFrame(Rc<RefCell<Frame<pel>>>),
     Frame(Frame<pel>),
     RefPacket(Rc<RefCell<Packet>>),
     Packet(Packet),
 }
 
+#[derive(Debug, Default)]
 pub struct Packet {
     pub data: Option<Vec<u8>>,
     pub pts: u64,
@@ -388,10 +391,10 @@ impl Context {
         }
     }
 
-    pub fn push(&mut self, data: &mut Data) -> Result<EvcdStat, EvcError> {
+    pub fn push(&mut self, data: &mut Data) -> Result<(), EvcError> {
         if let Context::Decoder(ctx) = self {
             if let Data::Packet(pkt) = data {
-                ctx.0.decode_nalu(pkt)
+                ctx.0.push_pkt(pkt)
             } else {
                 Err(EvcError::EVC_ERR_EMPTY_PACKET)
             }
@@ -404,10 +407,37 @@ impl Context {
         }
     }
 
-    pub fn pull(&mut self) -> Result<Data, EvcError> {
+    pub fn pull(&mut self, data: &mut Data) -> Result<Option<EvcdStat>, EvcError> {
         if let Context::Decoder(ctx) = self {
-            let frame = ctx.0.pull_frm()?;
-            Ok(Data::RefFrame(frame))
+            *data = Data::Empty;
+
+            let mut stat = None;
+            let mut pull_frm = false;
+            match ctx.0.decode_nalu() {
+                Ok(st) => {
+                    pull_frm = st.fnum >= 0;
+                    stat = Some(st);
+                }
+                Err(err) => {
+                    if err == EvcError::EVC_OK_FLUSH {
+                        pull_frm = true;
+                    }
+                }
+            }
+
+            if pull_frm {
+                let ret = ctx.0.pull_frm();
+                match ret {
+                    Ok(frame) => *data = Data::RefFrame(frame),
+                    Err(err) => {
+                        if err != EvcError::EVC_OK_OUTPUT_DELAYED {
+                            return Err(err);
+                        }
+                    }
+                }
+            }
+
+            Ok(stat)
         } else {
             Err(EvcError::EVC_ERR_UNSUPPORTED)
         }

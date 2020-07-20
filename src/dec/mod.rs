@@ -117,6 +117,9 @@ pub(crate) struct EvcdCtx {
     /* magic code */
     magic: u32,
 
+    /* buffered packets */
+    pkt: Packet,
+
     /* EVCD identifier */
     //EVCD                    id;
     /* CORE information used for fast operation */
@@ -227,6 +230,7 @@ impl EvcdCtx {
 
         EvcdCtx {
             magic: EVCD_MAGIC_CODE,
+            pkt: Packet::default(),
 
             /* EVCD identifier */
             //EVCD                    id;
@@ -1329,7 +1333,7 @@ impl EvcdCtx {
                     self.core.y_lcu += 1;
                 }
             }
-            eprint!("{} ", self.num_ctb);
+            //eprint!("{} ", self.num_ctb);
         }
 
         Ok(())
@@ -1570,7 +1574,7 @@ impl EvcdCtx {
         /* horizontal filtering */
         for j in y_l..y_r {
             for i in x_l..x_r {
-                eprint!("{} ", j * self.w_lcu + i);
+                //eprint!("{} ", j * self.w_lcu + i);
                 self.deblock_tree(
                     (i << self.log2_max_cuwh),
                     (j << self.log2_max_cuwh),
@@ -1615,8 +1619,18 @@ impl EvcdCtx {
         Ok(())
     }
 
-    pub(crate) fn decode_nalu(&mut self, pkt: &mut Packet) -> Result<EvcdStat, EvcError> {
-        let data = pkt.data.take();
+    pub(crate) fn push_pkt(&mut self, pkt: &mut Packet) -> Result<(), EvcError> {
+        self.pkt.data = pkt.data.take();
+        self.pkt.pts = pkt.pts;
+        Ok(())
+    }
+
+    pub(crate) fn decode_nalu(&mut self) -> Result<EvcdStat, EvcError> {
+        if self.pkt.data.is_none() {
+            return Err(EvcError::EVC_OK_FLUSH);
+        }
+
+        let data = self.pkt.data.take();
         let buf = if let Some(b) = data {
             b
         } else {

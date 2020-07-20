@@ -421,7 +421,6 @@ fn parse_cli() -> std::io::Result<CLISettings> {
 enum EvceState {
     STATE_ENCODING,
     STATE_BUMPING,
-    STATE_SKIPPING,
 }
 
 fn main() -> std::io::Result<()> {
@@ -444,35 +443,24 @@ fn main() -> std::io::Result<()> {
 
     let mut ctx = Context::new(&cfg);
 
+    for _ in 0..cli.skip {
+        match cli.input.read() {
+            Ok(f) => f,
+            Err(_) => {
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::InvalidData,
+                    "Skipped more frames than in the input",
+                ))
+            }
+        };
+    }
+
     let mut clk_tot = 0;
     let mut pic_cnt = 0;
-    let mut pic_skip = 0;
 
-    let mut state = if cli.skip > 0 {
-        EvceState::STATE_ENCODING
-    } else {
-        EvceState::STATE_SKIPPING
-    };
+    let mut state = EvceState::STATE_ENCODING;
 
     loop {
-        if state == EvceState::STATE_SKIPPING {
-            if pic_skip < cli.skip {
-                match cli.input.read() {
-                    Ok(f) => f,
-                    Err(_) => {
-                        return Err(std::io::Error::new(
-                            std::io::ErrorKind::InvalidData,
-                            "Skipped more frames than in the input",
-                        ))
-                    }
-                };
-            } else {
-                state = EvceState::STATE_ENCODING;
-            }
-            pic_skip += 1;
-            continue;
-        }
-
         if state == EvceState::STATE_ENCODING {
             if cli.frames != 0 && pic_cnt >= cli.frames {
                 if cli.verbose {
@@ -483,15 +471,13 @@ fn main() -> std::io::Result<()> {
             } else {
                 match cli.input.read() {
                     Ok(mut data) => {
-                        pic_cnt += 1;
-
                         let start = Instant::now();
                         let ret = ctx.push(&mut data);
                         let duration = start.elapsed();
                         clk_tot += duration.as_millis() as usize;
 
                         match ret {
-                            Ok(_) => {}
+                            Ok(_) => pic_cnt += 1,
                             Err(err) => {
                                 eprint!("Encoding error = {:?}\n", err);
                                 break;
@@ -509,13 +495,14 @@ fn main() -> std::io::Result<()> {
             }
         }
 
+        let mut data = Data::Empty;
         let start = Instant::now();
-        let ret = ctx.pull();
+        let ret = ctx.pull(&mut data);
         let duration = start.elapsed();
         clk_tot += duration.as_millis() as usize;
 
         match ret {
-            Ok(data) => cli.output.write(
+            Ok(_) => cli.output.write(
                 data,
                 cli.bitdepth,
                 Rational::new(cli.enc.time_base.den, cli.enc.time_base.num),
