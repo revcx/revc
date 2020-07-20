@@ -101,7 +101,7 @@ pub(crate) struct EvcdCore {
     mvd: [[i16; MV_D]; REFP_NUM],
     inter_dir: InterPredDir,
     bi_idx: i16,
-    ctx_flags: [u8; NUM_CNID],
+    ctx_flags: [u8; CtxNevIdx::NUM_CNID as usize],
     tree_cons: TREE_CONS,
 
     evc_tbl_qp_chroma_dynamic_ext: [Vec<i8>; 2], // [[i8; MAX_QP_TABLE_SIZE_EXT]; 2],
@@ -112,13 +112,12 @@ pub(crate) struct EvcdCore {
  *
  * All have to be stored are in this structure.
  *****************************************************************************/
-//#[derive(Default)]
 pub(crate) struct EvcdCtx {
     /* magic code */
     magic: u32,
 
     /* buffered packets */
-    pkt: Packet,
+    pkt: Option<Packet>,
 
     /* EVCD identifier */
     //EVCD                    id;
@@ -218,7 +217,7 @@ pub(crate) struct EvcdCtx {
 }
 
 impl EvcdCtx {
-    pub(crate) fn new() -> Self {
+    pub(crate) fn new(cfg: &Config) -> Self {
         let mut refp = vec![];
         for j in 0..MAX_NUM_REF_PICS {
             let mut refp1d = vec![]; //[[EvcRefP::new(); REFP_NUM]; MAX_NUM_REF_PICS];
@@ -230,7 +229,7 @@ impl EvcdCtx {
 
         EvcdCtx {
             magic: EVCD_MAGIC_CODE,
-            pkt: Packet::default(),
+            pkt: None,
 
             /* EVCD identifier */
             //EVCD                    id;
@@ -1619,26 +1618,20 @@ impl EvcdCtx {
         Ok(())
     }
 
-    pub(crate) fn push_pkt(&mut self, pkt: &mut Packet) -> Result<(), EvcError> {
-        self.pkt.data = pkt.data.take();
-        self.pkt.pts = pkt.pts;
+    pub(crate) fn push_pkt(&mut self, pkt: &mut Option<Packet>) -> Result<(), EvcError> {
+        self.pkt = pkt.take();
         Ok(())
     }
 
     pub(crate) fn decode_nalu(&mut self) -> Result<EvcdStat, EvcError> {
-        if self.pkt.data.is_none() {
+        if self.pkt.is_none() {
             return Err(EvcError::EVC_OK_FLUSH);
         }
 
-        let data = self.pkt.data.take();
-        let buf = if let Some(b) = data {
-            b
-        } else {
-            return Err(EvcError::EVC_ERR_EMPTY_PACKET);
-        };
+        let pkt = self.pkt.take().ok_or(EvcError::EVC_ERR_EMPTY_PACKET)?;
 
         /* bitstream reader initialization */
-        self.bs = EvcdBsr::new(buf);
+        self.bs = EvcdBsr::new(pkt);
 
         /* parse nalu header */
         evcd_eco_nalu(&mut self.bs, &mut self.nalu)?;

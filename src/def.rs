@@ -242,8 +242,8 @@ pub(crate) enum CtxNevIdx {
     CNID_MODE_CONS = 2,
     CNID_AFFN_FLAG = 3,
     CNID_IBC_FLAG = 4,
+    NUM_CNID = 5,
 }
-pub(crate) const NUM_CNID: usize = 5;
 
 /*************************************************
 

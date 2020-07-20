@@ -47,7 +47,7 @@ impl Demuxer for Y4mDemuxer {
             })
             .map_err(|e| map_y4m_error(e))?;
 
-        Ok(Data::Frame(frame))
+        Ok(Data::Frame(Some(frame)))
     }
 
     fn info(&self) -> Option<VideoInfo> {

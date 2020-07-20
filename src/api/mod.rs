@@ -10,6 +10,7 @@ pub mod frame;
 
 use crate::dec::*;
 use crate::def::*;
+use crate::enc::*;
 use frame::*;
 
 /*****************************************************************************
@@ -41,6 +42,7 @@ pub enum EvcError {
     EVC_ERR_UNSUPPORTED_COLORSPACE = (-201),
     EVC_ERR_MALFORMED_BITSTREAM = (-202),
     EVC_ERR_EMPTY_PACKET = (-203),
+    EVC_ERR_EMPTY_FRAME = (-204),
 
     EVC_ERR_UNKNOWN = (-32767), /* unknown error */
 }
@@ -216,25 +218,20 @@ impl Default for EvcChromaTable {
 pub enum Data {
     Empty,
     RefFrame(Rc<RefCell<Frame<pel>>>),
-    Frame(Frame<pel>),
+    Frame(Option<Frame<pel>>),
     RefPacket(Rc<RefCell<Packet>>),
-    Packet(Packet),
+    Packet(Option<Packet>),
 }
 
 #[derive(Debug, Default)]
 pub struct Packet {
-    pub data: Option<Vec<u8>>,
+    pub data: Vec<u8>,
     pub pts: u64,
 }
 
 impl fmt::Display for Packet {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let len = if let Some(data) = &self.data {
-            data.len()
-        } else {
-            0
-        };
-        write!(f, "Packet {} - {} bytes", self.pts, len)
+        write!(f, "Packet {} - {} bytes", self.pts, self.data.len())
     }
 }
 
@@ -374,7 +371,7 @@ pub struct Config {
 }
 
 pub struct DecoderContext(EvcdCtx);
-pub struct EncoderContext;
+pub struct EncoderContext(EvceCtx);
 
 pub enum Context {
     Decoder(DecoderContext),
@@ -384,24 +381,27 @@ pub enum Context {
 impl Context {
     pub fn new(cfg: &Config) -> Self {
         if cfg.enc.is_none() {
-            Context::Decoder(DecoderContext(EvcdCtx::new()))
+            Context::Decoder(DecoderContext(EvcdCtx::new(cfg)))
         } else {
-            Context::Encoder(EncoderContext)
+            Context::Encoder(EncoderContext(EvceCtx::new(cfg)))
         }
     }
 
     pub fn push(&mut self, data: &mut Data) -> Result<(), EvcError> {
-        if let Context::Decoder(ctx) = self {
-            if let Data::Packet(pkt) = data {
-                ctx.0.push_pkt(pkt)
-            } else {
-                Err(EvcError::EVC_ERR_EMPTY_PACKET)
+        match self {
+            Context::Decoder(ctx) => {
+                if let Data::Packet(pkt) = data {
+                    ctx.0.push_pkt(pkt)
+                } else {
+                    Err(EvcError::EVC_ERR_EMPTY_PACKET)
+                }
             }
-        } else {
-            if let Data::Frame(frm) = data {
-                Err(EvcError::EVC_ERR_UNSUPPORTED)
-            } else {
-                Err(EvcError::EVC_ERR_EMPTY_PACKET)
+            Context::Encoder(ctx) => {
+                if let Data::Frame(frm) = data {
+                    ctx.0.push_frm(frm)
+                } else {
+                    Err(EvcError::EVC_ERR_EMPTY_FRAME)
+                }
             }
         }
     }

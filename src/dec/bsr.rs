@@ -1,6 +1,6 @@
 use log::*;
 
-use crate::api::EvcError;
+use crate::api::*;
 use crate::tracer::*;
 
 /*
@@ -18,7 +18,7 @@ pub(crate) struct EvcdBsr {
     /* bitstream cur position */
     cur: usize,
     /* buffer */
-    buf: Vec<u8>,
+    pkt: Packet,
     /* trace */
     pub(crate) tracer: Option<Tracer>,
 }
@@ -51,12 +51,12 @@ impl EvcdBsr {
         self.cur as isize - (self.leftbits >> 3)
     }
 
-    pub(crate) fn new(buf: Vec<u8>) -> Self {
+    pub(crate) fn new(pkt: Packet) -> Self {
         EvcdBsr {
             code: 0,
             leftbits: 0,
             cur: 0,
-            buf,
+            pkt,
             tracer: OPEN_TRACE(),
         }
     }
@@ -67,7 +67,7 @@ impl EvcdBsr {
 
         assert_ne!(byte, 0);
 
-        let remained = (self.buf.len() as isize - self.cur as isize);
+        let remained = (self.pkt.data.len() as isize - self.cur as isize);
         if byte > remained {
             byte = remained;
         }
@@ -82,7 +82,7 @@ impl EvcdBsr {
 
         self.cur += byte as usize;
         while byte != 0 {
-            code |= ((self.buf[self.cur - byte as usize] as i32) << shift) as u32;
+            code |= ((self.pkt.data[self.cur - byte as usize] as i32) << shift) as u32;
             byte -= 1;
             shift -= 8;
         }
