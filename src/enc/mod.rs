@@ -459,4 +459,12 @@ impl EvceCtx {
         self.frm = frm.take();
         Ok(())
     }
+
+    pub(crate) fn encode_frm(&mut self) -> Result<(), EvcError> {
+        Ok(())
+    }
+
+    pub(crate) fn pull_pkt(&mut self) -> Result<(), EvcError> {
+        Ok(())
+    }
 }

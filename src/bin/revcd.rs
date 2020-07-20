@@ -253,7 +253,7 @@ fn main() -> std::io::Result<()> {
                         eprint!("bumping process completed\n");
                     }
                 } else {
-                    eprint!("failed to pull the decoded image\n");
+                    eprint!("failed to pull the decoded frame\n");
                 }
                 break;
             }

@@ -407,38 +407,60 @@ impl Context {
     }
 
     pub fn pull(&mut self, data: &mut Data) -> Result<Option<EvcdStat>, EvcError> {
-        if let Context::Decoder(ctx) = self {
-            *data = Data::Empty;
+        *data = Data::Empty;
 
-            let mut stat = None;
-            let mut pull_frm = false;
-            match ctx.0.decode_nalu() {
-                Ok(st) => {
-                    pull_frm = st.fnum >= 0;
-                    stat = Some(st);
-                }
-                Err(err) => {
-                    if err == EvcError::EVC_OK_FLUSH {
-                        pull_frm = true;
+        match self {
+            Context::Decoder(ctx) => {
+                let mut stat = None;
+                let mut pull_frm = false;
+                match ctx.0.decode_nalu() {
+                    Ok(st) => {
+                        pull_frm = st.fnum >= 0;
+                        stat = Some(st);
                     }
-                }
-            }
-
-            if pull_frm {
-                let ret = ctx.0.pull_frm();
-                match ret {
-                    Ok(frame) => *data = Data::RefFrame(frame),
                     Err(err) => {
-                        if err != EvcError::EVC_OK_OUTPUT_NOT_AVAILABLE {
-                            return Err(err);
+                        if err == EvcError::EVC_OK_FLUSH {
+                            pull_frm = true;
                         }
                     }
                 }
-            }
 
-            Ok(stat)
-        } else {
-            Err(EvcError::EVC_ERR_UNSUPPORTED)
+                if pull_frm {
+                    match ctx.0.pull_frm() {
+                        Ok(frame) => *data = Data::RefFrame(frame),
+                        Err(err) => {
+                            if err != EvcError::EVC_OK_OUTPUT_NOT_AVAILABLE {
+                                return Err(err);
+                            }
+                        }
+                    }
+                }
+
+                Ok(stat)
+            }
+            Context::Encoder(ctx) => {
+                let mut pull_pkt = false;
+                match ctx.0.encode_frm() {
+                    Ok(_) => {}
+                    Err(err) => {
+                        if err == EvcError::EVC_OK_FLUSH {
+                            pull_pkt = true;
+                        }
+                    }
+                }
+
+                if pull_pkt {
+                    match ctx.0.pull_pkt() {
+                        Ok(_) => {}
+                        Err(err) => {
+                            if err != EvcError::EVC_OK_OUTPUT_NOT_AVAILABLE {
+                                return Err(err);
+                            }
+                        }
+                    }
+                }
+                Err(EvcError::EVC_OK_NO_MORE_OUTPUT)
+            }
         }
     }
 }
