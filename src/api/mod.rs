@@ -23,15 +23,14 @@ pub const EVC_OK: usize = 0;
 
 #[derive(Debug, FromPrimitive, ToPrimitive, PartialOrd, Ord, PartialEq, Eq)]
 pub enum EvcError {
-    EVC_OK_FLUSH = 206,
     /* no more output, but it is OK */
     EVC_OK_NO_MORE_OUTPUT = 205,
     /* progress success, but output is not available temporarily */
     EVC_OK_OUTPUT_NOT_AVAILABLE = 204,
     /* frame dimension (width or height) has been changed */
     EVC_OK_DIM_CHANGED = 203,
-    /* decoding success, but output has been delayed */
-    EVC_OK_OUTPUT_DELAYED = 202,
+    /* flush decoding process */
+    EVC_OK_FLUSH = 202,
 
     EVC_ERR = (-1), /* generic error */
     EVC_ERR_INVALID_ARGUMENT = (-101),
@@ -430,7 +429,7 @@ impl Context {
                 match ret {
                     Ok(frame) => *data = Data::RefFrame(frame),
                     Err(err) => {
-                        if err != EvcError::EVC_OK_OUTPUT_DELAYED {
+                        if err != EvcError::EVC_OK_OUTPUT_NOT_AVAILABLE {
                             return Err(err);
                         }
                     }

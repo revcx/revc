@@ -233,20 +233,22 @@ fn main() -> std::io::Result<()> {
                     bs_cnt += 1;
                 }
 
-                let mut has_frame = false;
-                if let Data::RefFrame(frame) = &data {
+                let has_frame = if let Data::RefFrame(frame) = &data {
                     let f = frame.borrow();
                     w = f.planes[0].cfg.width;
                     h = f.planes[0].cfg.height;
-                    has_frame = true;
-                }
+                    true
+                } else {
+                    false
+                };
+
                 if has_frame {
+                    cli.muxer.write(data, cli.bitdepth, Rational::new(30, 1))?;
                     pic_cnt += 1;
-                    cli.muxer.write(data, cli.bitdepth, Rational::new(30, 1))?
                 }
             }
             Err(err) => {
-                if err == EvcError::EVC_ERR_UNEXPECTED {
+                if err == EvcError::EVC_OK_NO_MORE_OUTPUT {
                     if cli.verbose {
                         eprint!("bumping process completed\n");
                     }

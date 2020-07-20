@@ -17,8 +17,8 @@ use io::*;
 use revc::api::*;
 
 struct CLISettings {
-    input: Box<dyn demuxer::Demuxer>,
-    output: Box<dyn muxer::Muxer>,
+    demuxer: Box<dyn demuxer::Demuxer>,
+    muxer: Box<dyn muxer::Muxer>,
     rec: Option<Box<dyn muxer::Muxer>>,
     enc: EncoderConfig,
     frames: usize,
@@ -399,8 +399,8 @@ fn parse_cli() -> std::io::Result<CLISettings> {
     });
 
     Ok(CLISettings {
-        input: demuxer::new(matches.value_of("INPUT").unwrap(), info)?,
-        output: muxer::new(matches.value_of("OUTPUT").unwrap())?,
+        demuxer: demuxer::new(matches.value_of("INPUT").unwrap(), info)?,
+        muxer: muxer::new(matches.value_of("OUTPUT").unwrap())?,
         rec,
         enc,
         frames: matches.value_of("FRAMES").unwrap().parse().unwrap(),
@@ -426,7 +426,7 @@ enum EvceState {
 fn main() -> std::io::Result<()> {
     let mut cli = parse_cli()?;
 
-    if let Some(video_info) = cli.input.info() {
+    if let Some(video_info) = cli.demuxer.info() {
         cli.enc.width = video_info.width;
         cli.enc.height = video_info.height;
         cli.enc.bit_depth = video_info.bit_depth;
@@ -444,7 +444,7 @@ fn main() -> std::io::Result<()> {
     let mut ctx = Context::new(&cfg);
 
     for _ in 0..cli.skip {
-        match cli.input.read() {
+        match cli.demuxer.read() {
             Ok(f) => f,
             Err(_) => {
                 return Err(std::io::Error::new(
@@ -469,7 +469,7 @@ fn main() -> std::io::Result<()> {
                 state = EvceState::STATE_BUMPING;
                 continue;
             } else {
-                match cli.input.read() {
+                match cli.demuxer.read() {
                     Ok(mut data) => {
                         let start = Instant::now();
                         let ret = ctx.push(&mut data);
@@ -502,26 +502,20 @@ fn main() -> std::io::Result<()> {
         clk_tot += duration.as_millis() as usize;
 
         match ret {
-            Ok(_) => cli.output.write(
+            Ok(_) => cli.muxer.write(
                 data,
                 cli.bitdepth,
                 Rational::new(cli.enc.time_base.den, cli.enc.time_base.num),
             )?,
             Err(err) => {
-                if err == EvcError::EVC_OK_OUTPUT_NOT_AVAILABLE {
-                    //do nothing, expected
-                } else if err == EvcError::EVC_OK_NO_MORE_OUTPUT {
-                    break;
-                } else {
-                    if err == EvcError::EVC_ERR_UNEXPECTED {
-                        if cli.verbose {
-                            eprint!("bumping process completed\n");
-                        }
-                    } else {
-                        eprint!("failed to pull the decoded image\n");
+                if err == EvcError::EVC_OK_NO_MORE_OUTPUT {
+                    if cli.verbose {
+                        eprint!("bumping process completed\n");
                     }
-                    break;
+                } else {
+                    eprint!("failed to pull the decoded image\n");
                 }
+                break;
             }
         }
     }

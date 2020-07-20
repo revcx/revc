@@ -468,7 +468,7 @@ impl EvcPm {
             }
         }
         if !any_need_for_out {
-            Err(EvcError::EVC_ERR_UNEXPECTED)
+            Err(EvcError::EVC_OK_NO_MORE_OUTPUT)
         } else {
             Ok(None)
         }
