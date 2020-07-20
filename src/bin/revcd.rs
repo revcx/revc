@@ -101,12 +101,12 @@ fn parse_cli() -> std::io::Result<CLISettings> {
     })
 }
 
-fn print_stat(stat: &EvcdStat, bs_cnt: usize) {
+fn print_stat(stat: &EvcStat, bs_cnt: usize) {
     eprint!("[{:4}] NALU --> ", bs_cnt);
     if stat.nalu_type < NaluType::EVC_SPS_NUT {
         eprint!("{}-slice", stat.stype);
 
-        eprint!(" ({} bytes", stat.read);
+        eprint!(" ({} bytes", stat.bytes);
         eprint!(", poc={}, tid={}, ", stat.poc, stat.tid);
 
         for i in 0..2 {
@@ -117,11 +117,11 @@ fn print_stat(stat: &EvcdStat, bs_cnt: usize) {
             eprint!("] ");
         }
     } else if stat.nalu_type == NaluType::EVC_SPS_NUT {
-        eprint!("Sequence Parameter Set ({} bytes)", stat.read);
+        eprint!("Sequence Parameter Set ({} bytes)", stat.bytes);
     } else if stat.nalu_type == NaluType::EVC_PPS_NUT {
-        eprint!("Picture Parameter Set ({} bytes)", stat.read);
+        eprint!("Picture Parameter Set ({} bytes)", stat.bytes);
     } else if stat.nalu_type == NaluType::EVC_APS_NUT {
-        eprint!("Adaptation Parameter Set ({} bytes)", stat.read);
+        eprint!("Adaptation Parameter Set ({} bytes)", stat.bytes);
     } else if stat.nalu_type == NaluType::EVC_SEI_NUT {
         eprint!("SEI message: ");
         if stat.ret == EVC_OK {

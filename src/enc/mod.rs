@@ -460,11 +460,15 @@ impl EvceCtx {
         Ok(())
     }
 
-    pub(crate) fn encode_frm(&mut self) -> Result<(), EvcError> {
-        Ok(())
+    pub(crate) fn encode_frm(&mut self) -> Result<EvcStat, EvcError> {
+        if self.frm.is_none() {
+            return Err(EvcError::EVC_OK_FLUSH);
+        }
+
+        Err(EvcError::EVC_ERR_EMPTY_FRAME)
     }
 
-    pub(crate) fn pull_pkt(&mut self) -> Result<(), EvcError> {
-        Ok(())
+    pub(crate) fn pull_pkt(&mut self) -> Result<Rc<RefCell<Packet>>, EvcError> {
+        Err(EvcError::EVC_OK_OUTPUT_NOT_AVAILABLE)
     }
 }

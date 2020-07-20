@@ -1338,12 +1338,12 @@ impl EvcdCtx {
         Ok(())
     }
 
-    fn make_stat(&mut self, btype: NaluType) -> EvcdStat {
-        let mut stat = EvcdStat {
+    fn make_stat(&mut self, btype: NaluType) -> EvcStat {
+        let mut stat = EvcStat {
             nalu_type: btype,
             stype: SliceType::EVC_ST_I,
             fnum: -1,
-            read: NALU_SIZE_FIELD_IN_BYTES + self.bs.get_read_byte() as usize,
+            bytes: NALU_SIZE_FIELD_IN_BYTES + self.bs.get_read_byte() as usize,
             ..Default::default()
         };
 
@@ -1623,7 +1623,7 @@ impl EvcdCtx {
         Ok(())
     }
 
-    pub(crate) fn decode_nalu(&mut self) -> Result<EvcdStat, EvcError> {
+    pub(crate) fn decode_nalu(&mut self) -> Result<EvcStat, EvcError> {
         if self.pkt.is_none() {
             return Err(EvcError::EVC_OK_FLUSH);
         }

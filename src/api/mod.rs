@@ -147,12 +147,12 @@ impl Default for SliceType {
 }
 
 /*****************************************************************************
- * status after decoder operation
+ * status after decoder/encoder operation
  *****************************************************************************/
 #[derive(Debug, Default)]
-pub struct EvcdStat {
-    /* byte size of decoded bitstream (read size of bitstream) */
-    pub read: usize,
+pub struct EvcStat {
+    /* byte size of decoded/encoded bitstream (read/write size of bitstream) */
+    pub bytes: usize,
     /* nalu type */
     pub nalu_type: NaluType,
     /* slice type */
@@ -171,6 +171,13 @@ pub struct EvcdStat {
     pub refpic: [[isize; 16]; 2], //[2][16]
 
     pub ret: usize,
+
+    // encoder only
+    /* encoded sei messages byte size */
+    pub sei_size: usize,
+    /* picture number increased whenever encoding a frame */
+    /* quantization parameter used for encoding */
+    pub qp: u8,
 }
 
 pub const MAX_NUM_REF_PICS: usize = 21;
@@ -406,7 +413,7 @@ impl Context {
         }
     }
 
-    pub fn pull(&mut self, data: &mut Data) -> Result<Option<EvcdStat>, EvcError> {
+    pub fn pull(&mut self, data: &mut Data) -> Result<Option<EvcStat>, EvcError> {
         *data = Data::Empty;
 
         match self {
