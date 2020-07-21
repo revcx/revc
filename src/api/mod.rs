@@ -316,6 +316,72 @@ pub struct Point {
     pub y: u16,
 }
 
+/// Enumeration of possible invalid configuration errors.
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+#[non_exhaustive]
+pub enum InvalidConfig {
+    /// The width is invalid.
+    //#[error("invalid width {0} (expected >= 16, <= 32767)")]
+    InvalidWidth(usize),
+    /// The height is invalid.
+    //#[error("invalid height {0} (expected >= 16, <= 32767)")]
+    InvalidHeight(usize),
+    /// RDO lookahead frame count is invalid.
+    //#[error("invalid rdo lookahead frames {actual} (expected <= {max} and >= {min})")]
+    InvalidRdoLookaheadFrames {
+        /// The actual value.
+        actual: usize,
+        /// The maximal supported value.
+        max: usize,
+        /// The minimal supported value.
+        min: usize,
+    },
+    /// Maximal keyframe interval is invalid.
+    //#[error("invalid max keyframe interval {actual} (expected <= {max})")]
+    InvalidMaxKeyFrameInterval {
+        /// The actual value.
+        actual: u64,
+        /// The maximal supported value.
+        max: u64,
+    },
+    /// Framerate numerator is invalid.
+    //#[error("invalid framerate numerator {actual} (expected > 0, <= {max})")]
+    InvalidFrameRateNum {
+        /// The actual value.
+        actual: u64,
+        /// The maximal supported value.
+        max: u64,
+    },
+    /// Framerate denominator is invalid.
+    //#[error("invalid framerate denominator {actual} (expected > 0, <= {max})")]
+    InvalidFrameRateDen {
+        /// The actual value.
+        actual: u64,
+        /// The maximal supported value.
+        max: u64,
+    },
+
+    /// The QP is invalid.
+    InvalidQP {
+        /// The actual value.
+        actual: u8,
+        /// The maximal supported value.
+        max: u8,
+        /// The minimal supported value.
+        min: u8,
+    },
+
+    InvalidMaxBFrames,
+    InvalidRefPicGapLength,
+    InvalidHierarchicalGOP,
+
+    /// The rate control needs a target bitrate in order to produce results
+    //#[error("The rate control requires a target bitrate")]
+    TargetBitrateNeeded,
+}
+
+// We add 1 to rdo_lookahead_frames in a bunch of places.
+pub(crate) const MAX_RDO_LOOKAHEAD_FRAMES: usize = usize::max_value() - 1;
 // Due to the math in RCState::new() regarding the reservoir frame delay.
 pub const MAX_MAX_KEY_FRAME_INTERVAL: u64 = i32::max_value() as u64 / 3;
 
@@ -356,15 +422,114 @@ pub struct EncoderConfig {
     pub max_b_frames: u8,
     pub ref_pic_gap_length: u8,
     pub closed_gop: bool,
+    pub disable_hgop: bool,
     pub level: u8,
     pub enable_cip: bool,
     pub disable_dbf: bool,
     pub num_slices_in_pic: usize,
     pub inter_slice_type: u8,
+
+    // Number of frames to read ahead for the RDO lookahead computation.
+    pub rdo_lookahead_frames: usize,
     // Settings which affect the enconding speed vs. quality trade-off.
     //pub speed_settings: SpeedSettings,
     // Rate control configuration
     // rate_control: RateControlConfig,
+}
+
+impl EncoderConfig {
+    /// Validates the configuration.
+    pub fn validate(&self) -> Result<(), InvalidConfig> {
+        use InvalidConfig::*;
+
+        let config = self;
+
+        if config.width < 16 || config.width > u16::max_value() as usize || config.width & 7 != 0 {
+            return Err(InvalidWidth(config.width));
+        }
+        if config.height < 16 || config.height > u16::max_value() as usize || config.height & 7 != 0
+        {
+            return Err(InvalidHeight(config.height));
+        }
+
+        if config.qp < MIN_QUANT || config.qp > MAX_QUANT {
+            return Err(InvalidQP {
+                actual: config.qp,
+                max: MAX_QUANT,
+                min: MIN_QUANT,
+            });
+        }
+
+        if config.rdo_lookahead_frames > MAX_RDO_LOOKAHEAD_FRAMES || config.rdo_lookahead_frames < 1
+        {
+            return Err(InvalidRdoLookaheadFrames {
+                actual: config.rdo_lookahead_frames,
+                max: MAX_RDO_LOOKAHEAD_FRAMES,
+                min: 1,
+            });
+        }
+        if config.max_key_frame_interval > MAX_MAX_KEY_FRAME_INTERVAL {
+            return Err(InvalidMaxKeyFrameInterval {
+                actual: config.max_key_frame_interval,
+                max: MAX_MAX_KEY_FRAME_INTERVAL,
+            });
+        }
+
+        if config.time_base.num == 0 || config.time_base.num > u32::max_value() as u64 {
+            return Err(InvalidFrameRateNum {
+                actual: config.time_base.num,
+                max: u32::max_value() as u64,
+            });
+        }
+        if config.time_base.den == 0 || config.time_base.den > u32::max_value() as u64 {
+            return Err(InvalidFrameRateDen {
+                actual: config.time_base.den,
+                max: u32::max_value() as u64,
+            });
+        }
+
+        if !config.disable_hgop {
+            if !(config.max_b_frames == 0
+                || config.max_b_frames == 1
+                || config.max_b_frames == 3
+                || config.max_b_frames == 5
+                || config.max_b_frames == 7
+                || config.max_b_frames == 15)
+            {
+                return Err(InvalidMaxBFrames);
+            }
+
+            if config.max_b_frames != 0 {
+                if config.max_key_frame_interval % (config.max_b_frames + 1) as u64 != 0 {
+                    return Err(InvalidHierarchicalGOP);
+                }
+            }
+        }
+
+        if config.ref_pic_gap_length != 0 && config.max_b_frames != 0 {
+            return Err(InvalidMaxBFrames);
+        }
+
+        if config.max_b_frames == 0 {
+            if !(config.ref_pic_gap_length == 1
+                || config.ref_pic_gap_length == 2
+                || config.ref_pic_gap_length == 4
+                || config.ref_pic_gap_length == 8
+                || config.ref_pic_gap_length == 16)
+            {
+                return Err(InvalidRefPicGapLength);
+            }
+        }
+
+        // TODO: add more validation
+        /*let rc = &self.rate_control;
+
+        if (rc.emit_pass_data || rc.summary.is_some()) && config.bitrate == 0 {
+            return Err(TargetBitrateNeeded);
+        }*/
+
+        Ok(())
+    }
 }
 
 /// Contains the encoder configuration.
@@ -381,16 +546,20 @@ pub struct DecoderContext(EvcdCtx);
 pub struct EncoderContext(EvceCtx);
 
 pub enum Context {
+    Invalid(InvalidConfig),
     Decoder(DecoderContext),
     Encoder(EncoderContext),
 }
 
 impl Context {
     pub fn new(cfg: &Config) -> Self {
-        if cfg.enc.is_none() {
-            Context::Decoder(DecoderContext(EvcdCtx::new(cfg)))
+        if let Some(cfg_enc) = &cfg.enc {
+            match cfg_enc.validate() {
+                Ok(_) => Context::Encoder(EncoderContext(EvceCtx::new(cfg))),
+                Err(err) => return Context::Invalid(err),
+            }
         } else {
-            Context::Encoder(EncoderContext(EvceCtx::new(cfg)))
+            Context::Decoder(DecoderContext(EvcdCtx::new(cfg)))
         }
     }
 
@@ -410,6 +579,7 @@ impl Context {
                     Err(EvcError::EVC_ERR_EMPTY_FRAME)
                 }
             }
+            Context::Invalid(_) => Err(EvcError::EVC_ERR_UNSUPPORTED),
         }
     }
 
@@ -468,6 +638,7 @@ impl Context {
                 }
                 Err(EvcError::EVC_OK_NO_MORE_OUTPUT)
             }
+            Context::Invalid(_) => Err(EvcError::EVC_ERR_UNSUPPORTED),
         }
     }
 }

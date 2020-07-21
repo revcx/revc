@@ -193,6 +193,7 @@ pub(crate) enum InterPredDir {
     PRED_SKIP = 3,
     /* inter pred direction, look both list0, list1 side */
     PRED_DIR = 4,
+    PRED_NUM = 5,
 }
 
 impl Default for InterPredDir {

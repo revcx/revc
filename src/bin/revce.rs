@@ -132,6 +132,7 @@ fn parse_config(matches: &ArgMatches<'_>) -> std::io::Result<EncoderConfig> {
         .unwrap();
     cfg.level = matches.value_of("LEVEL").unwrap_or("51").parse().unwrap();
     cfg.closed_gop = matches.is_present("CLOSED_GOP");
+    cfg.disable_hgop = matches.is_present("DISABLE_HGOP");
     cfg.enable_cip = matches.is_present("ENABLE_CIP");
     cfg.disable_dbf = matches.is_present("DISABLE_DBF");
     cfg.num_slices_in_pic = matches
@@ -331,6 +332,11 @@ fn parse_cli() -> std::io::Result<CLISettings> {
             Arg::with_name("CLOSED_GOP")
                 .help("use closed GOP structure. if not set, open GOP is used")
                 .long("closed_gop"),
+        )
+        .arg(
+            Arg::with_name("DISABLE_HGOP")
+                .help("disable hierarchical GOP. if not set, hierarchical GOP is used")
+                .long("disable_hgop"),
         )
         .arg(
             Arg::with_name("SKIP")
