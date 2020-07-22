@@ -20,3 +20,9 @@ jobs:
       run: cargo build --verbose
     - name: Run tests
       run: cargo test --verbose
+    - name: Run decoder test
+      run: |
+        mkdir -p tools/tmp
+        cd tools
+        ../target/debug/revcd.exe -i ./data/test_ra_b_q37.evc -o ./tmp/test_ra_b_q37_revc.yuv
+        md5sum -c                    ./data/test_ra_b_q37.txt
