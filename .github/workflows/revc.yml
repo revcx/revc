@@ -24,5 +24,5 @@ jobs:
       run: |
         mkdir -p tools/tmp
         cd tools
-        ../target/debug/revcd.exe -i ./data/test_ra_b_q37.evc -o ./tmp/test_ra_b_q37_revc.yuv
-        md5sum -c                    ./data/test_ra_b_q37.txt
+        cargo run --bin revcd -- -i ./data/test_ra_b_q37.evc -o ./tmp/test_ra_b_q37_revc.yuv -v
+        md5sum -c                   ./data/test_ra_b_q37.txt
