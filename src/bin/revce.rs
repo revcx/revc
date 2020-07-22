@@ -130,6 +130,9 @@ fn parse_config(matches: &ArgMatches<'_>) -> std::io::Result<EncoderConfig> {
         .unwrap_or("0")
         .parse()
         .unwrap();
+    if cfg.max_b_frames == 0 && cfg.ref_pic_gap_length == 0 {
+        cfg.ref_pic_gap_length = 1;
+    }
     cfg.level = matches.value_of("LEVEL").unwrap_or("51").parse().unwrap();
     cfg.closed_gop = matches.is_present("CLOSED_GOP");
     cfg.disable_hgop = matches.is_present("DISABLE_HGOP");
@@ -448,6 +451,9 @@ fn main() -> std::io::Result<()> {
     };
 
     let mut ctx = Context::new(&cfg);
+    if let Context::Invalid(err) = &ctx {
+        return Err(std::io::Error::new(std::io::ErrorKind::InvalidInput, *err));
+    }
 
     for _ in 0..cli.skip {
         match cli.demuxer.read() {

@@ -25,6 +25,7 @@ log = "0.4"
 num-traits = "0.2"
 num-derive = "0.3"
 lazy_static = "1.4.0"
+thiserror = "1.0"
 clap = { version = "2", optional = true, default-features = false }
 y4m = { version = "0.6", optional = true }
 

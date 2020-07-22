@@ -218,9 +218,9 @@ pub(crate) struct EvcdCtx {
 
 impl EvcdCtx {
     pub(crate) fn new(cfg: &Config) -> Self {
-        let mut refp = vec![];
+        let mut refp = Vec::with_capacity(MAX_NUM_REF_PICS);
         for j in 0..MAX_NUM_REF_PICS {
-            let mut refp1d = vec![]; //[[EvcRefP::new(); REFP_NUM]; MAX_NUM_REF_PICS];
+            let mut refp1d = Vec::with_capacity(REFP_NUM);
             for i in 0..REFP_NUM {
                 refp1d.push(EvcRefP::new());
             }

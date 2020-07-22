@@ -98,6 +98,7 @@ pub(crate) const LIST_NUM: usize = 1;
 /*****************************************************************************
  * original picture buffer structure
  *****************************************************************************/
+//#[derive(Default)]
 pub(crate) struct EvcePicOrg {
     /* original picture store */
     pic: EvcPic,
@@ -282,7 +283,7 @@ pub(crate) struct EvceDQP {
 }
 
 pub(crate) struct EvceCUData {
-    split_mode: [[[i8; MAX_CU_CNT_IN_LCU]; BlockShape::NUM_BLOCK_SHAPE as usize]; NUM_CU_DEPTH],
+    split_mode: Vec<Vec<Vec<i8>>>,
     /*u8  *qp_y;
     u8  *qp_u;
     u8  *qp_v;
@@ -309,12 +310,17 @@ pub(crate) struct EvceCUData {
 impl Default for EvceCUData {
     fn default() -> Self {
         EvceCUData {
-            split_mode: [[[0; MAX_CU_CNT_IN_LCU]; BlockShape::NUM_BLOCK_SHAPE as usize];
-                NUM_CU_DEPTH],
+            split_mode: vec![
+                vec![vec![0; MAX_CU_CNT_IN_LCU]; BlockShape::NUM_BLOCK_SHAPE as usize];
+                NUM_CU_DEPTH
+            ],
         }
     }
 }
 impl EvceCUData {
+    fn new(log2_cuw: usize, log2_cuh: usize) -> Self {
+        EvceCUData::default()
+    }
     fn init(&mut self, log2_cuw: usize, log2_cuh: usize) {
         /*int i, j;
             int cuw_scu, cuh_scu;
@@ -391,10 +397,10 @@ pub(crate) struct EvceCore {
     /* coefficient buffer of current CU */
     coef: CUBuffer<i16>, //[[i16; MAX_CU_DIM]; N_C]
     /* CU data for RDO */
-    cu_data_best: [[EvceCUData; MAX_CU_DEPTH]; MAX_CU_DEPTH],
-    cu_data_temp: [[EvceCUData; MAX_CU_DEPTH]; MAX_CU_DEPTH],
+    cu_data_best: Vec<Vec<EvceCUData>>, //[[EvceCUData; MAX_CU_DEPTH]; MAX_CU_DEPTH],
+    cu_data_temp: Vec<Vec<EvceCUData>>, //[[EvceCUData; MAX_CU_DEPTH]; MAX_CU_DEPTH],
 
-    dqp_data: [[EvceDQP; MAX_CU_DEPTH]; MAX_CU_DEPTH],
+    dqp_data: Vec<Vec<EvceDQP>>, //[[EvceDQP; MAX_CU_DEPTH]; MAX_CU_DEPTH],
 
     /* temporary coefficient buffer */
     ctmp: CUBuffer<i16>, //[[i16;MAX_CU_DIM];N_C]
@@ -409,8 +415,8 @@ pub(crate) struct EvceCore {
     cu_qp_delta_code: u8,
     cu_qp_delta_is_coded: u8,
     cu_qp_delta_code_mode: u8,
-    dqp_curr_best: [[EvceCUData; MAX_CU_DEPTH]; MAX_CU_DEPTH],
-    dqp_next_best: [[EvceCUData; MAX_CU_DEPTH]; MAX_CU_DEPTH],
+    dqp_curr_best: Vec<Vec<EvceCUData>>, //[[EvceCUData; MAX_CU_DEPTH]; MAX_CU_DEPTH],
+    dqp_next_best: Vec<Vec<EvceCUData>>, //[[EvceCUData; MAX_CU_DEPTH]; MAX_CU_DEPTH],
     dqp_temp_best: EvceCUData,
     dqp_temp_best_merge: EvceCUData,
     dqp_temp_run: EvceCUData,
@@ -492,7 +498,7 @@ pub(crate) struct EvceCore {
     //int            parent_split_allow[6];
 
     //one picture that arranges cu pixels and neighboring pixels for deblocking (just to match the interface of deblocking functions)
-    delta_dist: [i64; N_C], //delta distortion from filtering (negative values mean distortion reduced)
+    /*delta_dist: [i64; N_C], //delta distortion from filtering (negative values mean distortion reduced)
     dist_nofilt: [i64; N_C], //distortion of not filtered samples
     dist_filter: [i64; N_C], //distortion of filtered samples
     /* RDOQ related variables*/
@@ -506,8 +512,7 @@ pub(crate) struct EvceCore {
     rdoq_est_last_sig_coeff_y: [[i64; 2]; NUM_CTX_LAST_SIG_COEFF],
     rdoq_est_run: [[i32; 2]; NUM_CTX_CC_RUN],
     rdoq_est_level: [[i32; 2]; NUM_CTX_CC_LEVEL],
-    rdoq_est_last: [[i32; 2]; NUM_CTX_CC_LAST],
-
+    rdoq_est_last: [[i32; 2]; NUM_CTX_CC_LAST],*/
     evc_tbl_qp_chroma_dynamic_ext: [Vec<i8>; 2], // [[i8; MAX_QP_TABLE_SIZE_EXT]; 2],
 }
 
@@ -518,11 +523,11 @@ pub(crate) struct EvceCore {
  *****************************************************************************/
 pub(crate) struct EvceCtx {
     /* address of current input picture, ref_picture  buffer structure */
-    //EVCE_PICO            * pico_buf[EVCE_MAX_INBUF_CNT];
+    pico_buf: Vec<EvcePicOrg>,
     /* address of current input picture buffer structure */
-    //EVCE_PICO * pico;
+    //pico: EvcePicOrg,
     /* index of current input picture buffer in pico_buf[] */
-    pico_idx: u8,
+    pico_idx: usize,
     pico_max_cnt: usize,
     /* magic code */
     magic: u32,
@@ -560,14 +565,11 @@ pub(crate) struct EvceCtx {
     /* slice header */
     sh: EvcSh,
     /* reference picture manager */
-    rpm: Option<EvcPm>,
+    rpm: EvcPm,
     /* create descriptor */
     //EVCE_CDSC              cdsc;
     /* quantization value of current encoding slice */
     qp: u8,
-    /* offset value of alpha and beta for deblocking filter */
-    deblock_alpha_offset: u8,
-    deblock_beta_offset: u8,
     /* encoding picture width */
     w: u16,
     /* encoding picture height */
@@ -584,11 +586,11 @@ pub(crate) struct EvceCtx {
     prev_doc_offset: u32,
     /* current encoding picture count(This is not PicNum or FrameNum.
     Just count of encoded picture correctly) */
-    pic_cnt: u32,
+    pic_cnt: usize,
     /* current picture input count (only update when CTX0) */
-    pic_icnt: u32,
+    pic_icnt: usize,
     /* total input picture count (only used for bumping process) */
-    pic_ticnt: u32,
+    pic_ticnt: usize,
     /* remaining pictures is encoded to p or b slice (only used for bumping process) */
     force_slice: u8,
     /* ignored pictures for force slice count (unavailable pictures cnt in gop,\
@@ -652,7 +654,7 @@ pub(crate) struct EvceCtx {
     /* CU map (width in SCU x height in SCU) of raster scan order in a frame */
     map_scu: Vec<MCU>,
     /* cu data for current LCU */
-    //EVCE_CU_DATA * map_cu_data;
+    map_cu_data: Vec<EvceCUData>,
     /* map for encoded motion vectors in SCU */
     map_mv: Option<Rc<RefCell<Vec<[[i16; MV_D]; REFP_NUM]>>>>,
     /* map for reference indices */
@@ -669,9 +671,9 @@ pub(crate) struct EvceCtx {
 
 impl EvceCtx {
     pub(crate) fn new(cfg: &Config) -> Self {
-        let mut refp = vec![];
+        let mut refp = Vec::with_capacity(MAX_NUM_REF_PICS);
         for j in 0..MAX_NUM_REF_PICS {
-            let mut refp1d = vec![]; //[[EvcRefP::new(); REFP_NUM]; MAX_NUM_REF_PICS];
+            let mut refp1d = Vec::with_capacity(REFP_NUM);
             for i in 0..REFP_NUM {
                 refp1d.push(EvcRefP::new());
             }
@@ -719,14 +721,45 @@ impl EvceCtx {
         let log2_culine = log2_max_cuwh - MIN_CU_LOG2 as u8;
         let log2_cudim = log2_culine << 1;
 
+        /*  allocate CU data map*/
+        let mut map_cu_data = Vec::with_capacity(f_lcu as usize);
+        for i in 0..f_lcu as usize {
+            let mut cu_data = EvceCUData::new(
+                log2_max_cuwh as usize - MIN_CU_LOG2,
+                log2_max_cuwh as usize - MIN_CU_LOG2,
+            );
+            map_cu_data.push(cu_data);
+        }
+
+        /* allocate maps */
+        let map_scu = vec![MCU::default(); f_scu as usize];
+
+        let map_ipm = vec![IntraPredDir::default(); f_scu as usize];
+        let map_depth = vec![-1; f_scu as usize];
+        let map_cu_mode = vec![MCU::default(); f_scu as usize];
+
+        let pico_max_cnt = 1 + ((param.max_b_frames as usize) << 1);
+        /* initialize decode picture manager */
+        let mut rpm = EvcPm::new(w as usize, h as usize, param.chroma_sampling);
+        rpm.evc_picman_init(
+            MAX_PB_SIZE as u8,
+            MAX_NUM_REF_PICS as u8,
+            //PICBUF_ALLOCATOR * pa
+        );
+
+        let mut pico_buf = vec![];
+        for i in 0..pico_max_cnt {
+            //pico_buf.push(EvcePicOrg::default());
+        }
+
         EvceCtx {
             /* address of current input picture, ref_picture  buffer structure */
-            //EVCE_PICO            * pico_buf[EVCE_MAX_INBUF_CNT];
+            pico_buf,
             /* address of current input picture buffer structure */
-            //EVCE_PICO * pico;
+            //pico://EVCE_PICO *
             /* index of current input picture buffer in pico_buf[] */
             pico_idx: 0,
-            pico_max_cnt: 0,
+            pico_max_cnt,
 
             /* magic code */
             magic: EVCE_MAGIC_CODE,
@@ -762,14 +795,11 @@ impl EvceCtx {
             /* slice header */
             sh: EvcSh::default(),
             /* reference picture manager */
-            rpm: None,
+            rpm,
             /* create descriptor */
             //EVCE_CDSC              cdsc;
             /* quantization value of current encoding slice */
-            qp: 0,
-            /* offset value of alpha and beta for deblocking filter */
-            deblock_alpha_offset: 0,
-            deblock_beta_offset: 0,
+            qp: param.qp,
             /* encoding picture width */
             w,
             /* encoding picture height */
@@ -797,7 +827,7 @@ impl EvceCtx {
             only used for bumping process) */
             force_ignored_cnt: 0,
             /* initial frame return number(delayed input count) due to B picture or Forecast */
-            frm_rnum: 0,
+            frm_rnum: param.max_b_frames as u32,
             /* current encoding slice number in one picture */
             slice_num: 0,
             /* first mb number of current encoding slice in one picture */
@@ -852,18 +882,18 @@ impl EvceCtx {
             pinter: EvcePInter::default(),
             /* MAPS *******************************************************************/
             /* CU map (width in SCU x height in SCU) of raster scan order in a frame */
-            map_scu: vec![],
+            map_scu,
             /* cu data for current LCU */
-            //EVCE_CU_DATA * map_cu_data;
+            map_cu_data,
             /* map for encoded motion vectors in SCU */
             map_mv: None,
             /* map for reference indices */
             map_refi: None,
             /* map for intra pred mode */
-            map_ipm: vec![],
-            map_depth: vec![],
+            map_ipm,
+            map_depth,
             //EVC_PIC              * pic_dbk;          //one picture that arranges cu pixels and neighboring pixels for deblocking (just to match the interface of deblocking functions)
-            map_cu_mode: vec![],
+            map_cu_mode,
             lambda: [0.0; 3],
             sqrt_lambda: [0.0; 3],
             dist_chroma_weight: [0.0; 2],
@@ -871,6 +901,11 @@ impl EvceCtx {
     }
 
     pub(crate) fn push_frm(&mut self, frm: &mut Option<Frame<pel>>) -> Result<(), EvcError> {
+        self.pico_idx = self.pic_icnt % self.pico_max_cnt;
+        //self.pico = self.pico_buf[self.pico_idx];
+        //self.pico->pic_icnt = ctx->pic_icnt;
+        //self.pico->is_used = 1;
+        self.pic_icnt += 1;
         self.frm = frm.take();
         Ok(())
     }

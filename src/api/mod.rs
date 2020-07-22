@@ -3,6 +3,8 @@ use std::rc::Rc;
 use std::vec::Vec;
 use std::{cmp, fmt, io};
 
+use thiserror::Error;
+
 use num_derive::FromPrimitive;
 use num_traits::FromPrimitive;
 
@@ -317,17 +319,17 @@ pub struct Point {
 }
 
 /// Enumeration of possible invalid configuration errors.
-#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Error)]
 #[non_exhaustive]
 pub enum InvalidConfig {
     /// The width is invalid.
-    //#[error("invalid width {0} (expected >= 16, <= 32767)")]
+    #[error("invalid width {0} (expected >= 16, <= 32767)")]
     InvalidWidth(usize),
     /// The height is invalid.
-    //#[error("invalid height {0} (expected >= 16, <= 32767)")]
+    #[error("invalid height {0} (expected >= 16, <= 32767)")]
     InvalidHeight(usize),
     /// RDO lookahead frame count is invalid.
-    //#[error("invalid rdo lookahead frames {actual} (expected <= {max} and >= {min})")]
+    #[error("invalid rdo lookahead frames {actual} (expected <= {max} and >= {min})")]
     InvalidRdoLookaheadFrames {
         /// The actual value.
         actual: usize,
@@ -337,7 +339,7 @@ pub enum InvalidConfig {
         min: usize,
     },
     /// Maximal keyframe interval is invalid.
-    //#[error("invalid max keyframe interval {actual} (expected <= {max})")]
+    #[error("invalid max keyframe interval {actual} (expected <= {max})")]
     InvalidMaxKeyFrameInterval {
         /// The actual value.
         actual: u64,
@@ -345,7 +347,7 @@ pub enum InvalidConfig {
         max: u64,
     },
     /// Framerate numerator is invalid.
-    //#[error("invalid framerate numerator {actual} (expected > 0, <= {max})")]
+    #[error("invalid framerate numerator {actual} (expected > 0, <= {max})")]
     InvalidFrameRateNum {
         /// The actual value.
         actual: u64,
@@ -353,7 +355,7 @@ pub enum InvalidConfig {
         max: u64,
     },
     /// Framerate denominator is invalid.
-    //#[error("invalid framerate denominator {actual} (expected > 0, <= {max})")]
+    #[error("invalid framerate denominator {actual} (expected > 0, <= {max})")]
     InvalidFrameRateDen {
         /// The actual value.
         actual: u64,
@@ -362,6 +364,7 @@ pub enum InvalidConfig {
     },
 
     /// The QP is invalid.
+    #[error("invalid qp {actual} (expected <= {max} and >= {min})")]
     InvalidQP {
         /// The actual value.
         actual: u8,
@@ -371,12 +374,15 @@ pub enum InvalidConfig {
         min: u8,
     },
 
+    #[error("Invalid Max B Frames")]
     InvalidMaxBFrames,
+    #[error("Invalid Ref Pic GAP Length")]
     InvalidRefPicGapLength,
+    #[error("Invalid Hierarchical GOP")]
     InvalidHierarchicalGOP,
 
     /// The rate control needs a target bitrate in order to produce results
-    //#[error("The rate control requires a target bitrate")]
+    #[error("The rate control requires a target bitrate")]
     TargetBitrateNeeded,
 }
 
@@ -460,14 +466,14 @@ impl EncoderConfig {
             });
         }
 
-        if config.rdo_lookahead_frames > MAX_RDO_LOOKAHEAD_FRAMES || config.rdo_lookahead_frames < 1
+        /*if config.rdo_lookahead_frames > MAX_RDO_LOOKAHEAD_FRAMES || config.rdo_lookahead_frames < 1
         {
             return Err(InvalidRdoLookaheadFrames {
                 actual: config.rdo_lookahead_frames,
                 max: MAX_RDO_LOOKAHEAD_FRAMES,
                 min: 1,
             });
-        }
+        }*/
         if config.max_key_frame_interval > MAX_MAX_KEY_FRAME_INTERVAL {
             return Err(InvalidMaxKeyFrameInterval {
                 actual: config.max_key_frame_interval,

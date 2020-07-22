@@ -39,7 +39,7 @@ fn ITX_CLIP_32(x: i64) -> i32 {
 
 pub(crate) fn evc_sub_block_itdq(
     tracer: &mut Option<Tracer>,
-    coef: &mut [[i16; MAX_CU_DIM]],
+    coef: &mut Vec<Vec<i16>>, //[[i16; MAX_CU_DIM]],
     log2_cuw: u8,
     log2_cuh: u8,
     qp_y: u8,

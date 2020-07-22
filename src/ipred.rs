@@ -36,7 +36,7 @@ pub(crate) fn evc_get_nbr_b(
     cuh: usize,
     src: &PlaneRegion<'_, pel>,
     avail_cu: u16,
-    nb: &mut [[pel; MAX_CU_SIZE * 3]; N_REF],
+    nb: &mut Vec<Vec<pel>>, //[[pel; MAX_CU_SIZE * 3]; N_REF],
     scup: usize,
     map_scu: &[MCU],
     w_scu: usize,
