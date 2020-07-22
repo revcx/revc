@@ -11,8 +11,8 @@ Rust Essential Video Coding (MPEG-5 EVC baseline)
 - [ ] 0.3 Optimization: multi-threading and assembly
   - [ ] multi-threading
   - [ ] assembly
-    - [ ] assembly for arm		 
-    - [ ] assembly for arm64	
+    - [ ] assembly for armeabi-v7a 
+    - [ ] assembly for arm64-v8a	
     - [ ] assembly for x86			 
     - [ ] assembly for x86_64		 
 
