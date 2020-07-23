@@ -1,6 +1,6 @@
 # ![revc](doc/REVC.png) [![Actions Status](https://github.com/revcx/revc/workflows/revc/badge.svg?branch=master)](https://github.com/revcx/revc/actions) 
 
-Rust Essential Video Coding (MPEG-5 EVC baseline)
+The fastest and safest EVC encoder and decoder
 
 # Roadmap
 
