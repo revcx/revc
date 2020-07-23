@@ -7,7 +7,7 @@ use std::cmp::Ordering;
 use std::rc::Rc;
 
 /* picture store structure */
-//#[derive(Default)]
+#[derive(Default)]
 pub(crate) struct EvcPic {
     pub(crate) frame: Rc<RefCell<Frame<pel>>>,
 

@@ -491,11 +491,13 @@ pub(crate) fn evc_get_mv_dir(
 
 pub(crate) fn evc_derived_chroma_qp_mapping_tables(
     structChromaQP: &EvcChromaTable,
-    p_evc_tbl_qp_chroma_dynamic: &mut [Vec<i8>; 2],
-) {
+) -> Vec<Vec<i8>> {
     let MAX_QP = MAX_QP_TABLE_SIZE as i8 - 1;
     let mut qpInVal = [0i8; MAX_QP_TABLE_SIZE_EXT];
     let mut qpOutVal = [0i8; MAX_QP_TABLE_SIZE_EXT];
+    let mut p_evc_tbl_qp_chroma_dynamic = Vec::with_capacity(2);
+    p_evc_tbl_qp_chroma_dynamic.push(vec![0; MAX_QP_TABLE_SIZE_EXT]);
+    p_evc_tbl_qp_chroma_dynamic.push(vec![0; MAX_QP_TABLE_SIZE_EXT]);
 
     let startQp = if structChromaQP.global_offset_flag {
         16
@@ -560,6 +562,8 @@ pub(crate) fn evc_derived_chroma_qp_mapping_tables(
         let (p0, p1) = p_evc_tbl_qp_chroma_dynamic.split_at_mut(1);
         p1[0].copy_from_slice(&p0[0]);
     }
+
+    p_evc_tbl_qp_chroma_dynamic
 }
 
 pub(crate) fn evc_get_split_mode(

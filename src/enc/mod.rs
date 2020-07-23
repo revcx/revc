@@ -98,12 +98,12 @@ pub(crate) const LIST_NUM: usize = 1;
 /*****************************************************************************
  * original picture buffer structure
  *****************************************************************************/
-//#[derive(Default)]
+#[derive(Default)]
 pub(crate) struct EvcePicOrg {
     /* original picture store */
     pic: EvcPic,
     /* input picture count */
-    pic_icnt: u32,
+    pic_icnt: usize,
     /* be used for encoding input */
     is_used: bool,
     /* address of sub-picture */
@@ -415,11 +415,11 @@ pub(crate) struct EvceCore {
     cu_qp_delta_code: u8,
     cu_qp_delta_is_coded: u8,
     cu_qp_delta_code_mode: u8,
-    dqp_curr_best: Vec<Vec<EvceCUData>>, //[[EvceCUData; MAX_CU_DEPTH]; MAX_CU_DEPTH],
-    dqp_next_best: Vec<Vec<EvceCUData>>, //[[EvceCUData; MAX_CU_DEPTH]; MAX_CU_DEPTH],
-    dqp_temp_best: EvceCUData,
-    dqp_temp_best_merge: EvceCUData,
-    dqp_temp_run: EvceCUData,
+    dqp_curr_best: Vec<Vec<EvceDQP>>, //[[EVCE_DQP; MAX_CU_DEPTH]; MAX_CU_DEPTH],
+    dqp_next_best: Vec<Vec<EvceDQP>>, //[[EVCE_DQP; MAX_CU_DEPTH]; MAX_CU_DEPTH],
+    dqp_temp_best: EvceDQP,
+    dqp_temp_best_merge: EvceDQP,
+    dqp_temp_run: EvceDQP,
 
     /* QP for luma of current encoding CU */
     qp_y: u8,
@@ -513,15 +513,176 @@ pub(crate) struct EvceCore {
     rdoq_est_run: [[i32; 2]; NUM_CTX_CC_RUN],
     rdoq_est_level: [[i32; 2]; NUM_CTX_CC_LEVEL],
     rdoq_est_last: [[i32; 2]; NUM_CTX_CC_LAST],*/
-    evc_tbl_qp_chroma_dynamic_ext: [Vec<i8>; 2], // [[i8; MAX_QP_TABLE_SIZE_EXT]; 2],
+    evc_tbl_qp_chroma_dynamic_ext: Vec<Vec<i8>>, // [[i8; MAX_QP_TABLE_SIZE_EXT]; 2],
 }
+impl EvceCore {
+    pub(crate) fn new() -> Self {
+        let mut evc_tbl_qp_chroma_dynamic_ext = vec![];
+        /*if sps.chroma_qp_table_struct.chroma_qp_table_present_flag {
+            evc_derived_chroma_qp_mapping_tables(
+                &sps.chroma_qp_table_struct,
+                &mut core.evc_tbl_qp_chroma_dynamic_ext,
+            );
+        } else*/
+        {
+            evc_tbl_qp_chroma_dynamic_ext.push(evc_tbl_qp_chroma_ajudst_base.to_vec());
+            evc_tbl_qp_chroma_dynamic_ext.push(evc_tbl_qp_chroma_ajudst_base.to_vec());
+        }
 
+        let mut cu_data_best = Vec::with_capacity(MAX_CU_DEPTH);
+        let mut cu_data_temp = Vec::with_capacity(MAX_CU_DEPTH);
+        let mut dqp_data = Vec::with_capacity(MAX_CU_DEPTH);
+        let mut dqp_curr_best = Vec::with_capacity(MAX_CU_DEPTH);
+        let mut dqp_next_best = Vec::with_capacity(MAX_CU_DEPTH);
+        for i in 0..MAX_CU_DEPTH {
+            let mut best = Vec::with_capacity(MAX_CU_DEPTH);
+            let mut temp = Vec::with_capacity(MAX_CU_DEPTH);
+            let mut data = Vec::with_capacity(MAX_CU_DEPTH);
+            let mut curr = Vec::with_capacity(MAX_CU_DEPTH);
+            let mut next = Vec::with_capacity(MAX_CU_DEPTH);
+            for j in 0..MAX_CU_DEPTH {
+                best.push(EvceCUData::new(i, j));
+                temp.push(EvceCUData::new(i, j));
+                data.push(EvceDQP::default());
+                curr.push(EvceDQP::default());
+                next.push(EvceDQP::default());
+            }
+            cu_data_best.push(best);
+            cu_data_temp.push(temp);
+            dqp_data.push(data);
+            dqp_curr_best.push(curr);
+            dqp_next_best.push(next);
+        }
+
+        EvceCore {
+            /* coefficient buffer of current CU */
+            //coef: CUBuffer<i16>::default(), //[[i16; MAX_CU_DIM]; N_C]
+            /* CU data for RDO */
+            cu_data_best,
+            cu_data_temp,
+            dqp_data,
+
+            /* temporary coefficient buffer */
+            //ctmp: CUBuffer < i16 >, //[[i16;MAX_CU_DIM];N_C]
+            /* pred buffer of current CU. [1][x][x] is used for bi-pred */
+            //pred: [CUBuffer < pel >; 2], //[2][N_C][MAX_CU_DIM];
+            /* neighbor pixel buffer for intra prediction */
+            //nb: NBBuffer < pel >, //[N_C][N_REF][MAX_CU_SIZE * 3];
+            /* current encoding LCU number */
+            //lcu_num: u16,
+            /*QP for current encoding CU. Used to derive Luma and chroma qp*/
+            //qp: u8,
+            //cu_qp_delta_code: u8,
+            //cu_qp_delta_is_coded: u8,
+            //cu_qp_delta_code_mode: u8,
+            dqp_curr_best,
+            dqp_next_best,
+            //dqp_temp_best: EvceCUData,
+            //dqp_temp_best_merge: EvceCUData,
+            //dqp_temp_run: EvceCUData,
+
+            /* QP for luma of current encoding CU */
+            //qp_y: u8,
+            ///* QP for chroma of current encoding CU */
+            //qp_u: u8,
+            //qp_v: u8,
+            ///* X address of current LCU */
+            //x_lcu: u16,
+            ///* Y address of current LCU */
+            //y_lcu: u16,
+            ///* X address of current CU in SCU unit */
+            //x_scu: u16,
+            ///* Y address of current CU in SCU unit */
+            //y_scu: u16,
+            ///* left pel position of current LCU */
+            //x_pel: u16,
+            ///* top pel position of current LCU */
+            //y_pel: u16,
+            ///* CU position in current frame in SCU unit */
+            //scup: u32,
+            ///* CU position in current LCU in SCU unit */
+            //cup: u32,
+            ///* CU depth */
+            //cud: u16,
+            ///* neighbor CUs availability of current CU */
+            //avail_cu: u16,
+            ///* Left, right availability of current CU */
+            //avail_lr: u16,
+            //bef_data_idx: u16,
+            ///* CU mode */
+            //cu_mode: MCU,
+            /* intra prediction mode */
+            //u8             mpm[2]; /* mpm table pointer*/
+            //u8             mpm_ext[8];
+            //mpm_b_list: &'static [u8],
+            //pims: [u8; IntraPredDir::IPD_CNT_B as usize], /* probable intra mode set*/
+            //ipm: [IntraPredDir; 2],
+            /* skip flag for MODE_INTER */
+            //skip_flag: bool,
+            /* width of current CU */
+            //cuw: u16,
+            /* height of current CU */
+            //cuh: u16,
+            /* log2 of cuw */
+            //log2_cuw: u8,
+            /* log2 of cuh */
+            // log2_cuh: u8,
+            /* number of non-zero coefficient */
+            //nnz: [u16; N_C],
+            /* platform specific data, if needed */
+            //void          *pf;
+            /* bitstream structure for RDO */
+            //EVC_BSW        bs_temp;
+            /* SBAC structure for full RDO */
+            //EVCE_SBAC      s_curr_best[MAX_CU_DEPTH][MAX_CU_DEPTH];
+            //EVCE_SBAC      s_next_best[MAX_CU_DEPTH][MAX_CU_DEPTH];
+            //EVCE_SBAC      s_temp_best;
+            //EVCE_SBAC      s_temp_best_merge;
+            //EVCE_SBAC      s_temp_run;
+            //EVCE_SBAC      s_temp_prev_comp_best;
+            //EVCE_SBAC      s_temp_prev_comp_run;
+            //EVCE_SBAC      s_curr_before_split[MAX_CU_DEPTH][MAX_CU_DEPTH];
+            //EVCE_BEF_DATA  bef_data[MAX_CU_DEPTH][MAX_CU_DEPTH][MAX_CU_CNT_IN_LCU][MAX_BEF_DATA_NUM];
+            //cost_best: f64,
+            //inter_satd: u32,
+            //dist_cu: i32,
+            //dist_cu_best: i32, //dist of the best intra mode (note: only updated in intra coding now)
+            /* temporal pixel buffer for inter prediction */
+            //pel            eif_tmp_buffer[(MAX_CU_SIZE + 2) * (MAX_CU_SIZE + 2)];
+            //u8             au8_eval_mvp_idx[MAX_NUM_MVP];
+            //tree_cons: TREE_CONS,
+            //ctx_flags: [u8; CtxNevIdx::NUM_CNID as usize],
+            //int            split_mode_child:[4];
+            //int            parent_split_allow[6];
+
+            //one picture that arranges cu pixels and neighboring pixels for deblocking (just to match the interface of deblocking functions)
+            /*delta_dist: [i64; N_C], //delta distortion from filtering (negative values mean distortion reduced)
+            dist_nofilt: [i64; N_C], //distortion of not filtered samples
+            dist_filter: [i64; N_C], //distortion of filtered samples
+            /* RDOQ related variables*/
+            rdoq_est_cbf_all: [i64; 2],
+            rdoq_est_cbf_luma: [i64; 2],
+            rdoq_est_cbf_cb: [i64; 2],
+            rdoq_est_cbf_cr: [i64; 2],
+            //rdoq_est_sig_coeff: [[i64; 2]; NUM_CTX_SIG_COEFF_FLAG],
+            rdoq_est_gtx: [[i64; 2]; NUM_CTX_GTX],
+            rdoq_est_last_sig_coeff_x: [[i64; 2]; NUM_CTX_LAST_SIG_COEFF],
+            rdoq_est_last_sig_coeff_y: [[i64; 2]; NUM_CTX_LAST_SIG_COEFF],
+            rdoq_est_run: [[i32; 2]; NUM_CTX_CC_RUN],
+            rdoq_est_level: [[i32; 2]; NUM_CTX_CC_LEVEL],
+            rdoq_est_last: [[i32; 2]; NUM_CTX_CC_LAST],*/
+            evc_tbl_qp_chroma_dynamic_ext, // [[i8; MAX_QP_TABLE_SIZE_EXT]; 2],
+            ..Default::default()
+        }
+    }
+}
 /******************************************************************************
  * CONTEXT used for encoding process.
  *
  * All have to be stored are in this structure.
  *****************************************************************************/
 pub(crate) struct EvceCtx {
+    flush: bool,
     /* address of current input picture, ref_picture  buffer structure */
     pico_buf: Vec<EvcePicOrg>,
     /* address of current input picture buffer structure */
@@ -597,7 +758,7 @@ pub(crate) struct EvceCtx {
     only used for bumping process) */
     force_ignored_cnt: u8,
     /* initial frame return number(delayed input count) due to B picture or Forecast */
-    frm_rnum: u32,
+    frm_rnum: usize,
     /* current encoding slice number in one picture */
     slice_num: i32,
     /* first mb number of current encoding slice in one picture */
@@ -680,27 +841,7 @@ impl EvceCtx {
             refp.push(refp1d);
         }
 
-        let mut core = EvceCore::default();
-
-        core.evc_tbl_qp_chroma_dynamic_ext[0] = vec![0; MAX_QP_TABLE_SIZE_EXT];
-        core.evc_tbl_qp_chroma_dynamic_ext[1] = vec![0; MAX_QP_TABLE_SIZE_EXT];
-        /*if sps.chroma_qp_table_struct.chroma_qp_table_present_flag {
-            evc_derived_chroma_qp_mapping_tables(
-                &sps.chroma_qp_table_struct,
-                &mut core.evc_tbl_qp_chroma_dynamic_ext,
-            );
-        } else*/
-        {
-            core.evc_tbl_qp_chroma_dynamic_ext[0].copy_from_slice(&evc_tbl_qp_chroma_ajudst_base);
-            core.evc_tbl_qp_chroma_dynamic_ext[1].copy_from_slice(&evc_tbl_qp_chroma_ajudst_base);
-        }
-
-        for i in 0..MAX_CU_DEPTH {
-            for j in 0..MAX_CU_DEPTH {
-                core.cu_data_best[i][j].init(i, j);
-                core.cu_data_temp[i][j].init(i, j);
-            }
-        }
+        let core = EvceCore::new();
 
         let param = cfg.enc.unwrap();
 
@@ -747,12 +888,13 @@ impl EvceCtx {
             //PICBUF_ALLOCATOR * pa
         );
 
-        let mut pico_buf = vec![];
+        let mut pico_buf = Vec::with_capacity(pico_max_cnt);
         for i in 0..pico_max_cnt {
-            //pico_buf.push(EvcePicOrg::default());
+            pico_buf.push(EvcePicOrg::default());
         }
 
         EvceCtx {
+            flush: false,
             /* address of current input picture, ref_picture  buffer structure */
             pico_buf,
             /* address of current input picture buffer structure */
@@ -827,7 +969,7 @@ impl EvceCtx {
             only used for bumping process) */
             force_ignored_cnt: 0,
             /* initial frame return number(delayed input count) due to B picture or Forecast */
-            frm_rnum: param.max_b_frames as u32,
+            frm_rnum: param.max_b_frames as usize,
             /* current encoding slice number in one picture */
             slice_num: 0,
             /* first mb number of current encoding slice in one picture */
@@ -902,16 +1044,18 @@ impl EvceCtx {
 
     pub(crate) fn push_frm(&mut self, frm: &mut Option<Frame<pel>>) -> Result<(), EvcError> {
         self.pico_idx = self.pic_icnt % self.pico_max_cnt;
-        //self.pico = self.pico_buf[self.pico_idx];
-        //self.pico->pic_icnt = ctx->pic_icnt;
-        //self.pico->is_used = 1;
+        let pico = &mut self.pico_buf[self.pico_idx];
+        pico.pic_icnt = self.pic_icnt;
+        pico.is_used = true;
         self.pic_icnt += 1;
+
         self.frm = frm.take();
         Ok(())
     }
 
     pub(crate) fn encode_frm(&mut self) -> Result<EvcStat, EvcError> {
         if self.frm.is_none() {
+            self.flush = true;
             return Err(EvcError::EVC_OK_FLUSH);
         }
 
@@ -919,6 +1063,37 @@ impl EvceCtx {
     }
 
     pub(crate) fn pull_pkt(&mut self) -> Result<Rc<RefCell<Packet>>, EvcError> {
+        /* bumping - check whether input pictures are remaining or not in pico_buf[] */
+        self.check_more_frames()?;
+        /* store input picture and return if needed */
+        self.check_frame_delay()?;
+
         Err(EvcError::EVC_OK_OUTPUT_NOT_AVAILABLE)
+    }
+
+    fn check_frame_delay(&self) -> Result<(), EvcError> {
+        if self.pic_icnt < self.frm_rnum {
+            Err(EvcError::EVC_OK_OUTPUT_NOT_AVAILABLE)
+        } else {
+            Ok(())
+        }
+    }
+
+    fn check_more_frames(&mut self) -> Result<(), EvcError> {
+        if self.flush {
+            /* pseudo evce_push() for bumping process ****************/
+            self.pic_icnt += 1;
+            /**********************************************************/
+
+            for pico in &self.pico_buf {
+                if pico.is_used {
+                    return Ok(());
+                }
+            }
+
+            return Err(EvcError::EVC_OK_NO_MORE_OUTPUT);
+        }
+
+        Ok(())
     }
 }

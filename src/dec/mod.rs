@@ -104,7 +104,7 @@ pub(crate) struct EvcdCore {
     ctx_flags: [u8; CtxNevIdx::NUM_CNID as usize],
     tree_cons: TREE_CONS,
 
-    evc_tbl_qp_chroma_dynamic_ext: [Vec<i8>; 2], // [[i8; MAX_QP_TABLE_SIZE_EXT]; 2],
+    evc_tbl_qp_chroma_dynamic_ext: Vec<Vec<i8>>, // [[i8; MAX_QP_TABLE_SIZE_EXT]; 2],
 }
 
 /******************************************************************************
@@ -383,18 +383,17 @@ impl EvcdCtx {
         )?;
         self.dpm = Some(dpm);
 
-        self.core.evc_tbl_qp_chroma_dynamic_ext[0] = vec![0; MAX_QP_TABLE_SIZE_EXT];
-        self.core.evc_tbl_qp_chroma_dynamic_ext[1] = vec![0; MAX_QP_TABLE_SIZE_EXT];
         if self.sps.chroma_qp_table_struct.chroma_qp_table_present_flag {
-            evc_derived_chroma_qp_mapping_tables(
-                &self.sps.chroma_qp_table_struct,
-                &mut self.core.evc_tbl_qp_chroma_dynamic_ext,
-            );
+            self.core.evc_tbl_qp_chroma_dynamic_ext =
+                evc_derived_chroma_qp_mapping_tables(&self.sps.chroma_qp_table_struct);
         } else {
-            self.core.evc_tbl_qp_chroma_dynamic_ext[0]
-                .copy_from_slice(&evc_tbl_qp_chroma_ajudst_base);
-            self.core.evc_tbl_qp_chroma_dynamic_ext[1]
-                .copy_from_slice(&evc_tbl_qp_chroma_ajudst_base);
+            self.core.evc_tbl_qp_chroma_dynamic_ext = vec![];
+            self.core
+                .evc_tbl_qp_chroma_dynamic_ext
+                .push(evc_tbl_qp_chroma_ajudst_base.to_vec());
+            self.core
+                .evc_tbl_qp_chroma_dynamic_ext
+                .push(evc_tbl_qp_chroma_ajudst_base.to_vec());
         }
         Ok(())
     }
