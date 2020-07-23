@@ -753,7 +753,7 @@ pub(crate) struct EvceCtx {
     /* total input picture count (only used for bumping process) */
     pic_ticnt: usize,
     /* remaining pictures is encoded to p or b slice (only used for bumping process) */
-    force_slice: u8,
+    force_slice: bool,
     /* ignored pictures for force slice count (unavailable pictures cnt in gop,\
     only used for bumping process) */
     force_ignored_cnt: u8,
@@ -964,7 +964,7 @@ impl EvceCtx {
             /* total input picture count (only used for bumping process) */
             pic_ticnt: 0,
             /* remaining pictures is encoded to p or b slice (only used for bumping process) */
-            force_slice: 0,
+            force_slice: false,
             /* ignored pictures for force slice count (unavailable pictures cnt in gop,\
             only used for bumping process) */
             force_ignored_cnt: 0,
@@ -1068,6 +1068,27 @@ impl EvceCtx {
         /* store input picture and return if needed */
         self.check_frame_delay()?;
 
+        let pic_cnt = self.pic_icnt - self.frm_rnum;
+        let gop_size = self.param.max_b_frames as usize + 1;
+
+        self.force_slice =
+            if (self.pic_ticnt % gop_size >= self.pic_ticnt - pic_cnt + 1) && self.flush {
+                true
+            } else {
+                false
+            };
+
+        //evc_assert_rv(bitb->addr && bitb->bsize > 0, EVC_ERR_INVALID_ARGUMENT);
+
+        /* initialize variables for a picture encoding */
+        self.evce_enc_pic_prepare()?;
+
+        /* encode one picture */
+        self.evce_enc_pic()?;
+
+        /* finishing of encoding a picture */
+        self.evce_enc_pic_finish()?;
+
         Err(EvcError::EVC_OK_OUTPUT_NOT_AVAILABLE)
     }
 
@@ -1094,6 +1115,16 @@ impl EvceCtx {
             return Err(EvcError::EVC_OK_NO_MORE_OUTPUT);
         }
 
+        Ok(())
+    }
+
+    fn evce_enc_pic_prepare(&mut self) -> Result<(), EvcError> {
+        Ok(())
+    }
+    fn evce_enc_pic(&mut self) -> Result<(), EvcError> {
+        Ok(())
+    }
+    fn evce_enc_pic_finish(&mut self) -> Result<(), EvcError> {
         Ok(())
     }
 }
