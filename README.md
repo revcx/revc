@@ -12,23 +12,9 @@ The fastest and safest EVC encoder and decoder
   - [ ] multi-threading
   - [ ] assembly
     - [ ] armeabi-v7a
-      - armeabi
-      - Thumb-2
-      - VFPv3-D16
     - [ ] arm64-v8a
-      - AArch64
-    - [ ] assembly for x86
-      - x86 (IA-32)
-      - MMX
-      - SSE/2/3
-      - SSSE3
-    - [ ] assembly for x86_64
-      - x86-64
-      - MMX
-      - SSE/2/3
-      - SSSE3
-      - SSE4.1, 4.2
-      - POPCNT
+    - [ ] x86
+    - [ ] x86_64
 
 # Usage
 
