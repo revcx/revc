@@ -423,7 +423,6 @@ pub struct EncoderConfig {
 
     pub cb_qp_offset: i8,
     pub cr_qp_offset: i8,
-    pub use_dqp: u8,
     pub cu_qp_delta_area: u8,
     pub max_b_frames: u8,
     pub ref_pic_gap_length: u8,

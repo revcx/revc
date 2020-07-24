@@ -401,6 +401,17 @@ pub(crate) struct EvcNalu {
     pub(crate) nuh_extension_flag: bool,
 }
 
+impl EvcNalu {
+    pub(crate) fn set_nalu(&mut self, nalu_type: NaluType, nuh_temporal_id: u8) {
+        self.nal_unit_size = 0;
+        self.forbidden_zero_bit = 0;
+        self.nal_unit_type = nalu_type;
+        self.nuh_temporal_id = nuh_temporal_id;
+        self.nuh_reserved_zero_5bits = 0;
+        self.nuh_extension_flag = false;
+    }
+}
+
 pub(crate) const EXTENDED_SAR: usize = 255;
 pub(crate) const NUM_CPB: usize = 32;
 

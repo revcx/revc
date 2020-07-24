@@ -118,7 +118,6 @@ fn parse_config(matches: &ArgMatches<'_>) -> std::io::Result<EncoderConfig> {
         .unwrap_or("0")
         .parse()
         .unwrap();
-    cfg.use_dqp = matches.value_of("USE_DQP").unwrap_or("0").parse().unwrap();
     cfg.cu_qp_delta_area = matches
         .value_of("CU_QP_DELTA_AREA")
         .unwrap_or("6")

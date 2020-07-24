@@ -1,3 +1,7 @@
+pub(crate) mod bsw;
+pub(crate) mod mode;
+pub(crate) mod tbl;
+
 use super::api::frame::*;
 use super::api::*;
 use super::def::*;
@@ -5,10 +9,11 @@ use super::picman::*;
 use super::tbl::*;
 use super::util::*;
 
+use bsw::*;
+use tbl::*;
+
 use std::cell::RefCell;
 use std::rc::Rc;
-
-pub(crate) mod bsw;
 
 /* support RDOQ */
 pub(crate) const SCALE_BITS: usize = 15; /* Inherited from TMuC, pressumably for fractional bit estimates in RDOQ */
@@ -21,40 +26,6 @@ pub(crate) const MAX_QUANT: u8 = 51;
 pub(crate) const MIN_QUANT: u8 = 0;
 
 pub(crate) const GOP_P: usize = 8;
-
-#[rustfmt::skip]
-static tbl_slice_depth_P: [[u8;16];5] =
-[
-    /* gop_size = 2 */
-    [ FRM_DEPTH_2, FRM_DEPTH_1, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF ],
-    /* gop_size = 4 */
-    [ FRM_DEPTH_3, FRM_DEPTH_2, FRM_DEPTH_3, FRM_DEPTH_1, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF ],
-    /* gop_size = 8 */
-    [ FRM_DEPTH_4, FRM_DEPTH_3, FRM_DEPTH_4, FRM_DEPTH_2, FRM_DEPTH_4, FRM_DEPTH_3, FRM_DEPTH_4, FRM_DEPTH_1,
-      0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF ],
-    /* gop_size = 12 */
-    [0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF],
-    /* gop_size = 16 */
-    [ FRM_DEPTH_5, FRM_DEPTH_4, FRM_DEPTH_5, FRM_DEPTH_3, FRM_DEPTH_5, FRM_DEPTH_4, FRM_DEPTH_5, FRM_DEPTH_2,
-      FRM_DEPTH_5, FRM_DEPTH_4, FRM_DEPTH_5, FRM_DEPTH_3, FRM_DEPTH_5, FRM_DEPTH_4, FRM_DEPTH_5, FRM_DEPTH_1 ],
-];
-
-#[rustfmt::skip]
-static tbl_slice_depth: [[u8;15];5] =
-[
-    /* gop_size = 2 */
-    [ FRM_DEPTH_2, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF ],
-    /* gop_size = 4 */
-    [ FRM_DEPTH_2, FRM_DEPTH_3, FRM_DEPTH_3, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF ],
-    /* gop_size = 8 */
-    [ FRM_DEPTH_2, FRM_DEPTH_3, FRM_DEPTH_3, FRM_DEPTH_4, FRM_DEPTH_4, FRM_DEPTH_4, FRM_DEPTH_4,
-      0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF ],
-    /* gop_size = 12 */
-    [0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF ],
-    /* gop_size = 16 */
-    [ FRM_DEPTH_2, FRM_DEPTH_3, FRM_DEPTH_3, FRM_DEPTH_4, FRM_DEPTH_4, FRM_DEPTH_4, FRM_DEPTH_4, FRM_DEPTH_5,
-      FRM_DEPTH_5,  FRM_DEPTH_5, FRM_DEPTH_5, FRM_DEPTH_5, FRM_DEPTH_5, FRM_DEPTH_5, FRM_DEPTH_5 ],
-];
 
 /* count of picture including encoding and reference pictures
 0: encoding picture buffer
@@ -752,9 +723,9 @@ pub(crate) struct EvceCtx {
     /* encoding parameter */
     param: EncoderConfig,
     /* bitstream structure */
-    //EVC_BSW                bs;
+    bs: EvceBsw,
     /* bitstream structure for RDO */
-    //EVC_BSW                bs_temp;
+    bs_temp: EvceBsw,
     /* sequnce parameter set */
     sps: EvcSps,
     /* picture parameter set */
@@ -801,7 +772,7 @@ pub(crate) struct EvceCtx {
     /* initial frame return number(delayed input count) due to B picture or Forecast */
     frm_rnum: usize,
     /* current encoding slice number in one picture */
-    slice_num: i32,
+    slice_num: usize,
     /* first mb number of current encoding slice in one picture */
     sl_first_mb: i32,
     /* current slice type */
@@ -966,9 +937,9 @@ impl EvceCtx {
             /* encoding parameter */
             param,
             /* bitstream structure */
-            //EVC_BSW                bs;
+            bs: EvceBsw::new(),
             /* bitstream structure for RDO */
-            //EVC_BSW                bs_temp;
+            bs_temp: EvceBsw::new(),
             /* sequnce parameter set */
             sps: EvcSps::default(),
             /* picture parameter set */
@@ -1223,6 +1194,55 @@ impl EvceCtx {
         let col_bd = 0;
         let num_slice_in_pic = self.param.num_slices_in_pic;
 
+        for slice_num in 0..num_slice_in_pic {
+            self.slice_num = slice_num;
+            let bs = &mut self.bs;
+            let core = &mut self.core;
+            let sh = &mut self.sh;
+
+            if self.poc.poc_val > self.last_intra_poc {
+                self.last_intra_poc = i32::MAX;
+            }
+            if self.slice_type == SliceType::EVC_ST_I {
+                self.last_intra_poc = self.poc.poc_val;
+            }
+
+            /* initialize reference pictures */
+            self.rpm.evc_picman_refp_init(
+                self.sps.max_num_ref_pics,
+                self.slice_type,
+                self.poc.poc_val as u32,
+                self.nalu.nuh_temporal_id,
+                self.last_intra_poc,
+                &mut self.refp,
+            );
+
+            /* initialize mode decision for frame encoding */
+            //TODO
+
+            /* slice layer encoding loop */
+            core.x_lcu = 0;
+            core.y_lcu = 0;
+            core.x_pel = 0;
+            core.y_pel = 0;
+            core.lcu_num = 0;
+            self.lcu_cnt = self.f_lcu;
+
+            /* Set nalu header */
+            self.nalu.set_nalu(
+                if self.pic_cnt == 0
+                    || (self.slice_type == SliceType::EVC_ST_I && self.param.closed_gop)
+                {
+                    NaluType::EVC_IDR_NUT
+                } else {
+                    NaluType::EVC_NONIDR_NUT
+                },
+                self.nalu.nuh_temporal_id,
+            );
+
+            self.set_sh();
+        }
+
         Ok(())
     }
     fn evce_enc_pic_finish(&mut self) -> Result<EvcStat, EvcError> {
@@ -1438,5 +1458,57 @@ impl EvceCtx {
 
             self.pic[PIC_IDX_ORIG] = Some(Rc::clone(&pico.pic));
         }
+    }
+
+    fn set_sh(&mut self) {
+        let sh = &mut self.sh;
+
+        let qp_adapt_param = if self.param.max_b_frames == 0 {
+            if self.param.max_key_frame_interval == 1 {
+                &qp_adapt_param_ai
+            } else {
+                &qp_adapt_param_ld
+            }
+        } else {
+            &qp_adapt_param_ra
+        };
+
+        sh.slice_type = self.slice_type;
+        sh.no_output_of_prior_pics_flag = false;
+        sh.deblocking_filter_on = if self.param.disable_dbf { false } else { true };
+
+        /* set lambda */
+        let mut qp = self.qp as i8; //EVC_CLIP3(0, MAX_QUANT, (ctx->param.qp_incread_frame != 0 && (int)(ctx->poc.poc_val) >= ctx->param.qp_incread_frame) ? ctx->qp + 1.0 : ctx->qp);
+
+        if !self.param.disable_hgop {
+            qp += qp_adapt_param[self.slice_depth as usize].qp_offset_layer;
+            let dqp_offset = qp as f64
+                * qp_adapt_param[self.slice_depth as usize].qp_offset_model_scale
+                + qp_adapt_param[self.slice_depth as usize].qp_offset_model_offset
+                + 0.5;
+
+            let qp_offset = EVC_CLIP3(0.0, 3.0, dqp_offset).floor() as i8;
+            qp += qp_offset;
+        }
+
+        sh.qp = EVC_CLIP3(0, MAX_QUANT as i8, qp) as u8;
+        sh.qp_u_offset = self.param.cb_qp_offset;
+        sh.qp_v_offset = self.param.cr_qp_offset;
+        sh.qp_u = EVC_CLIP3(-6 * (BIT_DEPTH as i8 - 8), 57, sh.qp as i8 + sh.qp_u_offset) as u8;
+        sh.qp_v = EVC_CLIP3(-6 * (BIT_DEPTH as i8 - 8), 57, sh.qp as i8 + sh.qp_v_offset) as u8;
+
+        let qp_l_i = sh.qp as i8;
+        self.lambda[0] = 0.57 * (2.0f64).powf((qp_l_i - 12) as f64 / 3.0);
+        let qp_c_i = self.core.evc_tbl_qp_chroma_dynamic_ext[0]
+            [EVC_TBL_CHROMA_QP_OFFSET as usize + sh.qp_u as usize];
+        self.dist_chroma_weight[0] = (2.0f64).powf((qp_l_i - qp_c_i) as f64 / 3.0);
+        let qp_c_i = self.core.evc_tbl_qp_chroma_dynamic_ext[1]
+            [EVC_TBL_CHROMA_QP_OFFSET as usize + sh.qp_v as usize];
+        self.dist_chroma_weight[1] = (2.0f64).powf((qp_l_i - qp_c_i) as f64 / 3.0);
+        self.lambda[1] = self.lambda[0] / self.dist_chroma_weight[0];
+        self.lambda[2] = self.lambda[0] / self.dist_chroma_weight[1];
+        self.sqrt_lambda[0] = self.lambda[0].sqrt();
+        self.sqrt_lambda[1] = self.lambda[1].sqrt();
+        self.sqrt_lambda[2] = self.lambda[2].sqrt();
     }
 }

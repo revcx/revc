@@ -3,13 +3,18 @@ use super::picman::*;
 use super::tbl::*;
 use crate::api::*;
 
-use std::cmp::*;
 use std::ops::Neg;
 
 /* clipping within min and max */
 #[inline]
-pub(crate) fn EVC_CLIP3<T: Ord>(min_x: T, max_x: T, value: T) -> T {
-    max(min_x, min(max_x, value))
+pub(crate) fn EVC_CLIP3<T: PartialOrd>(min_x: T, max_x: T, value: T) -> T {
+    if value < min_x {
+        min_x
+    } else if value > max_x {
+        max_x
+    } else {
+        value
+    }
 }
 
 #[inline]
