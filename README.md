@@ -1,6 +1,6 @@
 # ![revc](doc/REVC.png) [![Actions Status](https://github.com/revcx/revc/workflows/revc/badge.svg?branch=master)](https://github.com/revcx/revc/actions) 
 
-Rust Essential Video Coding (MPEG-5 EVC baseline)
+The fastest and safest EVC encoder and decoder
 
 # Roadmap
 
@@ -12,23 +12,9 @@ Rust Essential Video Coding (MPEG-5 EVC baseline)
   - [ ] multi-threading
   - [ ] assembly
     - [ ] armeabi-v7a
-      - armeabi
-      - Thumb-2
-      - VFPv3-D16
     - [ ] arm64-v8a
-      - AArch64
-    - [ ] assembly for x86
-      - x86 (IA-32)
-      - MMX
-      - SSE/2/3
-      - SSSE3
-    - [ ] assembly for x86_64
-      - x86-64
-      - MMX
-      - SSE/2/3
-      - SSSE3
-      - SSE4.1, 4.2
-      - POPCNT
+    - [ ] x86
+    - [ ] x86_64
 
 # Usage
 
