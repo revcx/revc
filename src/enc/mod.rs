@@ -8,6 +8,8 @@ use super::util::*;
 use std::cell::RefCell;
 use std::rc::Rc;
 
+pub(crate) mod bsw;
+
 /* support RDOQ */
 pub(crate) const SCALE_BITS: usize = 15; /* Inherited from TMuC, pressumably for fractional bit estimates in RDOQ */
 pub(crate) const ERR_SCALE_PRECISION_BITS: usize = 20;
@@ -1216,6 +1218,11 @@ impl EvceCtx {
         Ok(())
     }
     fn evce_enc_pic(&mut self) -> Result<(), EvcError> {
+        let split_allow: [bool; 6] = [false, false, false, false, false, true];
+        let ctb_cnt_in_tile = 0;
+        let col_bd = 0;
+        let num_slice_in_pic = self.param.num_slices_in_pic;
+
         Ok(())
     }
     fn evce_enc_pic_finish(&mut self) -> Result<EvcStat, EvcError> {
