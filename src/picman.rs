@@ -30,7 +30,7 @@ pub(crate) struct EvcPic {
 }
 
 impl EvcPic {
-    fn new(width: usize, height: usize, chroma_sampling: ChromaSampling) -> Self {
+    pub(crate) fn new(width: usize, height: usize, chroma_sampling: ChromaSampling) -> Self {
         /* allocate maps */
         let w_scu = (width + ((1 << MIN_CU_LOG2) - 1)) >> MIN_CU_LOG2;
         let h_scu = (height + ((1 << MIN_CU_LOG2) - 1)) >> MIN_CU_LOG2;

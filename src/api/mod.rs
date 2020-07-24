@@ -342,9 +342,9 @@ pub enum InvalidConfig {
     #[error("invalid max keyframe interval {actual} (expected <= {max})")]
     InvalidMaxKeyFrameInterval {
         /// The actual value.
-        actual: u64,
+        actual: usize,
         /// The maximal supported value.
-        max: u64,
+        max: usize,
     },
     /// Framerate numerator is invalid.
     #[error("invalid framerate numerator {actual} (expected > 0, <= {max})")]
@@ -389,7 +389,7 @@ pub enum InvalidConfig {
 // We add 1 to rdo_lookahead_frames in a bunch of places.
 pub(crate) const MAX_RDO_LOOKAHEAD_FRAMES: usize = usize::max_value() - 1;
 // Due to the math in RCState::new() regarding the reservoir frame delay.
-pub const MAX_MAX_KEY_FRAME_INTERVAL: u64 = i32::max_value() as u64 / 3;
+pub const MAX_MAX_KEY_FRAME_INTERVAL: usize = i32::max_value() as usize / 3;
 
 #[derive(Clone, Copy, Debug, Default)]
 pub struct EncoderConfig {
@@ -408,9 +408,9 @@ pub struct EncoderConfig {
 
     // encoder configuration
     // The *minimum* interval between two keyframes
-    pub min_key_frame_interval: u64,
+    pub min_key_frame_interval: usize,
     // The *maximum* interval between two keyframes
-    pub max_key_frame_interval: u64, //iperiod
+    pub max_key_frame_interval: usize, //iperiod
 
     // The base quantizer to use.
     pub qp: u8,
@@ -506,7 +506,7 @@ impl EncoderConfig {
             }
 
             if config.max_b_frames != 0 {
-                if config.max_key_frame_interval % (config.max_b_frames + 1) as u64 != 0 {
+                if config.max_key_frame_interval % (config.max_b_frames + 1) as usize != 0 {
                     return Err(InvalidHierarchicalGOP);
                 }
             }

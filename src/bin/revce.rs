@@ -63,7 +63,7 @@ fn parse_config(matches: &ArgMatches<'_>) -> std::io::Result<EncoderConfig> {
         panic!("Quantizer must be between 0-51");
     }
 
-    let mut max_interval: u64 = matches
+    let mut max_interval: usize = matches
         .value_of("KEYFRAME_INTERVAL")
         .unwrap()
         .parse()
@@ -73,7 +73,7 @@ fn parse_config(matches: &ArgMatches<'_>) -> std::io::Result<EncoderConfig> {
     } else {
         max_interval
     };
-    let mut min_interval: u64 = matches
+    let mut min_interval: usize = matches
         .value_of("MIN_KEYFRAME_INTERVAL")
         .unwrap()
         .parse()

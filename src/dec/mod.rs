@@ -116,7 +116,7 @@ pub(crate) struct EvcdCtx {
     /* magic code */
     magic: u32,
 
-    /* buffered packets */
+    /* input packet */
     pkt: Option<Packet>,
 
     /* EVCD identifier */

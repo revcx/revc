@@ -3,6 +3,7 @@ use super::api::*;
 use super::def::*;
 use super::picman::*;
 use super::tbl::*;
+use super::util::*;
 
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -18,6 +19,40 @@ pub(crate) const MAX_QUANT: u8 = 51;
 pub(crate) const MIN_QUANT: u8 = 0;
 
 pub(crate) const GOP_P: usize = 8;
+
+#[rustfmt::skip]
+static tbl_slice_depth_P: [[u8;16];5] =
+[
+    /* gop_size = 2 */
+    [ FRM_DEPTH_2, FRM_DEPTH_1, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF ],
+    /* gop_size = 4 */
+    [ FRM_DEPTH_3, FRM_DEPTH_2, FRM_DEPTH_3, FRM_DEPTH_1, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF ],
+    /* gop_size = 8 */
+    [ FRM_DEPTH_4, FRM_DEPTH_3, FRM_DEPTH_4, FRM_DEPTH_2, FRM_DEPTH_4, FRM_DEPTH_3, FRM_DEPTH_4, FRM_DEPTH_1,
+      0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF ],
+    /* gop_size = 12 */
+    [0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF],
+    /* gop_size = 16 */
+    [ FRM_DEPTH_5, FRM_DEPTH_4, FRM_DEPTH_5, FRM_DEPTH_3, FRM_DEPTH_5, FRM_DEPTH_4, FRM_DEPTH_5, FRM_DEPTH_2,
+      FRM_DEPTH_5, FRM_DEPTH_4, FRM_DEPTH_5, FRM_DEPTH_3, FRM_DEPTH_5, FRM_DEPTH_4, FRM_DEPTH_5, FRM_DEPTH_1 ],
+];
+
+#[rustfmt::skip]
+static tbl_slice_depth: [[u8;15];5] =
+[
+    /* gop_size = 2 */
+    [ FRM_DEPTH_2, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF ],
+    /* gop_size = 4 */
+    [ FRM_DEPTH_2, FRM_DEPTH_3, FRM_DEPTH_3, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF ],
+    /* gop_size = 8 */
+    [ FRM_DEPTH_2, FRM_DEPTH_3, FRM_DEPTH_3, FRM_DEPTH_4, FRM_DEPTH_4, FRM_DEPTH_4, FRM_DEPTH_4,
+      0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF ],
+    /* gop_size = 12 */
+    [0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF ],
+    /* gop_size = 16 */
+    [ FRM_DEPTH_2, FRM_DEPTH_3, FRM_DEPTH_3, FRM_DEPTH_4, FRM_DEPTH_4, FRM_DEPTH_4, FRM_DEPTH_4, FRM_DEPTH_5,
+      FRM_DEPTH_5,  FRM_DEPTH_5, FRM_DEPTH_5, FRM_DEPTH_5, FRM_DEPTH_5, FRM_DEPTH_5, FRM_DEPTH_5 ],
+];
 
 /* count of picture including encoding and reference pictures
 0: encoding picture buffer
@@ -84,14 +119,14 @@ pub(crate) struct EvceMode {
 }
 
 /* virtual frame depth B picture */
-pub(crate) const FRM_DEPTH_0: usize = 0;
-pub(crate) const FRM_DEPTH_1: usize = 1;
-pub(crate) const FRM_DEPTH_2: usize = 2;
-pub(crate) const FRM_DEPTH_3: usize = 3;
-pub(crate) const FRM_DEPTH_4: usize = 4;
-pub(crate) const FRM_DEPTH_5: usize = 5;
-pub(crate) const FRM_DEPTH_6: usize = 6;
-pub(crate) const FRM_DEPTH_MAX: usize = 7;
+pub(crate) const FRM_DEPTH_0: u8 = 0;
+pub(crate) const FRM_DEPTH_1: u8 = 1;
+pub(crate) const FRM_DEPTH_2: u8 = 2;
+pub(crate) const FRM_DEPTH_3: u8 = 3;
+pub(crate) const FRM_DEPTH_4: u8 = 4;
+pub(crate) const FRM_DEPTH_5: u8 = 5;
+pub(crate) const FRM_DEPTH_6: u8 = 6;
+pub(crate) const FRM_DEPTH_MAX: u8 = 7;
 /* I-slice, P-slice, B-slice + depth + 1 (max for GOP 8 size)*/
 pub(crate) const LIST_NUM: usize = 1;
 
@@ -101,7 +136,7 @@ pub(crate) const LIST_NUM: usize = 1;
 #[derive(Default)]
 pub(crate) struct EvcePicOrg {
     /* original picture store */
-    pic: EvcPic,
+    pic: Rc<RefCell<EvcPic>>,
     /* input picture count */
     pic_icnt: usize,
     /* be used for encoding input */
@@ -676,12 +711,21 @@ impl EvceCore {
         }
     }
 }
+
 /******************************************************************************
  * CONTEXT used for encoding process.
  *
  * All have to be stored are in this structure.
  *****************************************************************************/
 pub(crate) struct EvceCtx {
+    /* magic code */
+    magic: u32,
+
+    /* input frame */
+    frm: Option<Frame<pel>>,
+    /* output packet */
+    pkt: Vec<u8>,
+
     flush: bool,
     /* address of current input picture, ref_picture  buffer structure */
     pico_buf: Vec<EvcePicOrg>,
@@ -690,11 +734,7 @@ pub(crate) struct EvceCtx {
     /* index of current input picture buffer in pico_buf[] */
     pico_idx: usize,
     pico_max_cnt: usize,
-    /* magic code */
-    magic: u32,
-
-    /* buffered packets */
-    frm: Option<Frame<pel>>,
+    gop_size: usize,
 
     /* EVCE identifier */
     //EVCE                   id;
@@ -703,7 +743,7 @@ pub(crate) struct EvceCtx {
     /* current input (original) image */
     //EVC_PIC                pic_o;
     /* address indicating current encoding, list0, list1 and original pictures */
-    //EVC_PIC * pic[PIC_D + 1]; /* the last one is for original */
+    pic: Vec<Option<Rc<RefCell<EvcPic>>>>, /* the last one is for original */
     /* picture address for mode decision */
     //EVC_PIC * pic_m;
     /* reference picture (0: foward, 1: backward) */
@@ -756,7 +796,7 @@ pub(crate) struct EvceCtx {
     force_slice: bool,
     /* ignored pictures for force slice count (unavailable pictures cnt in gop,\
     only used for bumping process) */
-    force_ignored_cnt: u8,
+    force_ignored_cnt: usize,
     /* initial frame return number(delayed input count) due to B picture or Forecast */
     frm_rnum: usize,
     /* current encoding slice number in one picture */
@@ -823,7 +863,7 @@ pub(crate) struct EvceCtx {
     /* map for intra pred mode */
     map_ipm: Vec<IntraPredDir>,
     map_depth: Vec<i8>,
-    //EVC_PIC              * pic_dbk;          //one picture that arranges cu pixels and neighboring pixels for deblocking (just to match the interface of deblocking functions)
+    pic_dbk: Option<Rc<RefCell<EvcPic>>>, //one picture that arranges cu pixels and neighboring pixels for deblocking (just to match the interface of deblocking functions)
     map_cu_mode: Vec<MCU>,
     lambda: [f64; 3],
     sqrt_lambda: [f64; 3],
@@ -894,6 +934,12 @@ impl EvceCtx {
         }
 
         EvceCtx {
+            /* magic code */
+            magic: EVCE_MAGIC_CODE,
+
+            frm: None,
+            pkt: vec![],
+
             flush: false,
             /* address of current input picture, ref_picture  buffer structure */
             pico_buf,
@@ -902,10 +948,7 @@ impl EvceCtx {
             /* index of current input picture buffer in pico_buf[] */
             pico_idx: 0,
             pico_max_cnt,
-
-            /* magic code */
-            magic: EVCE_MAGIC_CODE,
-            frm: None,
+            gop_size: param.max_b_frames as usize + 1,
 
             /* EVCE identifier */
             //EVCE                   id;
@@ -914,7 +957,7 @@ impl EvceCtx {
             /* current input (original) image */
             //EVC_PIC                pic_o;
             /* address indicating current encoding, list0, list1 and original pictures */
-            //EVC_PIC * pic[PIC_D + 1]; /* the last one is for original */
+            pic: vec![None; PicIdx::PIC_D as usize + 1], /* the last one is for original */
             /* picture address for mode decision */
             //EVC_PIC * pic_m;
             /* reference picture (0: foward, 1: backward) */
@@ -1034,7 +1077,7 @@ impl EvceCtx {
             /* map for intra pred mode */
             map_ipm,
             map_depth,
-            //EVC_PIC              * pic_dbk;          //one picture that arranges cu pixels and neighboring pixels for deblocking (just to match the interface of deblocking functions)
+            pic_dbk: None, //one picture that arranges cu pixels and neighboring pixels for deblocking (just to match the interface of deblocking functions)
             map_cu_mode,
             lambda: [0.0; 3],
             sqrt_lambda: [0.0; 3],
@@ -1069,10 +1112,8 @@ impl EvceCtx {
         self.check_frame_delay()?;
 
         let pic_cnt = self.pic_icnt - self.frm_rnum;
-        let gop_size = self.param.max_b_frames as usize + 1;
-
         self.force_slice =
-            if (self.pic_ticnt % gop_size >= self.pic_ticnt - pic_cnt + 1) && self.flush {
+            if (self.pic_ticnt % self.gop_size >= self.pic_ticnt - pic_cnt + 1) && self.flush {
                 true
             } else {
                 false
@@ -1119,6 +1160,37 @@ impl EvceCtx {
     }
 
     fn evce_enc_pic_prepare(&mut self) -> Result<(), EvcError> {
+        self.qp = self.param.qp;
+
+        self.pic[PicIdx::PIC_IDX_CURR as usize] = self.rpm.evc_picman_get_empty_pic()?;
+        if let Some(pic) = &self.pic[PicIdx::PIC_IDX_CURR as usize] {
+            {
+                let p = pic.borrow();
+                self.map_refi = Some(Rc::clone(&p.map_refi));
+                self.map_mv = Some(Rc::clone(&p.map_mv));
+            }
+
+            /*if self.sps.picture_cropping_flag {
+                PIC_CURR(ctx)->imgb->crop_idx = 1;
+                PIC_CURR(ctx)->imgb->crop_l = ctx->sps.picture_crop_left_offset;
+                PIC_CURR(ctx)->imgb->crop_r = ctx->sps.picture_crop_right_offset;
+                PIC_CURR(ctx)->imgb->crop_t = ctx->sps.picture_crop_top_offset;
+                PIC_CURR(ctx)->imgb->crop_b = ctx->sps.picture_crop_bottom_offset;
+            }*/
+
+            self.pic[PicIdx::PIC_IDX_MODE as usize] = Some(Rc::clone(pic));
+        }
+
+        if self.pic_dbk.is_none() {
+            self.pic_dbk = Some(Rc::new(RefCell::new(EvcPic::new(
+                self.w as usize,
+                self.h as usize,
+                self.param.chroma_sampling,
+            ))));
+        }
+
+        self.decide_slice_type();
+
         Ok(())
     }
     fn evce_enc_pic(&mut self) -> Result<(), EvcError> {
@@ -1126,5 +1198,155 @@ impl EvceCtx {
     }
     fn evce_enc_pic_finish(&mut self) -> Result<(), EvcError> {
         Ok(())
+    }
+
+    /* slice_type / slice_depth / poc / PIC_ORIG setting */
+    fn decide_slice_type(&mut self) {
+        let mut force_cnt = 0;
+        let i_period = self.param.max_key_frame_interval as usize;
+        let gop_size = self.gop_size;
+        let mut pic_icnt = self.pic_cnt + self.param.max_b_frames as usize;
+        let mut pic_imcnt = pic_icnt;
+        self.pico_idx = pic_icnt % self.pico_max_cnt;
+        let pico = &self.pico_buf[self.pico_idx];
+        self.pic[PicIdx::PIC_IDX_ORIG as usize] = Some(Rc::clone(&pico.pic));
+
+        if gop_size == 1 {
+            if i_period == 1 {
+                /* IIII... */
+                self.slice_type = SliceType::EVC_ST_I;
+                self.slice_depth = FRM_DEPTH_0;
+                self.poc.poc_val = pic_icnt as i32;
+                self.slice_ref_flag = false;
+            } else {
+                /* IPPP... */
+                pic_imcnt = if i_period > 0 {
+                    pic_icnt % i_period
+                } else {
+                    pic_icnt
+                };
+                if pic_imcnt == 0 {
+                    self.slice_type = SliceType::EVC_ST_I;
+                    self.slice_depth = FRM_DEPTH_0;
+                    self.poc.poc_val = 0;
+                    self.slice_ref_flag = true;
+                } else {
+                    self.slice_type = SliceType::from(self.param.inter_slice_type);
+
+                    if !self.param.disable_hgop {
+                        self.slice_depth = tbl_slice_depth_P
+                            [self.param.ref_pic_gap_length as usize >> 2]
+                            [(pic_imcnt - 1) % self.param.ref_pic_gap_length as usize];
+                    } else {
+                        self.slice_depth = FRM_DEPTH_1;
+                    }
+                    self.poc.poc_val = if i_period > 0 {
+                        self.pic_cnt % i_period
+                    } else {
+                        self.pic_cnt
+                    } as i32;
+                    self.slice_ref_flag = true;
+                }
+            }
+        } else {
+            /* include B Picture (gop_size = 2 or 4 or 8 or 16) */
+            if pic_icnt == gop_size - 1 {
+                /* special case when sequence start */
+
+                self.slice_type = SliceType::EVC_ST_I;
+                self.slice_depth = FRM_DEPTH_0;
+                self.poc.poc_val = 0;
+                self.poc.prev_doc_offset = 0;
+                self.poc.prev_poc_val = self.poc.poc_val as u32;
+                self.slice_ref_flag = true;
+
+                /* flush the first IDR picture */
+                self.pic[PicIdx::PIC_IDX_ORIG as usize] = Some(Rc::clone(&self.pico_buf[0].pic));
+            //ctx->pico = ctx->pico_buf[0];
+            } else if self.force_slice {
+                force_cnt = self.force_ignored_cnt as usize;
+                while (force_cnt < gop_size) {
+                    pic_icnt = self.pic_cnt + self.param.max_b_frames as usize + force_cnt;
+                    pic_imcnt = pic_icnt;
+
+                    self.decide_normal_gop(pic_imcnt);
+
+                    if self.poc.poc_val <= self.pic_ticnt as i32 {
+                        break;
+                    }
+                }
+                self.force_ignored_cnt = force_cnt;
+            } else {
+                /* normal GOP case */
+                self.decide_normal_gop(pic_imcnt);
+            }
+        }
+        if !self.param.disable_hgop && gop_size > 1 {
+            self.nalu.nuh_temporal_id = self.slice_depth - if self.slice_depth > 0 { 1 } else { 0 };
+        } else {
+            self.nalu.nuh_temporal_id = 0;
+        }
+    }
+
+    fn decide_normal_gop(&mut self, pic_imcnt: usize) {
+        let i_period = self.param.max_key_frame_interval;
+        let gop_size = self.gop_size;
+
+        if i_period == 0 && pic_imcnt == 0 {
+            self.slice_type = SliceType::EVC_ST_I;
+            self.slice_depth = FRM_DEPTH_0;
+            self.poc.poc_val = pic_imcnt as i32;
+            self.poc.prev_doc_offset = 0;
+            self.poc.prev_poc_val = self.poc.poc_val as u32;
+            self.slice_ref_flag = true;
+        } else if (i_period != 0) && pic_imcnt % i_period == 0 {
+            self.slice_type = SliceType::EVC_ST_I;
+            self.slice_depth = FRM_DEPTH_0;
+            self.poc.poc_val = pic_imcnt as i32;
+            self.poc.prev_doc_offset = 0;
+            self.poc.prev_poc_val = self.poc.poc_val as u32;
+            self.slice_ref_flag = true;
+        } else if pic_imcnt % gop_size == 0 {
+            self.slice_type = SliceType::from(self.param.inter_slice_type);
+            self.slice_depth = FRM_DEPTH_1;
+            self.poc.poc_val = pic_imcnt as i32;
+            self.poc.prev_doc_offset = 0;
+            self.poc.prev_poc_val = self.poc.poc_val as u32;
+            self.slice_ref_flag = true;
+        } else {
+            self.slice_type = SliceType::from(self.param.inter_slice_type);
+            if !self.param.disable_hgop {
+                let pos = (pic_imcnt % gop_size) - 1;
+
+                self.slice_depth = tbl_slice_depth[gop_size >> 2][pos];
+                let tid = self.slice_depth - if self.slice_depth > 0 { 1 } else { 0 };
+                evc_poc_derivation(&self.sps, tid, &mut self.poc);
+
+                if gop_size >= 2 {
+                    self.slice_ref_flag =
+                        if self.slice_depth == tbl_slice_depth[gop_size >> 2][gop_size - 2] {
+                            false
+                        } else {
+                            true
+                        };
+                } else {
+                    self.slice_ref_flag = true;
+                }
+            } else {
+                let pos = (pic_imcnt % gop_size) - 1;
+                self.slice_depth = FRM_DEPTH_2;
+                self.poc.poc_val =
+                    (((pic_imcnt / gop_size) * gop_size) - gop_size + pos + 1) as i32;
+                self.slice_ref_flag = false;
+            }
+            /* find current encoding picture's(B picture) pic_icnt */
+            let pic_icnt_b = self.poc.poc_val;
+
+            /* find pico again here */
+            self.pico_idx = pic_icnt_b as usize % self.pico_max_cnt;
+            let pico = &self.pico_buf[self.pico_idx];
+
+            self.pic[PicIdx::PIC_IDX_ORIG as usize] = Some(Rc::clone(&pico.pic));
+        }
     }
 }
