@@ -61,19 +61,18 @@ static tbl_slice_depth: [[u8;15];5] =
 3: original (input) picture buffer
 4: mode decision picture buffer, if exists
 */
-pub(crate) enum PicIdx {
-    /* current encoding picture buffer index */
-    PIC_IDX_CURR = 0,
-    /* list0 reference picture buffer index */
-    PIC_IDX_FORW = 1,
-    /* list1 reference picture buffer index */
-    PIC_IDX_BACK = 2,
-    /* original (input) picture buffer index */
-    PIC_IDX_ORIG = 3,
-    /* mode decision picture buffer index */
-    PIC_IDX_MODE = 4,
-    PIC_D = 5,
-}
+
+/* current encoding picture buffer index */
+pub(crate) const PIC_IDX_CURR: usize = 0;
+/* list0 reference picture buffer index */
+pub(crate) const PIC_IDX_FORW: usize = 1;
+/* list1 reference picture buffer index */
+pub(crate) const PIC_IDX_BACK: usize = 2;
+/* original (input) picture buffer index */
+pub(crate) const PIC_IDX_ORIG: usize = 3;
+/* mode decision picture buffer index */
+pub(crate) const PIC_IDX_MODE: usize = 4;
+pub(crate) const PIC_D: usize = 5;
 
 /* check whether bumping is progress or not */
 // FORCE_OUT(ctx)          (ctx->param.force_output == 1)
@@ -828,7 +827,7 @@ pub(crate) struct EvceCtx {
     log2_min_cuwh: u8,
     /* total count of remained LCU for encoding one picture. if a picture is
     encoded properly, this value should reach to zero */
-    lcu_cnt: i32,
+    lcu_cnt: u32,
     /* picture width in LCU unit */
     w_lcu: u16,
     /* picture height in LCU unit */
@@ -957,7 +956,7 @@ impl EvceCtx {
             /* current input (original) image */
             //EVC_PIC                pic_o;
             /* address indicating current encoding, list0, list1 and original pictures */
-            pic: vec![None; PicIdx::PIC_D as usize + 1], /* the last one is for original */
+            pic: vec![None; PIC_D + 1], /* the last one is for original */
             /* picture address for mode decision */
             //EVC_PIC * pic_m;
             /* reference picture (0: foward, 1: backward) */
@@ -1099,25 +1098,22 @@ impl EvceCtx {
     pub(crate) fn encode_frm(&mut self) -> Result<EvcStat, EvcError> {
         if self.frm.is_none() {
             self.flush = true;
-            return Err(EvcError::EVC_OK_FLUSH);
         }
 
-        Err(EvcError::EVC_ERR_EMPTY_FRAME)
-    }
-
-    pub(crate) fn pull_pkt(&mut self) -> Result<Rc<RefCell<Packet>>, EvcError> {
         /* bumping - check whether input pictures are remaining or not in pico_buf[] */
         self.check_more_frames()?;
         /* store input picture and return if needed */
         self.check_frame_delay()?;
 
-        let pic_cnt = self.pic_icnt - self.frm_rnum;
-        self.force_slice =
-            if (self.pic_ticnt % self.gop_size >= self.pic_ticnt - pic_cnt + 1) && self.flush {
-                true
-            } else {
-                false
-            };
+        let pic_cnt = self.pic_icnt as isize - self.frm_rnum as isize;
+        self.force_slice = if (self.pic_ticnt % self.gop_size) as isize
+            >= (self.pic_ticnt as isize - pic_cnt + 1)
+            && self.flush
+        {
+            true
+        } else {
+            false
+        };
 
         //evc_assert_rv(bitb->addr && bitb->bsize > 0, EVC_ERR_INVALID_ARGUMENT);
 
@@ -1128,8 +1124,10 @@ impl EvceCtx {
         self.evce_enc_pic()?;
 
         /* finishing of encoding a picture */
-        self.evce_enc_pic_finish()?;
+        self.evce_enc_pic_finish()
+    }
 
+    pub(crate) fn pull_pkt(&mut self) -> Result<Rc<RefCell<Packet>>, EvcError> {
         Err(EvcError::EVC_OK_OUTPUT_NOT_AVAILABLE)
     }
 
@@ -1162,8 +1160,8 @@ impl EvceCtx {
     fn evce_enc_pic_prepare(&mut self) -> Result<(), EvcError> {
         self.qp = self.param.qp;
 
-        self.pic[PicIdx::PIC_IDX_CURR as usize] = self.rpm.evc_picman_get_empty_pic()?;
-        if let Some(pic) = &self.pic[PicIdx::PIC_IDX_CURR as usize] {
+        self.pic[PIC_IDX_CURR] = self.rpm.evc_picman_get_empty_pic()?;
+        if let Some(pic) = &self.pic[PIC_IDX_CURR] {
             {
                 let p = pic.borrow();
                 self.map_refi = Some(Rc::clone(&p.map_refi));
@@ -1178,7 +1176,7 @@ impl EvceCtx {
                 PIC_CURR(ctx)->imgb->crop_b = ctx->sps.picture_crop_bottom_offset;
             }*/
 
-            self.pic[PicIdx::PIC_IDX_MODE as usize] = Some(Rc::clone(pic));
+            self.pic[PIC_IDX_MODE] = Some(Rc::clone(pic));
         }
 
         if self.pic_dbk.is_none() {
@@ -1191,13 +1189,98 @@ impl EvceCtx {
 
         self.decide_slice_type();
 
+        self.lcu_cnt = self.f_lcu;
+        self.slice_num = 0;
+
+        if self.slice_type == SliceType::EVC_ST_I {
+            self.last_intra_poc = self.poc.poc_val;
+        }
+
+        //TODO: initialize map here?
+        /*
+        size = sizeof(s8) * ctx->f_scu * REFP_NUM;
+        evc_mset_x64a(ctx->map_refi, -1, size);
+
+        size = sizeof(s16) * ctx->f_scu * REFP_NUM * MV_D;
+        evc_mset_x64a(ctx->map_mv, 0, size);
+        /* initialize bitstream container */
+        evc_bsw_init(&ctx->bs, bitb->addr, bitb->bsize, NULL);
+
+        /* clear map */
+        evc_mset_x64a(ctx->map_scu, 0, sizeof(u32) * ctx->f_scu);
+        evc_mset_x64a(ctx->map_cu_mode, 0, sizeof(u32) * ctx->f_scu);
+        */
+
+        //TODO: support MULTIPLE_NAL?
+
         Ok(())
     }
     fn evce_enc_pic(&mut self) -> Result<(), EvcError> {
         Ok(())
     }
-    fn evce_enc_pic_finish(&mut self) -> Result<(), EvcError> {
-        Ok(())
+    fn evce_enc_pic_finish(&mut self) -> Result<EvcStat, EvcError> {
+        let mut stat = EvcStat::default();
+
+        //TODO: adding picture signature
+
+        /* expand current encoding picture, if needs */
+        //ctx->fn_picbuf_expand(ctx, PIC_CURR(ctx));
+        let pic_curr = &self.pic[PIC_IDX_CURR];
+        if let Some(pic) = &pic_curr {
+            let frame = &pic.borrow().frame;
+            frame.borrow_mut().pad();
+        }
+
+        /* picture buffer management */
+        self.rpm.evc_picman_put_pic(
+            pic_curr,
+            self.nalu.nal_unit_type == NaluType::EVC_IDR_NUT,
+            self.poc.poc_val as u32,
+            self.nalu.nuh_temporal_id,
+            false,
+            &mut self.refp,
+            self.slice_ref_flag,
+            self.ref_pic_gap_length,
+        );
+
+        /*
+        imgb_o = PIC_ORIG(ctx)->imgb;
+        evc_assert(imgb_o != NULL);
+
+        imgb_c = PIC_CURR(ctx)->imgb;
+        evc_assert(imgb_c != NULL);*/
+
+        /* set stat */
+        stat.bytes = 0; //TODO:self.bs.EVC_BSW_GET_WRITE_BYTE();
+        stat.nalu_type = if self.slice_type == SliceType::EVC_ST_I {
+            NaluType::EVC_IDR_NUT
+        } else {
+            NaluType::EVC_NONIDR_NUT
+        };
+        stat.stype = self.slice_type;
+        stat.fnum = self.pic_cnt as isize;
+        stat.qp = self.sh.qp;
+        stat.poc = self.poc.poc_val as isize;
+        stat.tid = self.nalu.nuh_temporal_id as isize;
+
+        for i in 0..2 {
+            stat.refpic_num[i] = self.rpm.num_refp[i];
+            for j in 0..stat.refpic_num[i] as usize {
+                stat.refpic[i][j] = self.refp[j][i].poc as isize;
+            }
+        }
+
+        self.pic_cnt += 1; /* increase picture count */
+        //self.param.f_ifrm = 0; /* clear force-IDR flag */ //TODO
+        let pico = &mut self.pico_buf[self.pico_idx];
+        pico.is_used = false;
+        /*
+                imgb_c->ts[0] = bitb->ts[0] = imgb_o->ts[0];
+                imgb_c->ts[1] = bitb->ts[1] = imgb_o->ts[1];
+                imgb_c->ts[2] = bitb->ts[2] = imgb_o->ts[2];
+                imgb_c->ts[3] = bitb->ts[3] = imgb_o->ts[3];
+        */
+        Ok(stat)
     }
 
     /* slice_type / slice_depth / poc / PIC_ORIG setting */
@@ -1209,7 +1292,7 @@ impl EvceCtx {
         let mut pic_imcnt = pic_icnt;
         self.pico_idx = pic_icnt % self.pico_max_cnt;
         let pico = &self.pico_buf[self.pico_idx];
-        self.pic[PicIdx::PIC_IDX_ORIG as usize] = Some(Rc::clone(&pico.pic));
+        self.pic[PIC_IDX_ORIG] = Some(Rc::clone(&pico.pic));
 
         if gop_size == 1 {
             if i_period == 1 {
@@ -1261,7 +1344,7 @@ impl EvceCtx {
                 self.slice_ref_flag = true;
 
                 /* flush the first IDR picture */
-                self.pic[PicIdx::PIC_IDX_ORIG as usize] = Some(Rc::clone(&self.pico_buf[0].pic));
+                self.pic[PIC_IDX_ORIG] = Some(Rc::clone(&self.pico_buf[0].pic));
             //ctx->pico = ctx->pico_buf[0];
             } else if self.force_slice {
                 force_cnt = self.force_ignored_cnt as usize;
@@ -1346,7 +1429,7 @@ impl EvceCtx {
             self.pico_idx = pic_icnt_b as usize % self.pico_max_cnt;
             let pico = &self.pico_buf[self.pico_idx];
 
-            self.pic[PicIdx::PIC_IDX_ORIG as usize] = Some(Rc::clone(&pico.pic));
+            self.pic[PIC_IDX_ORIG] = Some(Rc::clone(&pico.pic));
         }
     }
 }

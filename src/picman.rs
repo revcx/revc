@@ -402,7 +402,6 @@ impl EvcPm {
         need_for_output: bool,
         refp: &mut Vec<Vec<EvcRefP>>,
         ref_pic: bool,
-        tool_rpl: bool,
         ref_pic_gap_length: u32,
     ) {
         /* manage RPB */
@@ -410,10 +409,8 @@ impl EvcPm {
             self.picman_flush_pb();
         }
         //Perform picture marking if RPL approach is not used
-        else if !tool_rpl {
-            if temporal_id == 0 {
-                self.pic_marking_no_rpl(ref_pic_gap_length);
-            }
+        else if temporal_id == 0 {
+            self.pic_marking_no_rpl(ref_pic_gap_length);
         }
 
         if let Some(pic) = pic {

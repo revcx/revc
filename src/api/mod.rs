@@ -622,27 +622,10 @@ impl Context {
                 Ok(stat)
             }
             Context::Encoder(ctx) => {
-                let mut pull_pkt = false;
-                match ctx.0.encode_frm() {
-                    Ok(_) => {}
-                    Err(err) => {
-                        if err == EvcError::EVC_OK_FLUSH {
-                            pull_pkt = true;
-                        }
-                    }
-                }
-
-                if pull_pkt {
-                    match ctx.0.pull_pkt() {
-                        Ok(_) => {}
-                        Err(err) => {
-                            if err != EvcError::EVC_OK_OUTPUT_NOT_AVAILABLE {
-                                return Err(err);
-                            }
-                        }
-                    }
-                }
-                Err(EvcError::EVC_OK_NO_MORE_OUTPUT)
+                let stat = Some(ctx.0.encode_frm()?);
+                let packet = ctx.0.pull_pkt()?;
+                *data = Data::RefPacket(packet);
+                Ok(stat)
             }
             Context::Invalid(_) => Err(EvcError::EVC_ERR_UNSUPPORTED),
         }

@@ -1726,7 +1726,6 @@ impl EvcdCtx {
                     true,
                     &mut self.refp,
                     self.slice_ref_flag,
-                    self.sps.tool_rpl,
                     self.ref_pic_gap_length,
                 );
             }
