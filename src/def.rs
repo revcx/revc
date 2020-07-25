@@ -583,6 +583,11 @@ pub(crate) struct EvcSh {
     pub(crate) qp_u_offset: i8,
     pub(crate) qp_v_offset: i8,
 
+    /*QP of previous cu in decoding order (used for dqp)*/
+    pub(crate) qp_prev_eco: u8,
+    pub(crate) dqp: u8,
+    pub(crate) qp_prev_mode: u8,
+
     pub(crate) num_ctb: u16,
 }
 
@@ -753,27 +758,12 @@ pub(crate) const QUANT_IQUANT_SHIFT: usize = 20;
 #[derive(Default)]
 pub(crate) struct EvcSbacCtx {
     pub(crate) skip_flag: [SBAC_CTX_MODEL; NUM_CTX_SKIP_FLAG],
-    pub(crate) ibc_flag: [SBAC_CTX_MODEL; NUM_CTX_IBC_FLAG],
-    pub(crate) mmvd_flag: [SBAC_CTX_MODEL; NUM_CTX_MMVD_FLAG],
-    pub(crate) mmvd_merge_idx: [SBAC_CTX_MODEL; NUM_CTX_MMVD_MERGE_IDX],
-    pub(crate) mmvd_distance_idx: [SBAC_CTX_MODEL; NUM_CTX_MMVD_DIST_IDX],
-    pub(crate) mmvd_direction_idx: [SBAC_CTX_MODEL; NUM_CTX_MMVD_DIRECTION_IDX],
-    pub(crate) mmvd_group_idx: [SBAC_CTX_MODEL; NUM_CTX_MMVD_GROUP_IDX],
     pub(crate) direct_mode_flag: [SBAC_CTX_MODEL; NUM_CTX_DIRECT_MODE_FLAG],
-    pub(crate) merge_mode_flag: [SBAC_CTX_MODEL; NUM_CTX_MERGE_MODE_FLAG],
     pub(crate) inter_dir: [SBAC_CTX_MODEL; NUM_CTX_INTER_PRED_IDC],
     pub(crate) intra_dir: [SBAC_CTX_MODEL; NUM_CTX_INTRA_PRED_MODE],
-    pub(crate) intra_luma_pred_mpm_flag: [SBAC_CTX_MODEL; NUM_CTX_INTRA_LUMA_PRED_MPM_FLAG],
-    pub(crate) intra_luma_pred_mpm_idx: [SBAC_CTX_MODEL; NUM_CTX_INTRA_LUMA_PRED_MPM_IDX],
-    pub(crate) intra_chroma_pred_mode: [SBAC_CTX_MODEL; NUM_CTX_INTRA_CHROMA_PRED_MODE],
     pub(crate) pred_mode: [SBAC_CTX_MODEL; NUM_CTX_PRED_MODE],
-    pub(crate) mode_cons: [SBAC_CTX_MODEL; NUM_CTX_MODE_CONS],
     pub(crate) refi: [SBAC_CTX_MODEL; NUM_CTX_REF_IDX],
-    pub(crate) merge_idx: [SBAC_CTX_MODEL; NUM_CTX_MERGE_IDX],
     pub(crate) mvp_idx: [SBAC_CTX_MODEL; NUM_CTX_MVP_IDX],
-    pub(crate) affine_mvp_idx: [SBAC_CTX_MODEL; NUM_CTX_AFFINE_MVP_IDX],
-    pub(crate) mvr_idx: [SBAC_CTX_MODEL; NUM_CTX_AMVR_IDX],
-    pub(crate) bi_idx: [SBAC_CTX_MODEL; NUM_CTX_BI_PRED_IDX],
     pub(crate) mvd: [SBAC_CTX_MODEL; NUM_CTX_MVD],
     pub(crate) cbf_all: [SBAC_CTX_MODEL; NUM_CTX_CBF_ALL],
     pub(crate) cbf_luma: [SBAC_CTX_MODEL; NUM_CTX_CBF_LUMA],
@@ -782,26 +772,8 @@ pub(crate) struct EvcSbacCtx {
     pub(crate) run: [SBAC_CTX_MODEL; NUM_CTX_CC_RUN],
     pub(crate) last: [SBAC_CTX_MODEL; NUM_CTX_CC_LAST],
     pub(crate) level: [SBAC_CTX_MODEL; NUM_CTX_CC_LEVEL],
-    //pub(crate) sig_coeff_flag: [SBAC_CTX_MODEL; NUM_CTX_SIG_COEFF_FLAG],
-    pub(crate) coeff_abs_level_greaterAB_flag: [SBAC_CTX_MODEL; NUM_CTX_GTX],
-    pub(crate) last_sig_coeff_x_prefix: [SBAC_CTX_MODEL; NUM_CTX_LAST_SIG_COEFF],
-    pub(crate) last_sig_coeff_y_prefix: [SBAC_CTX_MODEL; NUM_CTX_LAST_SIG_COEFF],
-    pub(crate) btt_split_flag: [SBAC_CTX_MODEL; NUM_CTX_BTT_SPLIT_FLAG],
-    pub(crate) btt_split_dir: [SBAC_CTX_MODEL; NUM_CTX_BTT_SPLIT_DIR],
-    pub(crate) btt_split_type: [SBAC_CTX_MODEL; NUM_CTX_BTT_SPLIT_TYPE],
-    pub(crate) affine_flag: [SBAC_CTX_MODEL; NUM_CTX_AFFINE_FLAG],
-    pub(crate) affine_mode: [SBAC_CTX_MODEL; NUM_CTX_AFFINE_MODE],
-    pub(crate) affine_mrg: [SBAC_CTX_MODEL; NUM_CTX_AFFINE_MRG],
-    pub(crate) affine_mvd_flag: [SBAC_CTX_MODEL; NUM_CTX_AFFINE_MVD_FLAG],
-    pub(crate) suco_flag: [SBAC_CTX_MODEL; NUM_CTX_SUCO_FLAG],
-    pub(crate) alf_ctb_flag: [SBAC_CTX_MODEL; NUM_CTX_ALF_CTB_FLAG],
     pub(crate) split_cu_flag: [SBAC_CTX_MODEL; NUM_CTX_SPLIT_CU_FLAG],
     pub(crate) delta_qp: [SBAC_CTX_MODEL; NUM_CTX_DELTA_QP],
-    pub(crate) ats_mode: [SBAC_CTX_MODEL; NUM_CTX_ATS_MODE_FLAG],
-    pub(crate) ats_cu_inter_flag: [SBAC_CTX_MODEL; NUM_CTX_ATS_INTER_FLAG],
-    pub(crate) ats_cu_inter_quad_flag: [SBAC_CTX_MODEL; NUM_CTX_ATS_INTER_QUAD_FLAG],
-    pub(crate) ats_cu_inter_hor_flag: [SBAC_CTX_MODEL; NUM_CTX_ATS_INTER_HOR_FLAG],
-    pub(crate) ats_cu_inter_pos_flag: [SBAC_CTX_MODEL; NUM_CTX_ATS_INTER_POS_FLAG],
 }
 
 pub(crate) const MAX_SUB_TB_NUM: usize = 4;

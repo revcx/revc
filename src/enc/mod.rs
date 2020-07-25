@@ -1,5 +1,6 @@
 pub(crate) mod bsw;
 pub(crate) mod mode;
+pub(crate) mod sbac;
 pub(crate) mod tbl;
 
 use super::api::frame::*;
@@ -10,6 +11,7 @@ use super::tbl::*;
 use super::util::*;
 
 use bsw::*;
+use sbac::*;
 use tbl::*;
 
 use std::cell::RefCell;
@@ -1196,9 +1198,7 @@ impl EvceCtx {
 
         for slice_num in 0..num_slice_in_pic {
             self.slice_num = slice_num;
-            let bs = &mut self.bs;
-            let core = &mut self.core;
-            let sh = &mut self.sh;
+            //let bs = &mut self.bs;
 
             if self.poc.poc_val > self.last_intra_poc {
                 self.last_intra_poc = i32::MAX;
@@ -1221,11 +1221,14 @@ impl EvceCtx {
             //TODO
 
             /* slice layer encoding loop */
-            core.x_lcu = 0;
-            core.y_lcu = 0;
-            core.x_pel = 0;
-            core.y_pel = 0;
-            core.lcu_num = 0;
+            {
+                let core = &mut self.core;
+                core.x_lcu = 0;
+                core.y_lcu = 0;
+                core.x_pel = 0;
+                core.y_pel = 0;
+                core.lcu_num = 0;
+            }
             self.lcu_cnt = self.f_lcu;
 
             /* Set nalu header */
@@ -1241,6 +1244,30 @@ impl EvceCtx {
             );
 
             self.set_sh();
+
+            {
+                let core = &mut self.core;
+                let sh = &mut self.sh;
+
+                core.qp_y = sh.qp + 6 * (BIT_DEPTH as u8 - 8);
+                core.qp_u = (core.evc_tbl_qp_chroma_dynamic_ext[0]
+                    [EVC_TBL_CHROMA_QP_OFFSET as usize + sh.qp_u as usize]
+                    + 6 * (BIT_DEPTH as i8 - 8)) as u8;
+                core.qp_v = (core.evc_tbl_qp_chroma_dynamic_ext[1]
+                    [EVC_TBL_CHROMA_QP_OFFSET as usize + sh.qp_v as usize]
+                    + 6 * (BIT_DEPTH as i8 - 8)) as u8;
+
+                sh.qp_prev_eco = sh.qp;
+                sh.qp_prev_mode = sh.qp;
+                core.dqp_data[self.log2_max_cuwh as usize - 2][self.log2_max_cuwh as usize - 2]
+                    .prev_QP = sh.qp_prev_mode as i8;
+                core.dqp_curr_best[self.log2_max_cuwh as usize - 2]
+                    [self.log2_max_cuwh as usize - 2]
+                    .curr_QP = sh.qp as i8;
+                core.dqp_curr_best[self.log2_max_cuwh as usize - 2]
+                    [self.log2_max_cuwh as usize - 2]
+                    .prev_QP = sh.qp as i8;
+            }
         }
 
         Ok(())

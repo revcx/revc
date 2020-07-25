@@ -1,5 +1,4 @@
 use super::bsr::*;
-use super::EvcdCtx;
 use crate::api::*;
 use crate::def::*;
 use crate::tracer::*;
@@ -30,9 +29,6 @@ impl EvcdSbac {
         }
 
         /* Initialization of the context models */
-        for i in 0..NUM_CTX_ALF_CTB_FLAG {
-            sbac_ctx.alf_ctb_flag[i] = PROB_INIT;
-        }
         for i in 0..NUM_CTX_SPLIT_CU_FLAG {
             sbac_ctx.split_cu_flag[i] = PROB_INIT;
         }
@@ -57,29 +53,11 @@ impl EvcdSbac {
         for i in 0..NUM_CTX_CBF_ALL {
             sbac_ctx.cbf_all[i] = PROB_INIT;
         }
-        //for i in 0..NUM_CTX_SIG_COEFF_FLAG {
-        //    sbac_ctx.sig_coeff_flag[i] = PROB_INIT;
-        //}
-        for i in 0..NUM_CTX_GTX {
-            sbac_ctx.coeff_abs_level_greaterAB_flag[i] = PROB_INIT;
-        }
-        for i in 0..NUM_CTX_LAST_SIG_COEFF {
-            sbac_ctx.last_sig_coeff_x_prefix[i] = PROB_INIT;
-        }
-        for i in 0..NUM_CTX_LAST_SIG_COEFF {
-            sbac_ctx.last_sig_coeff_y_prefix[i] = PROB_INIT;
-        }
         for i in 0..NUM_CTX_PRED_MODE {
             sbac_ctx.pred_mode[i] = PROB_INIT;
         }
-        for i in 0..NUM_CTX_MODE_CONS {
-            sbac_ctx.mode_cons[i] = PROB_INIT;
-        }
         for i in 0..NUM_CTX_DIRECT_MODE_FLAG {
             sbac_ctx.direct_mode_flag[i] = PROB_INIT;
-        }
-        for i in 0..NUM_CTX_MERGE_MODE_FLAG {
-            sbac_ctx.merge_mode_flag[i] = PROB_INIT;
         }
         for i in 0..NUM_CTX_INTER_PRED_IDC {
             sbac_ctx.inter_dir[i] = PROB_INIT;
@@ -87,41 +65,8 @@ impl EvcdSbac {
         for i in 0..NUM_CTX_INTRA_PRED_MODE {
             sbac_ctx.intra_dir[i] = PROB_INIT;
         }
-        for i in 0..NUM_CTX_INTRA_LUMA_PRED_MPM_FLAG {
-            sbac_ctx.intra_luma_pred_mpm_flag[i] = PROB_INIT;
-        }
-        for i in 0..NUM_CTX_INTRA_LUMA_PRED_MPM_IDX {
-            sbac_ctx.intra_luma_pred_mpm_idx[i] = PROB_INIT;
-        }
-        for i in 0..NUM_CTX_INTRA_CHROMA_PRED_MODE {
-            sbac_ctx.intra_chroma_pred_mode[i] = PROB_INIT;
-        }
-        for i in 0..NUM_CTX_MMVD_FLAG {
-            sbac_ctx.mmvd_flag[i] = PROB_INIT;
-        }
-        for i in 0..NUM_CTX_MMVD_MERGE_IDX {
-            sbac_ctx.mmvd_merge_idx[i] = PROB_INIT;
-        }
-        for i in 0..NUM_CTX_MMVD_DIST_IDX {
-            sbac_ctx.mmvd_distance_idx[i] = PROB_INIT;
-        }
-        for i in 0..NUM_CTX_MMVD_DIRECTION_IDX {
-            sbac_ctx.mmvd_direction_idx[i] = PROB_INIT;
-        }
-        for i in 0..NUM_CTX_MMVD_GROUP_IDX {
-            sbac_ctx.mmvd_group_idx[i] = PROB_INIT;
-        }
-        for i in 0..NUM_CTX_MERGE_IDX {
-            sbac_ctx.merge_idx[i] = PROB_INIT;
-        }
         for i in 0..NUM_CTX_MVP_IDX {
             sbac_ctx.mvp_idx[i] = PROB_INIT;
-        }
-        for i in 0..NUM_CTX_AMVR_IDX {
-            sbac_ctx.mvr_idx[i] = PROB_INIT;
-        }
-        for i in 0..NUM_CTX_BI_PRED_IDX {
-            sbac_ctx.bi_idx[i] = PROB_INIT;
         }
         for i in 0..NUM_CTX_MVD {
             sbac_ctx.mvd[i] = PROB_INIT;
@@ -129,56 +74,11 @@ impl EvcdSbac {
         for i in 0..NUM_CTX_REF_IDX {
             sbac_ctx.refi[i] = PROB_INIT;
         }
-        for i in 0..NUM_CTX_BTT_SPLIT_FLAG {
-            sbac_ctx.btt_split_flag[i] = PROB_INIT;
-        }
-        for i in 0..NUM_CTX_BTT_SPLIT_DIR {
-            sbac_ctx.btt_split_dir[i] = PROB_INIT;
-        }
-        for i in 0..NUM_CTX_BTT_SPLIT_TYPE {
-            sbac_ctx.btt_split_type[i] = PROB_INIT;
-        }
-        for i in 0..NUM_CTX_SUCO_FLAG {
-            sbac_ctx.suco_flag[i] = PROB_INIT;
-        }
         for i in 0..NUM_CTX_DELTA_QP {
             sbac_ctx.delta_qp[i] = PROB_INIT;
         }
-        for i in 0..NUM_CTX_AFFINE_FLAG {
-            sbac_ctx.affine_flag[i] = PROB_INIT;
-        }
-        for i in 0..NUM_CTX_AFFINE_MODE {
-            sbac_ctx.affine_mode[i] = PROB_INIT;
-        }
-        for i in 0..NUM_CTX_AFFINE_MRG {
-            sbac_ctx.affine_mrg[i] = PROB_INIT;
-        }
-        for i in 0..NUM_CTX_AFFINE_MVP_IDX {
-            sbac_ctx.affine_mvp_idx[i] = PROB_INIT;
-        }
-        for i in 0..NUM_CTX_AFFINE_MVD_FLAG {
-            sbac_ctx.affine_mvd_flag[i] = PROB_INIT;
-        }
         for i in 0..NUM_CTX_SKIP_FLAG {
             sbac_ctx.skip_flag[i] = PROB_INIT;
-        }
-        for i in 0..NUM_CTX_IBC_FLAG {
-            sbac_ctx.ibc_flag[i] = PROB_INIT;
-        }
-        for i in 0..NUM_CTX_ATS_MODE_FLAG {
-            sbac_ctx.ats_mode[i] = PROB_INIT;
-        }
-        for i in 0..NUM_CTX_ATS_INTER_FLAG {
-            sbac_ctx.ats_cu_inter_flag[i] = PROB_INIT;
-        }
-        for i in 0..NUM_CTX_ATS_INTER_QUAD_FLAG {
-            sbac_ctx.ats_cu_inter_quad_flag[i] = PROB_INIT;
-        }
-        for i in 0..NUM_CTX_ATS_INTER_HOR_FLAG {
-            sbac_ctx.ats_cu_inter_hor_flag[i] = PROB_INIT;
-        }
-        for i in 0..NUM_CTX_ATS_INTER_POS_FLAG {
-            sbac_ctx.ats_cu_inter_pos_flag[i] = PROB_INIT;
         }
 
         Ok(())
