@@ -670,105 +670,45 @@ pub(crate) enum ModeCons {
     eAll,
 }
 
-/* MMVD (START) */
-pub(crate) const MMVD_BASE_MV_NUM: usize = 4;
-pub(crate) const MMVD_DIST_NUM: usize = 8;
-pub(crate) const MMVD_MAX_REFINE_NUM: usize = (MMVD_DIST_NUM * 4);
-pub(crate) const MMVD_SKIP_CON_NUM: usize = 4;
-pub(crate) const MMVD_GRP_NUM: usize = 3;
-pub(crate) const MMVD_THRESHOLD: f32 = 1.5;
-/* MMVD (END) */
-
-pub(crate) const AFF_MAX_NUM_MVP: usize = 2; // maximum affine inter candidates
-pub(crate) const AFF_MAX_CAND: usize = 5; // maximum affine merge candidates
-
 pub(crate) type SBAC_CTX_MODEL = u16;
 
 /* CABAC (START) */
 pub(crate) const PROB_INIT: SBAC_CTX_MODEL = (512); /* 1/2 of initialization with mps = 0 */
 /* CABAC (END) */
 
-pub(crate) const NUM_CTX_MMVD_FLAG: usize = 1;
-pub(crate) const NUM_CTX_MMVD_GROUP_IDX: usize = (MMVD_GRP_NUM - 1);
-pub(crate) const NUM_CTX_MMVD_MERGE_IDX: usize = (MMVD_BASE_MV_NUM - 1);
-pub(crate) const NUM_CTX_MMVD_DIST_IDX: usize = (MMVD_DIST_NUM - 1);
-pub(crate) const NUM_CTX_MMVD_DIRECTION_IDX: usize = 2;
-pub(crate) const NUM_CTX_AFFINE_MVD_FLAG: usize = 2; /* number of context models for affine_mvd_flag_l0 and affine_mvd_flag_l1 (1st one is for affine_mvd_flag_l0 and 2nd one if for affine_mvd_flag_l1) */
 pub(crate) const NUM_CTX_SKIP_FLAG: usize = 2;
-pub(crate) const NUM_CTX_IBC_FLAG: usize = 2;
-pub(crate) const NUM_CTX_BTT_SPLIT_FLAG: usize = 15;
-pub(crate) const NUM_CTX_BTT_SPLIT_DIR: usize = 5;
-pub(crate) const NUM_CTX_BTT_SPLIT_TYPE: usize = 1;
-pub(crate) const NUM_CTX_SUCO_FLAG: usize = 14;
 pub(crate) const NUM_CTX_CBF_LUMA: usize = 1;
 pub(crate) const NUM_CTX_CBF_CB: usize = 1;
 pub(crate) const NUM_CTX_CBF_CR: usize = 1;
 pub(crate) const NUM_CTX_CBF_ALL: usize = 1;
 pub(crate) const NUM_CTX_PRED_MODE: usize = 3;
-pub(crate) const NUM_CTX_MODE_CONS: usize = 3;
-pub(crate) const NUM_CTX_INTER_PRED_IDC: usize = 2; /* number of context models for inter prediction direction */
+pub(crate) const NUM_CTX_INTER_PRED_IDC: usize = 2;
 pub(crate) const NUM_CTX_DIRECT_MODE_FLAG: usize = 1;
-pub(crate) const NUM_CTX_MERGE_MODE_FLAG: usize = 1;
 pub(crate) const NUM_CTX_REF_IDX: usize = 2;
-pub(crate) const NUM_CTX_MERGE_IDX: usize = 5;
 pub(crate) const NUM_CTX_MVP_IDX: usize = 3;
-pub(crate) const NUM_CTX_AMVR_IDX: usize = 4;
-pub(crate) const NUM_CTX_BI_PRED_IDX: usize = 2;
-pub(crate) const NUM_CTX_MVD: usize = 1; /* number of context models for motion vector difference */
+pub(crate) const NUM_CTX_MVD: usize = 1;
 pub(crate) const NUM_CTX_INTRA_PRED_MODE: usize = 2;
-pub(crate) const NUM_CTX_INTRA_LUMA_PRED_MPM_FLAG: usize = 1;
-pub(crate) const NUM_CTX_INTRA_LUMA_PRED_MPM_IDX: usize = 1;
-pub(crate) const NUM_CTX_INTRA_CHROMA_PRED_MODE: usize = 1;
-pub(crate) const NUM_CTX_AFFINE_FLAG: usize = 2;
-pub(crate) const NUM_CTX_AFFINE_MODE: usize = 1;
-pub(crate) const NUM_CTX_AFFINE_MRG: usize = AFF_MAX_CAND;
-pub(crate) const NUM_CTX_AFFINE_MVP_IDX: usize = (AFF_MAX_NUM_MVP - 1);
 pub(crate) const NUM_CTX_CC_RUN: usize = 24;
 pub(crate) const NUM_CTX_CC_LAST: usize = 2;
 pub(crate) const NUM_CTX_CC_LEVEL: usize = 24;
-pub(crate) const NUM_CTX_ALF_CTB_FLAG: usize = 1;
 pub(crate) const NUM_CTX_SPLIT_CU_FLAG: usize = 1;
 pub(crate) const NUM_CTX_DELTA_QP: usize = 1;
-pub(crate) const NUM_CTX_ATS_INTRA_CU_FLAG: usize = 1;
-pub(crate) const NUM_CTX_ATS_MODE_FLAG: usize = 1;
-pub(crate) const NUM_CTX_ATS_INTER_FLAG: usize = 2;
-pub(crate) const NUM_CTX_ATS_INTER_QUAD_FLAG: usize = 1;
-pub(crate) const NUM_CTX_ATS_INTER_HOR_FLAG: usize = 3;
-pub(crate) const NUM_CTX_ATS_INTER_POS_FLAG: usize = 1;
-
-pub(crate) const NUM_CTX_LAST_SIG_COEFF_LUMA: usize = 18;
-pub(crate) const NUM_CTX_LAST_SIG_COEFF_CHROMA: usize = 3;
-pub(crate) const NUM_CTX_LAST_SIG_COEFF: usize =
-    (NUM_CTX_LAST_SIG_COEFF_LUMA + NUM_CTX_LAST_SIG_COEFF_CHROMA);
-pub(crate) const NUM_CTX_SIG_COEFF_LUMA: usize = 39; /* number of context models for luma sig coeff flag */
-pub(crate) const NUM_CTX_SIG_COEFF_CHROMA: usize = 8; /* number of context models for chroma sig coeff flag */
-pub(crate) const NUM_CTX_SIG_COEFF_LUMA_TU: usize = 13; /* number of context models for luma sig coeff flag per TU */
-pub(crate) const NUM_CTX_SIG_COEFF_FLAG: usize =
-    (NUM_CTX_SIG_COEFF_LUMA + NUM_CTX_SIG_COEFF_CHROMA); /* number of context models for sig coeff flag */
-pub(crate) const NUM_CTX_GTX_LUMA: usize = 13;
-pub(crate) const NUM_CTX_GTX_CHROMA: usize = 5;
-pub(crate) const NUM_CTX_GTX: usize = (NUM_CTX_GTX_LUMA + NUM_CTX_GTX_CHROMA); /* number of context models for gtA/B flag */
-
-/* Maximum transform dynamic range (excluding sign bit) */
-pub(crate) const MAX_TX_DYNAMIC_RANGE: usize = 15;
-pub(crate) const QUANT_SHIFT: usize = 14;
-pub(crate) const QUANT_IQUANT_SHIFT: usize = 20;
 
 /* context models for arithemetic coding */
-#[derive(Default)]
+#[derive(Default, Copy, Clone)]
 pub(crate) struct EvcSbacCtx {
     pub(crate) skip_flag: [SBAC_CTX_MODEL; NUM_CTX_SKIP_FLAG],
-    pub(crate) direct_mode_flag: [SBAC_CTX_MODEL; NUM_CTX_DIRECT_MODE_FLAG],
-    pub(crate) inter_dir: [SBAC_CTX_MODEL; NUM_CTX_INTER_PRED_IDC],
-    pub(crate) intra_dir: [SBAC_CTX_MODEL; NUM_CTX_INTRA_PRED_MODE],
-    pub(crate) pred_mode: [SBAC_CTX_MODEL; NUM_CTX_PRED_MODE],
-    pub(crate) refi: [SBAC_CTX_MODEL; NUM_CTX_REF_IDX],
-    pub(crate) mvp_idx: [SBAC_CTX_MODEL; NUM_CTX_MVP_IDX],
-    pub(crate) mvd: [SBAC_CTX_MODEL; NUM_CTX_MVD],
-    pub(crate) cbf_all: [SBAC_CTX_MODEL; NUM_CTX_CBF_ALL],
     pub(crate) cbf_luma: [SBAC_CTX_MODEL; NUM_CTX_CBF_LUMA],
     pub(crate) cbf_cb: [SBAC_CTX_MODEL; NUM_CTX_CBF_CB],
     pub(crate) cbf_cr: [SBAC_CTX_MODEL; NUM_CTX_CBF_CR],
+    pub(crate) cbf_all: [SBAC_CTX_MODEL; NUM_CTX_CBF_ALL],
+    pub(crate) pred_mode: [SBAC_CTX_MODEL; NUM_CTX_PRED_MODE],
+    pub(crate) inter_dir: [SBAC_CTX_MODEL; NUM_CTX_INTER_PRED_IDC],
+    pub(crate) direct_mode_flag: [SBAC_CTX_MODEL; NUM_CTX_DIRECT_MODE_FLAG],
+    pub(crate) refi: [SBAC_CTX_MODEL; NUM_CTX_REF_IDX],
+    pub(crate) mvp_idx: [SBAC_CTX_MODEL; NUM_CTX_MVP_IDX],
+    pub(crate) mvd: [SBAC_CTX_MODEL; NUM_CTX_MVD],
+    pub(crate) intra_dir: [SBAC_CTX_MODEL; NUM_CTX_INTRA_PRED_MODE],
     pub(crate) run: [SBAC_CTX_MODEL; NUM_CTX_CC_RUN],
     pub(crate) last: [SBAC_CTX_MODEL; NUM_CTX_CC_LAST],
     pub(crate) level: [SBAC_CTX_MODEL; NUM_CTX_CC_LEVEL],
@@ -776,7 +716,8 @@ pub(crate) struct EvcSbacCtx {
     pub(crate) delta_qp: [SBAC_CTX_MODEL; NUM_CTX_DELTA_QP],
 }
 
-pub(crate) const MAX_SUB_TB_NUM: usize = 4;
+pub(crate) const QUANT_SHIFT: usize = 14;
+pub(crate) const QUANT_IQUANT_SHIFT: usize = 20;
 
 #[derive(Clone, Copy, PartialEq)]
 pub(crate) enum TREE_TYPE {

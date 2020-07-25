@@ -1,4 +1,5 @@
 pub(crate) mod bsw;
+pub(crate) mod eco;
 pub(crate) mod mode;
 pub(crate) mod sbac;
 pub(crate) mod tbl;
@@ -11,9 +12,11 @@ use super::tbl::*;
 use super::util::*;
 
 use bsw::*;
+use eco::*;
 use sbac::*;
 use tbl::*;
 
+use crate::def::SplitDir::SPLIT_HOR;
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -482,16 +485,25 @@ pub(crate) struct EvceCore {
     /* platform specific data, if needed */
     //void          *pf;
     /* bitstream structure for RDO */
-    //EVC_BSW        bs_temp;
+    bs_temp: EvceBsw,
     /* SBAC structure for full RDO */
-    //EVCE_SBAC      s_curr_best[MAX_CU_DEPTH][MAX_CU_DEPTH];
-    //EVCE_SBAC      s_next_best[MAX_CU_DEPTH][MAX_CU_DEPTH];
-    //EVCE_SBAC      s_temp_best;
-    //EVCE_SBAC      s_temp_best_merge;
-    //EVCE_SBAC      s_temp_run;
-    //EVCE_SBAC      s_temp_prev_comp_best;
-    //EVCE_SBAC      s_temp_prev_comp_run;
-    //EVCE_SBAC      s_curr_before_split[MAX_CU_DEPTH][MAX_CU_DEPTH];
+    s_curr_best: [[EvceSbac; MAX_CU_DEPTH]; MAX_CU_DEPTH],
+    s_next_best: [[EvceSbac; MAX_CU_DEPTH]; MAX_CU_DEPTH],
+    s_temp_best: EvceSbac,
+    s_temp_best_merge: EvceSbac,
+    s_temp_run: EvceSbac,
+    s_temp_prev_comp_best: EvceSbac,
+    s_temp_prev_comp_run: EvceSbac,
+    s_curr_before_split: [[EvceSbac; MAX_CU_DEPTH]; MAX_CU_DEPTH],
+
+    c_curr_best: [[EvcSbacCtx; MAX_CU_DEPTH]; MAX_CU_DEPTH],
+    c_next_best: [[EvcSbacCtx; MAX_CU_DEPTH]; MAX_CU_DEPTH],
+    c_temp_best: EvcSbacCtx,
+    c_temp_best_merge: EvcSbacCtx,
+    c_temp_run: EvcSbacCtx,
+    c_temp_prev_comp_best: EvcSbacCtx,
+    c_temp_prev_comp_run: EvcSbacCtx,
+    c_curr_before_split: [[EvcSbacCtx; MAX_CU_DEPTH]; MAX_CU_DEPTH],
     //EVCE_BEF_DATA  bef_data[MAX_CU_DEPTH][MAX_CU_DEPTH][MAX_CU_CNT_IN_LCU][MAX_BEF_DATA_NUM];
     cost_best: f64,
     inter_satd: u32,
@@ -684,6 +696,14 @@ impl EvceCore {
             ..Default::default()
         }
     }
+
+    fn update_core_loc_param(&mut self, log2_max_cuwh: u8, w_lcu: u16) {
+        self.x_pel = self.x_lcu << log2_max_cuwh; // entry point's x location in pixel
+        self.y_pel = self.y_lcu << log2_max_cuwh; // entry point's y location in pixel
+        self.x_scu = self.x_lcu << (MAX_CU_LOG2 - MIN_CU_LOG2); // set x_scu location
+        self.y_scu = self.y_lcu << (MAX_CU_LOG2 - MIN_CU_LOG2); // set y_scu location
+        self.lcu_num = self.x_lcu + self.y_lcu * w_lcu; // Init the first lcu_num in tile
+    }
 }
 
 /******************************************************************************
@@ -724,6 +744,9 @@ pub(crate) struct EvceCtx {
     refp: Vec<Vec<EvcRefP>>, //EVC_REFP               refp[MAX_NUM_REF_PICS][REFP_NUM];
     /* encoding parameter */
     param: EncoderConfig,
+    /* SBAC */
+    sbac_enc: EvceSbac,
+    sbac_ctx: EvcSbacCtx,
     /* bitstream structure */
     bs: EvceBsw,
     /* bitstream structure for RDO */
@@ -938,6 +961,9 @@ impl EvceCtx {
             refp,
             /* encoding parameter */
             param,
+            /* SBAC */
+            sbac_enc: EvceSbac::default(),
+            sbac_ctx: EvcSbacCtx::default(),
             /* bitstream structure */
             bs: EvceBsw::new(),
             /* bitstream structure for RDO */
@@ -1192,8 +1218,6 @@ impl EvceCtx {
     }
     fn evce_enc_pic(&mut self) -> Result<(), EvcError> {
         let split_allow: [bool; 6] = [false, false, false, false, false, true];
-        let ctb_cnt_in_tile = 0;
-        let col_bd = 0;
         let num_slice_in_pic = self.param.num_slices_in_pic;
 
         for slice_num in 0..num_slice_in_pic {
@@ -1219,6 +1243,7 @@ impl EvceCtx {
 
             /* initialize mode decision for frame encoding */
             //TODO
+            //ret = ctx->fn_mode_init_frame(ctx);
 
             /* slice layer encoding loop */
             {
@@ -1268,6 +1293,76 @@ impl EvceCtx {
                     [self.log2_max_cuwh as usize - 2]
                     .prev_QP = sh.qp as i8;
             }
+
+            self.sbac_enc
+                .reset(&mut self.sbac_ctx, self.sh.slice_type, self.sh.qp);
+            self.core.s_curr_best[self.log2_max_cuwh as usize - 2][self.log2_max_cuwh as usize - 2]
+                .reset(
+                    &mut self.core.c_curr_best[self.log2_max_cuwh as usize - 2]
+                        [self.log2_max_cuwh as usize - 2],
+                    self.sh.slice_type,
+                    self.sh.qp,
+                );
+
+            /*Set entry point for each Tile in the tile Slice*/
+            //TODO: fix slice-based x/y-LCU
+            self.core.x_lcu = 0; //entry point lcu's x location
+            self.core.y_lcu = 0; // entry point lcu's y location
+            let mut lcu_cnt = self.f_lcu;
+            self.core
+                .update_core_loc_param(self.log2_max_cuwh, self.w_lcu);
+
+            /* LCU decoding loop */
+            loop {
+                /* initialize structures *****************************************/
+                //ret = ctx->fn_mode_init_lcu(ctx, core);
+
+                /* mode decision *************************************************/
+                self.core.s_curr_best[self.log2_max_cuwh as usize - 2]
+                    [self.log2_max_cuwh as usize - 2] = self.sbac_enc;
+                self.core.c_curr_best[self.log2_max_cuwh as usize - 2]
+                    [self.log2_max_cuwh as usize - 2] = self.sbac_ctx;
+                self.core.s_curr_best[self.log2_max_cuwh as usize - 2]
+                    [self.log2_max_cuwh as usize - 2]
+                    .is_bitcount = true;
+
+                //ret = ctx->fn_mode_analyze_lcu(ctx, core);
+
+                /* entropy coding ************************************************/
+                /*ret = self.evce_eco_tree(
+                    self.core.x_pel,
+                    self.core.y_pel,
+                    0,
+                    self.max_cuwh,
+                    self.max_cuwh,
+                    0,
+                    1,
+                    SplitMode::NO_SPLIT,
+                    split_mode_child,
+                    0,
+                    split_allow,
+                    0,
+                    0,
+                    evc_get_default_tree_cons(),
+                );*/
+                /* prepare next step *********************************************/
+                self.core.x_lcu += 1;
+                if self.core.x_lcu >= self.w_lcu {
+                    self.core.x_lcu = 0;
+                    self.core.y_lcu += 1;
+                }
+
+                self.core
+                    .update_core_loc_param(self.log2_max_cuwh, self.w_lcu);
+                lcu_cnt -= 1;
+                self.lcu_cnt -= 1; //To be updated properly in case of multicore
+
+                if lcu_cnt == 0 {
+                    evce_eco_tile_end_flag(&mut self.bs, &mut self.sbac_enc, 1);
+                    self.sbac_enc.finish(&mut self.bs);
+                    break;
+                }
+            } //End of LCU processing loop for a tile
         }
 
         Ok(())

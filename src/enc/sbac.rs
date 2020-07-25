@@ -3,6 +3,7 @@ use crate::api::*;
 use crate::def::*;
 use crate::tracer::*;
 
+#[derive(Default, Copy, Clone)]
 pub(crate) struct EvceSbac {
     range: u32,
     code: u32,
@@ -11,9 +12,8 @@ pub(crate) struct EvceSbac {
     stacked_zero: u32,
     pending_byte: u32,
     is_pending_byte: u32,
-    //EVC_SBAC_CTX   ctx;
     bitcounter: u32,
-    is_bitcount: bool,
+    pub(crate) is_bitcount: bool,
     bin_counter: u32,
 }
 

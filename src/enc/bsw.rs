@@ -2,6 +2,7 @@ use crate::api::*;
 use crate::tracer::*;
 
 /* Bitstream structure for encoder */
+#[derive(Default)]
 pub(crate) struct EvceBsw {
     /* buffer */
     code: u32,
@@ -83,6 +84,8 @@ impl EvceBsw {
     }
 
     pub(crate) fn write(&mut self, mut val: u32, len: isize, name: Option<&str>) {
+        assert!(len > 0);
+
         if let Some(name) = name {
             EVC_TRACE(&mut self.tracer, name);
             EVC_TRACE(&mut self.tracer, " ");
@@ -92,7 +95,12 @@ impl EvceBsw {
 
         let leftbits = self.leftbits;
         val <<= (32 - len);
-        self.code |= (val >> (32 - leftbits));
+        if leftbits == 0 {
+            // val >> 32 overflow panic in rust, but val == val >> 32 == val << 32 in C/C++
+            self.code |= val;
+        } else {
+            self.code |= (val >> (32 - leftbits));
+        }
 
         if len < leftbits {
             self.leftbits -= len;
