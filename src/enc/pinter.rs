@@ -1,3 +1,4 @@
+use super::*;
 use crate::api::*;
 use crate::def::*;
 use crate::picman::*;
@@ -76,11 +77,9 @@ pub(crate) struct EvcePInter {
     pic_o: Option<Rc<RefCell<EvcPic>>>,
     /* mode picture buffer */
     pic_m: Option<Rc<RefCell<EvcPic>>>,
-    /*
-        /* motion vector map */
-        s16            (*map_mv)[REFP_NUM][MV_D];
-    */
-        /* picture width in SCU unit */
+    /* motion vector map */
+    map_mv: Option<Rc<RefCell<Vec<[[i16; MV_D]; REFP_NUM]>>>>,
+    /* picture width in SCU unit */
     w_scu: u16,
     /* QP for luma of current encoding CU */
     qp_y: u8,
@@ -89,7 +88,7 @@ pub(crate) struct EvcePInter {
     qp_v: u8,
     lambda_mv: u32,
     /* reference pictures */
-    refp: Vec<Vec<EvcRefP>>,
+    refp: Option<Rc<RefCell<Vec<Vec<EvcRefP>>>>>,
     slice_type: SliceType,
     /* search level for motion estimation */
     /*int              me_level;
@@ -102,28 +101,35 @@ pub(crate) struct EvcePInter {
     gop_size: usize,
 }
 
-impl EvcePInter {
-    pub(crate) fn pinter_init_frame(
-        &mut self,
-        slice_type: SliceType,
-        pic_orig: &Option<Rc<RefCell<EvcPic>>>,
-        pic_mode: &Option<Rc<RefCell<EvcPic>>>,
-    ) {
-        self.slice_type = slice_type;
-        if let Some(pic) = pic_orig {
-            self.pic_o = Some(Rc::clone(pic));
+impl EvceCtx {
+    pub(crate) fn pinter_init_frame(&mut self) {
+        let pi = &mut self.pinter;
+
+        pi.slice_type = self.slice_type;
+        if let Some(pic) = &self.pic[PIC_IDX_ORIG] {
+            pi.pic_o = Some(Rc::clone(pic));
         }
-        if let Some(pic) = pic_mode {
-            self.pic_m = Some(Rc::clone(pic));
+        if let Some(pic) = &self.pic[PIC_IDX_MODE] {
+            pi.pic_m = Some(Rc::clone(pic));
         }
+        if let Some(mv) = &self.map_mv {
+            pi.map_mv = Some(Rc::clone(mv));
+        }
+        pi.refp = Some(Rc::clone(&self.refp));
     }
 
+    pub(crate) fn pinter_analyze_frame(&mut self) {}
+
     pub(crate) fn pinter_init_lcu(&mut self) {
-        /* self.lambda_mv = (u32)floor(65536.0 * ctx->sqrt_lambda[0]);
-        self.qp_y      = core->qp_y;
-        self.qp_u      = core->qp_u;
-        self.qp_v      = core->qp_v;
-        self.poc       = ctx->poc.poc_val;
-        self.gop_size  = ctx->param.gop_size;*/
+        let pi = &mut self.pinter;
+
+        pi.lambda_mv = (65536.0 * self.sqrt_lambda[0]).floor() as u32;
+        pi.qp_y = self.core.qp_y;
+        pi.qp_u = self.core.qp_u;
+        pi.qp_v = self.core.qp_v;
+        pi.poc = self.poc.poc_val;
+        pi.gop_size = self.gop_size;
     }
+
+    pub(crate) fn pinter_analyze_lcu(&mut self) {}
 }

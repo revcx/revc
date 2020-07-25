@@ -128,6 +128,9 @@ pub(crate) struct EvceCUData {
     s8  *depth;
     s16 *coef[N_C];
     pel *reco[N_C]; */
+    //#if TRACE_ENC_CU_DATA
+    //u64  trace_idx[MAX_CU_CNT_IN_LCU];
+    //#endif
 }
 
 impl Default for EvceCUData {
@@ -144,7 +147,7 @@ impl EvceCUData {
     fn new(log2_cuw: usize, log2_cuh: usize) -> Self {
         EvceCUData::default()
     }
-    fn init(&mut self, log2_cuw: usize, log2_cuh: usize) {
+    fn init(&mut self, log2_cuw: usize, log2_cuh: usize, qp_y: u8, qp_u: u8, qp_v: u8) {
         /*int i, j;
             int cuw_scu, cuh_scu;
             int size_8b, size_16b, size_32b, cu_cnt, pixel_cnt;
@@ -326,8 +329,8 @@ pub(crate) struct EvceCore {
     tree_cons: TREE_CONS,
 
     ctx_flags: [u8; CtxNevIdx::NUM_CNID as usize],
-    //int            split_mode_child:[4];
-    //int            parent_split_allow[6];
+    split_mode_child: [bool; 4],
+    parent_split_allow: [bool; 6],
 
     //one picture that arranges cu pixels and neighboring pixels for deblocking (just to match the interface of deblocking functions)
     /*delta_dist: [i64; N_C], //delta distortion from filtering (negative values mean distortion reduced)
@@ -552,7 +555,7 @@ pub(crate) struct EvceCtx {
     /* picture address for mode decision */
     //EVC_PIC * pic_m;
     /* reference picture (0: foward, 1: backward) */
-    refp: Vec<Vec<EvcRefP>>, //EVC_REFP               refp[MAX_NUM_REF_PICS][REFP_NUM];
+    refp: Rc<RefCell<Vec<Vec<EvcRefP>>>>, //EVC_REFP               refp[MAX_NUM_REF_PICS][REFP_NUM];
     /* encoding parameter */
     param: EncoderConfig,
     /* SBAC */
@@ -769,7 +772,7 @@ impl EvceCtx {
             /* picture address for mode decision */
             //EVC_PIC * pic_m;
             /* reference picture (0: foward, 1: backward) */
-            refp,
+            refp: Rc::new(RefCell::new(refp)),
             /* encoding parameter */
             param,
             /* SBAC */
@@ -1043,27 +1046,23 @@ impl EvceCtx {
             }
 
             /* initialize reference pictures */
-            self.rpm.evc_picman_refp_init(
-                self.sps.max_num_ref_pics,
-                self.slice_type,
-                self.poc.poc_val as u32,
-                self.nalu.nuh_temporal_id,
-                self.last_intra_poc,
-                &mut self.refp,
-            );
+            {
+                let mut refp = self.refp.borrow_mut();
+                self.rpm.evc_picman_refp_init(
+                    self.sps.max_num_ref_pics,
+                    self.slice_type,
+                    self.poc.poc_val as u32,
+                    self.nalu.nuh_temporal_id,
+                    self.last_intra_poc,
+                    &mut *refp,
+                );
+            }
 
             /* initialize mode decision for frame encoding */
-            self.mode.mode_init_frame(self.log2_max_cuwh);
-            self.pintra.pintra_init_frame(
-                self.slice_type,
-                &self.pic[PIC_IDX_ORIG],
-                &self.pic[PIC_IDX_MODE],
-            );
-            self.pinter.pinter_init_frame(
-                self.slice_type,
-                &self.pic[PIC_IDX_ORIG],
-                &self.pic[PIC_IDX_MODE],
-            );
+            self.mode_init_frame();
+
+            /* mode analyze frame */
+            self.mode_analyze_frame();
 
             /* slice layer encoding loop */
             {
@@ -1135,7 +1134,7 @@ impl EvceCtx {
             /* LCU decoding loop */
             loop {
                 /* initialize structures *****************************************/
-                //ret = ctx->fn_mode_init_lcu(ctx, core);
+                self.mode_init_lcu();
 
                 /* mode decision *************************************************/
                 self.core.s_curr_best[self.log2_max_cuwh as usize - 2]
@@ -1146,7 +1145,8 @@ impl EvceCtx {
                     [self.log2_max_cuwh as usize - 2]
                     .is_bitcount = true;
 
-                //ret = ctx->fn_mode_analyze_lcu(ctx, core);
+                /* analyzer lcu */
+                self.mode_analyze_lcu();
 
                 /* entropy coding ************************************************/
                 /*ret = self.evce_eco_tree(
@@ -1201,16 +1201,20 @@ impl EvceCtx {
         }
 
         /* picture buffer management */
-        self.rpm.evc_picman_put_pic(
-            pic_curr,
-            self.nalu.nal_unit_type == NaluType::EVC_IDR_NUT,
-            self.poc.poc_val as u32,
-            self.nalu.nuh_temporal_id,
-            false,
-            &mut self.refp,
-            self.slice_ref_flag,
-            self.ref_pic_gap_length,
-        );
+        {
+            let mut refp = self.refp.borrow_mut();
+
+            self.rpm.evc_picman_put_pic(
+                pic_curr,
+                self.nalu.nal_unit_type == NaluType::EVC_IDR_NUT,
+                self.poc.poc_val as u32,
+                self.nalu.nuh_temporal_id,
+                false,
+                &mut *refp,
+                self.slice_ref_flag,
+                self.ref_pic_gap_length,
+            );
+        }
 
         /*
         imgb_o = PIC_ORIG(ctx)->imgb;
@@ -1232,10 +1236,13 @@ impl EvceCtx {
         stat.poc = self.poc.poc_val as isize;
         stat.tid = self.nalu.nuh_temporal_id as isize;
 
-        for i in 0..2 {
-            stat.refpic_num[i] = self.rpm.num_refp[i];
-            for j in 0..stat.refpic_num[i] as usize {
-                stat.refpic[i][j] = self.refp[j][i].poc as isize;
+        {
+            let refp = self.refp.borrow();
+            for i in 0..2 {
+                stat.refpic_num[i] = self.rpm.num_refp[i];
+                for j in 0..stat.refpic_num[i] as usize {
+                    stat.refpic[i][j] = refp[j][i].poc as isize;
+                }
             }
         }
 

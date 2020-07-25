@@ -589,3 +589,11 @@ pub(crate) fn evc_get_split_mode(
         split_mode_buf.data[cud as usize][shape][pos as usize]
     }
 }
+
+pub(crate) fn evc_get_default_tree_cons() -> TREE_CONS {
+    TREE_CONS {
+        changed: false,
+        tree_type: TREE_TYPE::TREE_LC,
+        mode_cons: MODE_CONS::eAll,
+    }
+}

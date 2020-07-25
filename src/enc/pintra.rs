@@ -1,3 +1,4 @@
+use super::*;
 use crate::api::*;
 use crate::def::*;
 use crate::picman::*;
@@ -40,19 +41,22 @@ pub(crate) struct EvcePIntra {
     //int               * ndata[4];
 }
 
-impl EvcePIntra {
-    pub(crate) fn pintra_init_frame(
-        &mut self,
-        slice_type: SliceType,
-        pic_orig: &Option<Rc<RefCell<EvcPic>>>,
-        pic_mode: &Option<Rc<RefCell<EvcPic>>>,
-    ) {
-        self.slice_type = slice_type;
-        if let Some(pic) = pic_orig {
-            self.pic_o = Some(Rc::clone(pic));
+impl EvceCtx {
+    pub(crate) fn pintra_init_frame(&mut self) {
+        let pi = &mut self.pintra;
+
+        pi.slice_type = self.slice_type;
+        if let Some(pic) = &self.pic[PIC_IDX_ORIG] {
+            pi.pic_o = Some(Rc::clone(pic));
         }
-        if let Some(pic) = pic_mode {
-            self.pic_m = Some(Rc::clone(pic));
+        if let Some(pic) = &self.pic[PIC_IDX_MODE] {
+            pi.pic_m = Some(Rc::clone(pic));
         }
     }
+
+    pub(crate) fn pintra_analyze_frame(&mut self) {}
+
+    pub(crate) fn pintra_init_lcu(&mut self) {}
+
+    pub(crate) fn pintra_analyze_lcu(&mut self) {}
 }
