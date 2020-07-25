@@ -1,6 +1,8 @@
 pub(crate) mod bsw;
 pub(crate) mod eco;
 pub(crate) mod mode;
+pub(crate) mod pinter;
+pub(crate) mod pintra;
 pub(crate) mod sbac;
 pub(crate) mod tbl;
 
@@ -13,10 +15,12 @@ use super::util::*;
 
 use bsw::*;
 use eco::*;
+use mode::*;
+use pinter::*;
+use pintra::*;
 use sbac::*;
 use tbl::*;
 
-use crate::def::SplitDir::SPLIT_HOR;
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -66,35 +70,6 @@ pub(crate) const EVCE_MAX_INBUF_CNT: usize = 34;
 /* maximum cost value */
 pub(crate) const MAX_COST: f64 = (1.7e+308);
 
-/*****************************************************************************
- * mode decision structure
- *****************************************************************************/
-#[derive(Default)]
-pub(crate) struct EvceMode {
-    //void *pdata[4];
-    //int  *ndata[4];
-    //pel  *rec[N_C];
-    //int   s_rec[N_C];
-
-    /* CU count in a CU row in a LCU (== log2_max_cuwh - MIN_CU_LOG2) */
-    log2_culine: u8,
-    /* reference indices */
-    refi: [i8; REFP_NUM],
-    /* MVP indices */
-    mvp_idx: [u8; REFP_NUM],
-    /* MVR indices */
-    //u8    mvr_idx;
-    bi_idx: u8,
-    /* mv difference */
-    mvd: [[i16; MV_D]; REFP_NUM],
-
-    /* mv */
-    mv: [[i16; MV_D]; REFP_NUM],
-
-    //pel  *pred_y_best;
-    cu_mode: MCU,
-}
-
 /* virtual frame depth B picture */
 pub(crate) const FRM_DEPTH_0: u8 = 0;
 pub(crate) const FRM_DEPTH_1: u8 = 1;
@@ -120,170 +95,6 @@ pub(crate) struct EvcePicOrg {
     is_used: bool,
     /* address of sub-picture */
     //EVC_PIC              * spic;
-}
-
-/*****************************************************************************
- * intra prediction structure
- *****************************************************************************/
-#[derive(Default)]
-pub(crate) struct EvcePIntra {
-    /* temporary prediction buffer */
-    pred: CUBuffer<pel>, //[N_C][MAX_CU_DIM];
-    //pred_cache: [[pel; MAX_CU_DIM]; IntraPredDir::IPD_CNT_B as usize], // only for luma
-
-    /* reconstruction buffer */
-    rec: CUBuffer<pel>, //[N_C][MAX_CU_DIM];
-
-    coef_tmp: CUBuffer<i16>,  //[N_C][MAX_CU_DIM];
-    coef_best: CUBuffer<i16>, //[N_C][MAX_CU_DIM];
-    nnz_best: [u16; N_C],
-    rec_best: CUBuffer<pel>, //[N_C][MAX_CU_DIM];
-
-    /* original (input) picture buffer */
-    //EVC_PIC          * pic_o;
-    /* address of original (input) picture buffer */
-    //pel               * o[N_C];
-    /* stride of original (input) picture buffer */
-    //int                 s_o[N_C];
-    /* mode picture buffer */
-    //EVC_PIC          * pic_m;
-    /* address of mode picture buffer */
-
-    //pel               * m[N_C];
-    /* stride of mode picture buffer */
-    //int                 s_m[N_C];
-
-    /* QP for luma */
-    qp_y: u8,
-    /* QP for chroma */
-    qp_u: u8,
-    qp_v: u8,
-
-    slice_type: SliceType,
-
-    complexity: i64,
-    //void              * pdata[4];
-    //int               * ndata[4];
-}
-
-/*****************************************************************************
- * inter prediction structure
- *****************************************************************************/
-pub(crate) const MV_RANGE_MIN: usize = 0;
-pub(crate) const MV_RANGE_MAX: usize = 1;
-pub(crate) const MV_RANGE_DIM: usize = 2;
-
-#[derive(Default)]
-pub(crate) struct EvcePInter {
-    /* temporary prediction buffer (only used for ME)*/
-    //pred_buf: [pel; MAX_CU_DIM],
-
-    /* temporary buffer for analyze_cu */
-    refi: [[i8; REFP_NUM]; InterPredDir::PRED_NUM as usize],
-    /* Ref idx predictor */
-    refi_pred: [[i8; MAX_NUM_MVP]; REFP_NUM],
-    mvp_idx: [[u8; REFP_NUM]; InterPredDir::PRED_NUM as usize],
-    /*s16  mvp_scale[REFP_NUM][MAX_NUM_ACTIVE_REF_FRAME][MAX_NUM_MVP][MV_D];
-        s16  mv_scale[REFP_NUM][MAX_NUM_ACTIVE_REF_FRAME][MV_D];
-        u8   mvp_idx_temp_for_bi[PRED_NUM][REFP_NUM][MAX_NUM_ACTIVE_REF_FRAME];
-        int  best_index[PRED_NUM][4];
-        s16  mmvd_idx[PRED_NUM];
-        u8   mvr_idx[PRED_NUM];
-        u8   curr_mvr;
-        int  max_imv[MV_D];
-        s8   first_refi[PRED_NUM][REFP_NUM];
-        u8   bi_idx[PRED_NUM];
-        u8   curr_bi;
-        int max_search_range;
-        s16  affine_mvp_scale[REFP_NUM][MAX_NUM_ACTIVE_REF_FRAME][MAX_NUM_MVP][VER_NUM][MV_D];
-        s16  affine_mv_scale[REFP_NUM][MAX_NUM_ACTIVE_REF_FRAME][VER_NUM][MV_D];
-        u8   mvp_idx_scale[REFP_NUM][MAX_NUM_ACTIVE_REF_FRAME];
-
-        s16  affine_mvp[REFP_NUM][MAX_NUM_MVP][VER_NUM][MV_D];
-        s16  affine_mv[PRED_NUM][REFP_NUM][VER_NUM][MV_D];
-        s16  affine_mvd[PRED_NUM][REFP_NUM][VER_NUM][MV_D];
-
-        pel  p_error[MAX_CU_DIM];
-        int  i_gradient[2][MAX_CU_DIM];
-        s16  resi[N_C][MAX_CU_DIM];
-        s16  coff_save[N_C][MAX_CU_DIM];
-        u8   ats_inter_info_mode[PRED_NUM];
-        /* MV predictor */
-        s16  mvp[REFP_NUM][MAX_NUM_MVP][MV_D];
-
-        s16  mv[PRED_NUM][REFP_NUM][MV_D];
-        s16  mvd[PRED_NUM][REFP_NUM][MV_D];
-
-        s16  org_bi[MAX_CU_DIM];
-        s32  mot_bits[REFP_NUM];
-        /* temporary prediction buffer (only used for ME)*/
-        pel  pred[PRED_NUM+1][2][N_C][MAX_CU_DIM];
-        pel  dmvr_template[MAX_CU_DIM];
-        pel dmvr_half_pred_interpolated[REFP_NUM][(MAX_CU_SIZE + 1) * (MAX_CU_SIZE + 1)];
-    #if DMVR_PADDING
-        pel  dmvr_padding_buf[PRED_NUM][N_C][PAD_BUFFER_STRIDE * PAD_BUFFER_STRIDE];
-    #endif
-        pel  dmvr_ref_pred_interpolated[REFP_NUM][(MAX_CU_SIZE + ((DMVR_NEW_VERSION_ITER_COUNT + 1) * REF_PRED_EXTENTION_PEL_COUNT)) * (MAX_CU_SIZE + ((DMVR_NEW_VERSION_ITER_COUNT + 1) * REF_PRED_EXTENTION_PEL_COUNT))];
-
-        /* reconstruction buffer */
-        pel  rec[PRED_NUM][N_C][MAX_CU_DIM];
-        /* last one buffer used for RDO */
-        s16  coef[PRED_NUM+1][N_C][MAX_CU_DIM];
-
-        s16  residue[N_C][MAX_CU_DIM];
-        int  nnz_best[PRED_NUM][N_C];
-        int  nnz_sub_best[PRED_NUM][N_C][MAX_SUB_TB_NUM];
-
-        u8   num_refp;
-        /* minimum clip value */
-        s16  min_clip[MV_D];
-        /* maximum clip value */
-        s16  max_clip[MV_D];
-        /* search range for int-pel */
-        s16  search_range_ipel[MV_D];
-        /* search range for sub-pel */
-        s16  search_range_spel[MV_D];
-        s8  (*search_pattern_hpel)[2];
-        u8   search_pattern_hpel_cnt;
-        s8  (*search_pattern_qpel)[2];
-        u8   search_pattern_qpel_cnt;
-
-        /* original (input) picture buffer */
-        EVC_PIC        *pic_o;
-        /* address of original (input) picture buffer */
-        pel             *o[N_C];
-        /* stride of original (input) picture buffer */
-        int              s_o[N_C];
-        /* mode picture buffer */
-        EVC_PIC        *pic_m;
-        /* address of mode picture buffer */
-        pel             *m[N_C];
-        /* stride of mode picture buffer */
-        int              s_m[N_C];
-        /* motion vector map */
-        s16            (*map_mv)[REFP_NUM][MV_D];
-
-        /* picture width in SCU unit */
-        u16              w_scu;
-        /* QP for luma of current encoding CU */
-        u8               qp_y;
-        /* QP for chroma of current encoding CU */
-        u8               qp_u;
-        u8               qp_v;
-        u32              lambda_mv;
-        /* reference pictures */
-        EVC_REFP      (*refp)[REFP_NUM];
-        int              slice_type;
-        /* search level for motion estimation */
-        int              me_level;
-        int              complexity;
-        void            *pdata[4];
-        int             *ndata[4];
-        /* current picture order count */
-        int              poc;
-        /* gop size */
-        int              gop_size;
-         */
 }
 
 #[derive(Default)]
@@ -1242,8 +1053,17 @@ impl EvceCtx {
             );
 
             /* initialize mode decision for frame encoding */
-            //TODO
-            //ret = ctx->fn_mode_init_frame(ctx);
+            self.mode.mode_init_frame(self.log2_max_cuwh);
+            self.pintra.pintra_init_frame(
+                self.slice_type,
+                &self.pic[PIC_IDX_ORIG],
+                &self.pic[PIC_IDX_MODE],
+            );
+            self.pinter.pinter_init_frame(
+                self.slice_type,
+                &self.pic[PIC_IDX_ORIG],
+                &self.pic[PIC_IDX_MODE],
+            );
 
             /* slice layer encoding loop */
             {
