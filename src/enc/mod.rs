@@ -105,111 +105,6 @@ pub(crate) struct EvceDQP {
     cu_qp_delta_code: i8,
 }
 
-pub(crate) struct EvceCUData {
-    split_mode: LcuSplitMode,
-    /*u8  *qp_y;
-    u8  *qp_u;
-    u8  *qp_v;
-    u8  *pred_mode;
-    u8  *pred_mode_chroma;
-    u8  **mpm;
-    u8  **mpm_ext;
-    s8  **ipm;
-    u8  *skip_flag;
-    s8  **refi;
-    u8  **mvp_idx;
-    u8  *bi_idx;
-    s16 bv_chroma[MAX_CU_CNT_IN_LCU][MV_D];
-    s16 mv[MAX_CU_CNT_IN_LCU][REFP_NUM][MV_D];
-    s16 mvd[MAX_CU_CNT_IN_LCU][REFP_NUM][MV_D];
-    int *nnz[N_C];
-    u32 *map_scu;
-    u32 *map_cu_mode;
-    s8  *depth;
-    s16 *coef[N_C];
-    pel *reco[N_C]; */
-    //#if TRACE_ENC_CU_DATA
-    //u64  trace_idx[MAX_CU_CNT_IN_LCU];
-    //#endif
-}
-
-impl Default for EvceCUData {
-    fn default() -> Self {
-        EvceCUData {
-            split_mode: LcuSplitMode::default(),
-        }
-    }
-}
-impl EvceCUData {
-    fn new(log2_cuw: usize, log2_cuh: usize) -> Self {
-        EvceCUData::default()
-    }
-    fn init(&mut self, log2_cuw: usize, log2_cuh: usize, qp_y: u8, qp_u: u8, qp_v: u8) {
-        /*int i, j;
-            int cuw_scu, cuh_scu;
-            int size_8b, size_16b, size_32b, cu_cnt, pixel_cnt;
-
-            cuw_scu = 1 << log2_cuw;
-            cuh_scu = 1 << log2_cuh;
-
-            size_8b = cuw_scu * cuh_scu * sizeof(s8);
-            size_16b = cuw_scu * cuh_scu * sizeof(s16);
-            size_32b = cuw_scu * cuh_scu * sizeof(s32);
-            cu_cnt = cuw_scu * cuh_scu;
-            pixel_cnt = cu_cnt << 4;
-
-            evce_malloc_1d((void**)&cu_data->qp_y, size_8b);
-            evce_malloc_1d((void**)&cu_data->qp_u, size_8b);
-            evce_malloc_1d((void**)&cu_data->qp_v, size_8b);
-            evce_malloc_1d((void**)&cu_data->pred_mode, size_8b);
-            evce_malloc_1d((void**)&cu_data->pred_mode_chroma, size_8b);
-            evce_malloc_2d((s8***)&cu_data->mpm, 2, cu_cnt, sizeof(u8));
-            evce_malloc_2d((s8***)&cu_data->ipm, 2, cu_cnt, sizeof(u8));
-            evce_malloc_2d((s8***)&cu_data->mpm_ext, 8, cu_cnt, sizeof(u8));
-            evce_malloc_1d((void**)&cu_data->skip_flag, size_8b);
-            evce_malloc_1d((void**)&cu_data->ibc_flag, size_8b);
-        #if DMVR_FLAG
-            evce_malloc_1d((void**)&cu_data->dmvr_flag, size_8b);
-        #endif
-            evce_malloc_2d((s8***)&cu_data->refi, cu_cnt, REFP_NUM, sizeof(u8));
-            evce_malloc_2d((s8***)&cu_data->mvp_idx, cu_cnt, REFP_NUM, sizeof(u8));
-            evce_malloc_1d((void**)&cu_data->mvr_idx, size_8b);
-            evce_malloc_1d((void**)&cu_data->bi_idx, size_8b);
-            evce_malloc_1d((void**)&cu_data->mmvd_idx, size_16b);
-            evce_malloc_1d((void**)&cu_data->mmvd_flag, size_8b);
-
-            evce_malloc_1d((void**)& cu_data->ats_intra_cu, size_8b);
-            evce_malloc_1d((void**)& cu_data->ats_mode_h, size_8b);
-            evce_malloc_1d((void**)& cu_data->ats_mode_v, size_8b);
-
-            evce_malloc_1d((void**)&cu_data->ats_inter_info, size_8b);
-
-            for(i = 0; i < N_C; i++)
-            {
-                evce_malloc_1d((void**)&cu_data->nnz[i], size_32b);
-            }
-            for (i = 0; i < N_C; i++)
-            {
-                for (j = 0; j < 4; j++)
-                {
-                    evce_malloc_1d((void**)&cu_data->nnz_sub[i][j], size_32b);
-                }
-            }
-            evce_malloc_1d((void**)&cu_data->map_scu, size_32b);
-            evce_malloc_1d((void**)&cu_data->affine_flag, size_8b);
-            evce_malloc_1d((void**)&cu_data->map_affine, size_32b);
-            evce_malloc_1d((void**)&cu_data->map_cu_mode, size_32b);
-            evce_malloc_1d((void**)&cu_data->depth, size_8b);
-
-            for(i = 0; i < N_C; i++)
-            {
-                evce_malloc_1d((void**)&cu_data->coef[i], (pixel_cnt >> (!!(i)* 2)) * sizeof(s16));
-                evce_malloc_1d((void**)&cu_data->reco[i], (pixel_cnt >> (!!(i)* 2)) * sizeof(pel));
-            }
-            */
-    }
-}
-
 /*****************************************************************************
  * CORE information used for encoding process.
  *
@@ -374,8 +269,8 @@ impl EvceCore {
             let mut curr = Vec::with_capacity(MAX_CU_DEPTH);
             let mut next = Vec::with_capacity(MAX_CU_DEPTH);
             for j in 0..MAX_CU_DEPTH {
-                best.push(EvceCUData::new(i, j));
-                temp.push(EvceCUData::new(i, j));
+                best.push(EvceCUData::new(i as u8, j as u8));
+                temp.push(EvceCUData::new(i as u8, j as u8));
                 data.push(EvceDQP::default());
                 curr.push(EvceDQP::default());
                 next.push(EvceDQP::default());
@@ -715,8 +610,8 @@ impl EvceCtx {
         let mut map_cu_data = Vec::with_capacity(f_lcu as usize);
         for i in 0..f_lcu as usize {
             let mut cu_data = EvceCUData::new(
-                log2_max_cuwh as usize - MIN_CU_LOG2,
-                log2_max_cuwh as usize - MIN_CU_LOG2,
+                log2_max_cuwh - MIN_CU_LOG2 as u8,
+                log2_max_cuwh - MIN_CU_LOG2 as u8,
             );
             map_cu_data.push(cu_data);
         }

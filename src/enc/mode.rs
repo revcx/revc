@@ -1,5 +1,263 @@
 use super::*;
 use crate::api::*;
+use crate::def::*;
+use crate::plane::*;
+
+#[derive(Default)]
+pub(crate) struct EvceCUData {
+    split_mode: LcuSplitMode,
+    qp_y: Vec<u8>,
+    qp_u: Vec<u8>,
+    qp_v: Vec<u8>,
+    pred_mode: Vec<PredMode>,
+    pred_mode_chroma: Vec<PredMode>,
+    ipm: Vec<Vec<IntraPredDir>>,
+    skip_flag: Vec<bool>,
+    refi: Vec<Vec<i8>>,
+    mvp_idx: Vec<Vec<u8>>,
+    mv: Vec<Vec<Vec<i16>>>,  //[MAX_CU_CNT_IN_LCU][REFP_NUM][MV_D];
+    mvd: Vec<Vec<Vec<i16>>>, //[MAX_CU_CNT_IN_LCU][REFP_NUM][MV_D];
+    nnz: Vec<Vec<bool>>,     //[N_C];
+    map_scu: Vec<MCU>,
+    map_cu_mode: Vec<MCU>,
+    depth: Vec<i8>,
+    coef: Vec<Vec<i16>>, //[N_C];
+    reco: Vec<Vec<pel>>, //[N_C];
+                         //#if TRACE_ENC_CU_DATA
+                         //  u64  trace_idx[MAX_CU_CNT_IN_LCU];
+                         //#endif
+}
+
+impl EvceCUData {
+    pub(crate) fn new(log2_cuw: u8, log2_cuh: u8) -> Self {
+        let cuw_scu = 1 << log2_cuw as usize;
+        let cuh_scu = 1 << log2_cuh as usize;
+
+        let cu_cnt = cuw_scu * cuh_scu;
+        let pixel_cnt = cu_cnt << 4;
+
+        let mut coef = Vec::with_capacity(N_C);
+        let mut reco = Vec::with_capacity(N_C);
+        for i in 0..N_C {
+            let chroma = if i > 0 { 1 } else { 0 };
+            coef.push(vec![0; pixel_cnt >> (chroma * 2)]);
+            reco.push(vec![0; pixel_cnt >> (chroma * 2)]);
+        }
+
+        EvceCUData {
+            split_mode: LcuSplitMode::default(),
+            qp_y: vec![0; cu_cnt],
+            qp_u: vec![0; cu_cnt],
+            qp_v: vec![0; cu_cnt],
+            pred_mode: vec![PredMode::MODE_INTRA; cu_cnt],
+            pred_mode_chroma: vec![PredMode::MODE_INTRA; cu_cnt],
+            ipm: vec![vec![IntraPredDir::IPD_DC_B; cu_cnt]; 2],
+            skip_flag: vec![false; cu_cnt],
+            refi: vec![vec![0; REFP_NUM]; cu_cnt],
+            mvp_idx: vec![vec![0; REFP_NUM]; cu_cnt],
+            mv: vec![vec![vec![0; MV_D]; REFP_NUM]; cu_cnt],
+            mvd: vec![vec![vec![0; MV_D]; REFP_NUM]; cu_cnt],
+            nnz: vec![vec![false; cu_cnt]; N_C],
+            map_scu: vec![MCU::default(); cu_cnt],
+            map_cu_mode: vec![MCU::default(); cu_cnt],
+            depth: vec![0; cu_cnt],
+            coef,
+            reco,
+        }
+    }
+    pub(crate) fn init(&mut self, log2_cuw: u8, log2_cuh: u8, qp_y: u8, qp_u: u8, qp_v: u8) {
+        let cuw_scu = 1 << log2_cuw as usize;
+        let cuh_scu = 1 << log2_cuh as usize;
+
+        let cu_cnt = cuw_scu * cuh_scu;
+        let pixel_cnt = cu_cnt << 4;
+
+        for i in 0..NUM_CU_DEPTH {
+            for j in 0..BlockShape::NUM_BLOCK_SHAPE as usize {
+                for v in &mut self.split_mode.data[i][j] {
+                    *v = SplitMode::NO_SPLIT;
+                }
+            }
+        }
+
+        for i in 0..cu_cnt {
+            self.qp_y[i] = 0;
+            self.qp_u[i] = 0;
+            self.qp_v[i] = 0;
+            self.ipm[0][i] = IntraPredDir::IPD_DC_B;
+            self.ipm[1][i] = IntraPredDir::IPD_DC_B;
+        }
+    }
+
+    pub(crate) fn copy(
+        &mut self,
+        src: &EvceCUData,
+        x: u16,
+        y: u16,
+        log2_cuw: u8,
+        log2_cuh: u8,
+        log2_cus: u8,
+        cud: u16,
+        tree_cons: &TREE_CONS,
+    ) {
+        let cx = x as usize >> MIN_CU_LOG2; //x = position in LCU, cx = 4x4 CU horizontal index
+        let cy = y as usize >> MIN_CU_LOG2; //y = position in LCU, cy = 4x4 CU vertical index
+
+        let cuw = (1 << log2_cuw) as usize; //current CU width
+        let cuh = (1 << log2_cuh) as usize; //current CU height
+        let cus = (1 << log2_cus) as usize; //current CU buffer stride (= current CU width)
+        let cuw_scu = (1 << log2_cuw) as usize - MIN_CU_LOG2; //4x4 CU number in width
+        let cuh_scu = (1 << log2_cuh) as usize - MIN_CU_LOG2; //4x4 CU number in height
+        let cus_scu = (1 << log2_cus) as usize - MIN_CU_LOG2; //4x4 CU number in stride
+
+        // only copy src's first row of 4x4 CUs to dis's all 4x4 CUs
+        if evc_check_luma(tree_cons) {
+            let size = cuw_scu;
+            for j in 0..cuh_scu {
+                let idx_dst = (cy + j) * cus_scu + cx;
+                let idx_src = j * cuw_scu;
+
+                for k in cud as usize..NUM_CU_DEPTH {
+                    for i in 0..BlockShape::NUM_BLOCK_SHAPE as usize {
+                        self.split_mode.data[k][i][idx_dst..idx_dst + size]
+                            .copy_from_slice(&src.split_mode.data[k][i][idx_src..idx_src + size]);
+                    }
+                }
+
+                self.qp_y[idx_dst..idx_dst + size]
+                    .copy_from_slice(&src.qp_y[idx_src..idx_src + size]);
+                self.pred_mode[idx_dst..idx_dst + size]
+                    .copy_from_slice(&src.pred_mode[idx_src..idx_src + size]);
+                self.ipm[0][idx_dst..idx_dst + size]
+                    .copy_from_slice(&src.ipm[0][idx_src..idx_src + size]);
+                self.skip_flag[idx_dst..idx_dst + size]
+                    .copy_from_slice(&src.skip_flag[idx_src..idx_src + size]);
+                self.depth[idx_dst..idx_dst + size]
+                    .copy_from_slice(&src.depth[idx_src..idx_src + size]);
+                self.map_scu[idx_dst..idx_dst + size]
+                    .copy_from_slice(&src.map_scu[idx_src..idx_src + size]);
+                self.map_cu_mode[idx_dst..idx_dst + size]
+                    .copy_from_slice(&src.map_cu_mode[idx_src..idx_src + size]);
+                self.refi[idx_dst..idx_dst + size]
+                    .clone_from_slice(&src.refi[idx_src..idx_src + size]);
+                self.mvp_idx[idx_dst..idx_dst + size]
+                    .clone_from_slice(&src.mvp_idx[idx_src..idx_src + size]);
+                self.mv[idx_dst..idx_dst + size].clone_from_slice(&src.mv[idx_src..idx_src + size]);
+                self.mvd[idx_dst..idx_dst + size]
+                    .clone_from_slice(&src.mvd[idx_src..idx_src + size]);
+                self.nnz[Y_C][idx_dst..idx_dst + size]
+                    .copy_from_slice(&src.nnz[Y_C][idx_src..idx_src + size]);
+
+                //#if TRACE_ENC_CU_DATA
+                //        size = cuw_scu * sizeof(dst->trace_idx[0]);
+                //        evc_mcpy(dst->trace_idx + idx_dst, src->trace_idx + idx_src, size);
+                //#endif
+            }
+
+            let size = cuw;
+            for j in 0..cuh {
+                let idx_dst = (y as usize + j) * cus + x as usize;
+                let idx_src = j * cuw;
+
+                self.coef[Y_C][idx_dst..idx_dst + size]
+                    .copy_from_slice(&src.coef[Y_C][idx_src..idx_src + size]);
+                self.reco[Y_C][idx_dst..idx_dst + size]
+                    .copy_from_slice(&src.reco[Y_C][idx_src..idx_src + size]);
+            }
+        }
+
+        if evc_check_chroma(tree_cons) {
+            let size = cuw >> 1;
+            for j in 0..cuh >> 1 {
+                let idx_dst = ((y >> 1) as usize + j) * (cus >> 1) + (x >> 1) as usize;
+                let idx_src = j * (cuw >> 1);
+
+                self.coef[U_C][idx_dst..idx_dst + size]
+                    .copy_from_slice(&src.coef[U_C][idx_src..idx_src + size]);
+                self.reco[U_C][idx_dst..idx_dst + size]
+                    .copy_from_slice(&src.reco[U_C][idx_src..idx_src + size]);
+
+                self.coef[V_C][idx_dst..idx_dst + size]
+                    .copy_from_slice(&src.coef[V_C][idx_src..idx_src + size]);
+                self.reco[V_C][idx_dst..idx_dst + size]
+                    .copy_from_slice(&src.reco[V_C][idx_src..idx_src + size]);
+            }
+
+            let size = cuw_scu;
+            for j in 0..cuh_scu {
+                let idx_dst = (cy + j) * cus_scu + cx;
+                let idx_src = j * cuw_scu;
+
+                self.qp_u[idx_dst..idx_dst + size]
+                    .copy_from_slice(&src.qp_u[idx_src..idx_src + size]);
+                self.qp_v[idx_dst..idx_dst + size]
+                    .copy_from_slice(&src.qp_v[idx_src..idx_src + size]);
+
+                self.ipm[1][idx_dst..idx_dst + size]
+                    .copy_from_slice(&src.ipm[1][idx_src..idx_src + size]);
+                self.pred_mode_chroma[idx_dst..idx_dst + size]
+                    .copy_from_slice(&src.pred_mode_chroma[idx_src..idx_src + size]);
+
+                self.nnz[U_C][idx_dst..idx_dst + size]
+                    .copy_from_slice(&src.nnz[U_C][idx_src..idx_src + size]);
+                self.nnz[V_C][idx_dst..idx_dst + size]
+                    .copy_from_slice(&src.nnz[V_C][idx_src..idx_src + size]);
+            }
+        }
+    }
+
+    fn mode_cpy_rec_to_ref(
+        &mut self,
+        mut x: usize,
+        mut y: usize,
+        mut w: usize,
+        mut h: usize,
+        planes: &mut [Plane<pel>; N_C],
+        tree_cons: &TREE_CONS,
+    ) {
+        if evc_check_luma(tree_cons) {
+            /* luma */
+            let dst = &mut planes[Y_C].as_region_mut();
+            let src = &self.reco[Y_C];
+
+            for j in 0..h {
+                for i in 0..w {
+                    dst[y + j][x + i] = src[j * w + i];
+                }
+            }
+        }
+
+        if evc_check_chroma(tree_cons) {
+            /* chroma */
+            x >>= 1;
+            y >>= 1;
+            w >>= 1;
+            h >>= 1;
+
+            {
+                let dst = &mut planes[U_C].as_region_mut();
+                let src = &self.reco[U_C];
+
+                for j in 0..h {
+                    for i in 0..w {
+                        dst[y + j][x + i] = src[j * w + i];
+                    }
+                }
+            }
+
+            {
+                let dst = &mut planes[V_C].as_region_mut();
+                let src = &self.reco[V_C];
+
+                for j in 0..h {
+                    for i in 0..w {
+                        dst[y + j][x + i] = src[j * w + i];
+                    }
+                }
+            }
+        }
+    }
+}
 
 /*****************************************************************************
  * mode decision structure
@@ -28,6 +286,48 @@ pub(crate) struct EvceMode {
 
     //pel  *pred_y_best;
     cu_mode: MCU,
+}
+
+impl EvceMode {
+    fn get_cu_pred_data(
+        &mut self,
+        src: &EvceCUData,
+        x: u16,
+        y: u16,
+        log2_cuw: u8,
+        log2_cuh: u8,
+        log2_cus: u8,
+        cud: u16,
+    ) {
+        let cx = x as usize >> MIN_CU_LOG2; //x = position in LCU, cx = 4x4 CU horizontal index
+        let cy = y as usize >> MIN_CU_LOG2; //y = position in LCU, cy = 4x4 CU vertical index
+
+        let cuw = (1 << log2_cuw) as usize; //current CU width
+        let cuh = (1 << log2_cuh) as usize; //current CU height
+        let cus = (1 << log2_cus) as usize; //current CU buffer stride (= current CU width)
+        let cuw_scu = (1 << log2_cuw) as usize - MIN_CU_LOG2; //4x4 CU number in width
+        let cuh_scu = (1 << log2_cuh) as usize - MIN_CU_LOG2; //4x4 CU number in height
+        let cus_scu = (1 << log2_cus) as usize - MIN_CU_LOG2; //4x4 CU number in stride
+
+        // only copy src's first row of 4x4 CUs to dis's all 4x4 CUs
+        let idx_src = cy * cus_scu + cx;
+
+        self.cu_mode = (src.pred_mode[idx_src] as u32).into();
+        self.mv[REFP_0][MV_X] = src.mv[idx_src][REFP_0][MV_X];
+        self.mv[REFP_0][MV_Y] = src.mv[idx_src][REFP_0][MV_Y];
+        self.mv[REFP_1][MV_X] = src.mv[idx_src][REFP_1][MV_X];
+        self.mv[REFP_1][MV_Y] = src.mv[idx_src][REFP_1][MV_Y];
+
+        self.refi[REFP_0] = src.refi[idx_src][REFP_0];
+        self.refi[REFP_1] = src.refi[idx_src][REFP_1];
+
+        /*#if TRACE_ENC_CU_DATA
+            mi->trace_cu_idx = src->trace_idx[idx_src];
+        #endif
+        #if TRACE_ENC_CU_DATA_CHECK
+            evc_assert(mi->trace_cu_idx != 0);
+        #endif*/
+    }
 }
 
 impl EvceCtx {
@@ -59,16 +359,16 @@ impl EvceCtx {
         /* initialize cu data */
         self.core.cu_data_best[self.log2_max_cuwh as usize - 2][self.log2_max_cuwh as usize - 2]
             .init(
-                self.log2_max_cuwh as usize,
-                self.log2_max_cuwh as usize,
+                self.log2_max_cuwh,
+                self.log2_max_cuwh,
                 self.qp,
                 self.qp,
                 self.qp,
             );
         self.core.cu_data_temp[self.log2_max_cuwh as usize - 2][self.log2_max_cuwh as usize - 2]
             .init(
-                self.log2_max_cuwh as usize,
-                self.log2_max_cuwh as usize,
+                self.log2_max_cuwh,
+                self.log2_max_cuwh,
                 self.qp,
                 self.qp,
                 self.qp,
@@ -134,8 +434,6 @@ impl EvceCtx {
         qp: u8,
         tree_cons: TREE_CONS,
     ) {
-        let mi = &mut self.mode;
-
         // x0 = CU's left up corner horizontal index in entrie frame
         // y0 = CU's left up corner vertical index in entire frame
         // cuw = CU width, log2_cuw = CU width in log2
@@ -247,13 +545,8 @@ impl EvceCtx {
         if !boundary {
             cost_temp = 0.0;
 
-            self.core.cu_data_temp[log2_cuw as usize - 2][log2_cuh as usize - 2].init(
-                log2_cuw as usize,
-                log2_cuh as usize,
-                self.qp,
-                self.qp,
-                self.qp,
-            );
+            self.core.cu_data_temp[log2_cuw as usize - 2][log2_cuh as usize - 2]
+                .init(log2_cuw, log2_cuh, self.qp, self.qp, self.qp);
 
             self.sh.qp_prev_mode =
                 self.core.dqp_data[log2_cuw as usize - 2][log2_cuh as usize - 2].prev_QP as u8;
@@ -327,35 +620,60 @@ impl EvceCtx {
                             .cu_qp_delta_is_coded = false;
                     }
                     cost_temp_dqp = cost_temp;
-                    self.core.cu_data_temp[log2_cuw as usize - 2][log2_cuh as usize - 2].init(
-                        log2_cuw as usize,
-                        log2_cuh as usize,
-                        self.qp,
-                        self.qp,
-                        self.qp,
-                    );
+                    self.core.cu_data_temp[log2_cuw as usize - 2][log2_cuh as usize - 2]
+                        .init(log2_cuw, log2_cuh, self.qp, self.qp, self.qp);
 
                     self.clear_map_scu(x0, y0, cuw, cuh);
                     /*cost_temp_dqp += mode_coding_unit(ctx, core, x0, y0, log2_cuw, log2_cuh, cud, mi);
-                    */
+                     */
                     if cost_best > cost_temp_dqp {
                         cu_mode_dqp = self.core.cu_mode;
                         dist_cu_best_dqp = self.core.dist_cu_best;
                         /* backup the current best data */
-                        //copy_cu_data(&core->cu_data_best[log2_cuw - 2][log2_cuh - 2], &core->cu_data_temp[log2_cuw - 2][log2_cuh - 2], 0, 0, log2_cuw, log2_cuh, log2_cuw, cud, core->tree_cons );
+                        self.core.cu_data_best[log2_cuw as usize - 2][log2_cuh as usize - 2].copy(
+                            &self.core.cu_data_temp[log2_cuw as usize - 2][log2_cuh as usize - 2],
+                            0,
+                            0,
+                            log2_cuw,
+                            log2_cuh,
+                            log2_cuw,
+                            cud,
+                            &self.core.tree_cons,
+                        );
                         cost_best = cost_temp_dqp;
                         best_split_mode = SplitMode::NO_SPLIT;
                         s_temp_depth =
                             self.core.s_next_best[log2_cuw as usize - 2][log2_cuh as usize - 2];
                         dqp_temp_depth =
                             self.core.dqp_next_best[log2_cuw as usize - 2][log2_cuh as usize - 2];
-                        //mode_cpy_rec_to_ref(core, x0, y0, cuw, cuh, PIC_MODE(ctx), core->tree_cons);
+
+                        if let Some(pic) = &self.pic[PIC_IDX_MODE] {
+                            let cu_data_best = &mut self.core.cu_data_best[log2_cuw as usize - 2]
+                                [log2_cuh as usize - 2];
+                            cu_data_best.mode_cpy_rec_to_ref(
+                                x0 as usize,
+                                y0 as usize,
+                                cuw as usize,
+                                cuh as usize,
+                                &mut pic.borrow().frame.borrow_mut().planes,
+                                &self.core.tree_cons,
+                            );
+                        }
 
                         if evc_check_luma(&self.core.tree_cons) {
                             // update history MV list
                             // in mode_coding_unit, self.fn_pinter_analyze_cu will store the best MV in mi
                             // if the cost_temp has been update above, the best MV is in mi
-                            //get_cu_pred_data(&core->cu_data_best[log2_cuw - 2][log2_cuh - 2], 0, 0, log2_cuw, log2_cuh, log2_cuw, cud, mi);
+                            self.mode.get_cu_pred_data(
+                                &self.core.cu_data_best[log2_cuw as usize - 2]
+                                    [log2_cuh as usize - 2],
+                                0,
+                                0,
+                                log2_cuw,
+                                log2_cuh,
+                                log2_cuw,
+                                cud,
+                            );
                         }
                     }
                 }

@@ -167,9 +167,6 @@ pub(crate) enum PredMode {
     MODE_INTER = 1,
     MODE_SKIP = 2,
     MODE_DIR = 3,
-    MODE_SKIP_MMVD = 4,
-    MODE_DIR_MMVD = 5,
-    MODE_IBC = 6,
 }
 
 impl Default for PredMode {
@@ -265,6 +262,12 @@ pub(crate) enum CtxNevIdx {
 *****************************************************************************/
 #[derive(Default, Clone, Copy)]
 pub(crate) struct MCU(u32);
+
+impl From<u32> for MCU {
+    fn from(val: u32) -> Self {
+        MCU(val)
+    }
+}
 
 impl MCU {
     /* set slice number to map */
