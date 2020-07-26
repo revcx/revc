@@ -1156,7 +1156,14 @@ impl EvcdCtx {
                     EVC_TRACE(&mut bs.tracer, " depth ");
                     EVC_TRACE(&mut bs.tracer, cud);
                     EVC_TRACE(&mut bs.tracer, " split mode ");
-                    EVC_TRACE(&mut bs.tracer, split_mode as u8);
+                    EVC_TRACE(
+                        &mut bs.tracer,
+                        if split_mode == SplitMode::NO_SPLIT {
+                            0
+                        } else {
+                            5
+                        },
+                    );
                     EVC_TRACE(&mut bs.tracer, " \n");
                 } else {
                     split_mode = SplitMode::NO_SPLIT;

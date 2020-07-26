@@ -608,8 +608,9 @@ pub(crate) struct EvcPoc {
 #[derive(PartialEq, Clone, Copy)]
 pub(crate) enum SplitMode {
     NO_SPLIT = 0,
-    SPLIT_QUAD = 5,
+    SPLIT_QUAD = 1,
 }
+pub(crate) const MAX_SPLIT_NUM: usize = 2;
 
 impl SplitMode {
     #[inline]

@@ -97,7 +97,7 @@ pub(crate) struct EvcePicOrg {
     //EVC_PIC              * spic;
 }
 
-#[derive(Default)]
+#[derive(Default, Copy, Clone)]
 pub(crate) struct EvceDQP {
     prev_QP: i8,
     curr_QP: i8,
@@ -106,7 +106,7 @@ pub(crate) struct EvceDQP {
 }
 
 pub(crate) struct EvceCUData {
-    split_mode: Vec<Vec<Vec<i8>>>,
+    split_mode: LcuSplitMode,
     /*u8  *qp_y;
     u8  *qp_u;
     u8  *qp_v;
@@ -136,10 +136,7 @@ pub(crate) struct EvceCUData {
 impl Default for EvceCUData {
     fn default() -> Self {
         EvceCUData {
-            split_mode: vec![
-                vec![vec![0; MAX_CU_CNT_IN_LCU]; BlockShape::NUM_BLOCK_SHAPE as usize];
-                NUM_CU_DEPTH
-            ],
+            split_mode: LcuSplitMode::default(),
         }
     }
 }
@@ -300,12 +297,14 @@ pub(crate) struct EvceCore {
     //void          *pf;
     /* bitstream structure for RDO */
     bs_temp: EvceBsw,
+    s_temp_run: EvceSbac,
+    c_temp_run: EvcSbacCtx,
+
     /* SBAC structure for full RDO */
     s_curr_best: [[EvceSbac; MAX_CU_DEPTH]; MAX_CU_DEPTH],
     s_next_best: [[EvceSbac; MAX_CU_DEPTH]; MAX_CU_DEPTH],
     s_temp_best: EvceSbac,
     s_temp_best_merge: EvceSbac,
-    s_temp_run: EvceSbac,
     s_temp_prev_comp_best: EvceSbac,
     s_temp_prev_comp_run: EvceSbac,
     s_curr_before_split: [[EvceSbac; MAX_CU_DEPTH]; MAX_CU_DEPTH],
@@ -314,7 +313,6 @@ pub(crate) struct EvceCore {
     c_next_best: [[EvcSbacCtx; MAX_CU_DEPTH]; MAX_CU_DEPTH],
     c_temp_best: EvcSbacCtx,
     c_temp_best_merge: EvcSbacCtx,
-    c_temp_run: EvcSbacCtx,
     c_temp_prev_comp_best: EvcSbacCtx,
     c_temp_prev_comp_run: EvcSbacCtx,
     c_curr_before_split: [[EvcSbacCtx; MAX_CU_DEPTH]; MAX_CU_DEPTH],

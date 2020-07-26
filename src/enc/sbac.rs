@@ -83,6 +83,26 @@ impl EvceSbac {
         }
     }
 
+    pub(crate) fn bit_reset(&mut self) {
+        self.code &= 0x7FFFF;
+        self.code_bits = 11;
+        self.pending_byte = 0;
+        self.is_pending_byte = 0;
+        self.stacked_ff = 0;
+        self.stacked_zero = 0;
+        self.bitcounter = 0;
+        self.bin_counter = 0;
+    }
+
+    pub(crate) fn get_bit_number(&self) -> u32 {
+        self.bitcounter
+            + 8 * (self.stacked_zero + self.stacked_ff)
+            + 8 * (if self.is_pending_byte != 0 { 1 } else { 0 })
+            + 8
+            - self.code_bits
+            + 3
+    }
+
     pub(crate) fn finish(&mut self, bs: &mut EvceBsw) {
         let mut tmp = (self.code + self.range - 1) & (0xFFFFFFFF << 14);
         if tmp < self.code {
