@@ -5,6 +5,7 @@ pub(crate) mod pinter;
 pub(crate) mod pintra;
 pub(crate) mod sbac;
 pub(crate) mod tbl;
+pub(crate) mod util;
 
 use super::api::frame::*;
 use super::api::*;
@@ -226,7 +227,7 @@ pub(crate) struct EvceCore {
     parent_split_allow: [bool; 6],
 
     //one picture that arranges cu pixels and neighboring pixels for deblocking (just to match the interface of deblocking functions)
-    /*delta_dist: [i64; N_C], //delta distortion from filtering (negative values mean distortion reduced)
+    delta_dist: [i64; N_C], //delta distortion from filtering (negative values mean distortion reduced)
     dist_nofilt: [i64; N_C], //distortion of not filtered samples
     dist_filter: [i64; N_C], //distortion of filtered samples
     /* RDOQ related variables*/
@@ -234,13 +235,9 @@ pub(crate) struct EvceCore {
     rdoq_est_cbf_luma: [i64; 2],
     rdoq_est_cbf_cb: [i64; 2],
     rdoq_est_cbf_cr: [i64; 2],
-    //rdoq_est_sig_coeff: [[i64; 2]; NUM_CTX_SIG_COEFF_FLAG],
-    rdoq_est_gtx: [[i64; 2]; NUM_CTX_GTX],
-    rdoq_est_last_sig_coeff_x: [[i64; 2]; NUM_CTX_LAST_SIG_COEFF],
-    rdoq_est_last_sig_coeff_y: [[i64; 2]; NUM_CTX_LAST_SIG_COEFF],
     rdoq_est_run: [[i32; 2]; NUM_CTX_CC_RUN],
     rdoq_est_level: [[i32; 2]; NUM_CTX_CC_LEVEL],
-    rdoq_est_last: [[i32; 2]; NUM_CTX_CC_LAST],*/
+    rdoq_est_last: [[i32; 2]; NUM_CTX_CC_LAST],
     evc_tbl_qp_chroma_dynamic_ext: Vec<Vec<i8>>, // [[i8; MAX_QP_TABLE_SIZE_EXT]; 2],
 }
 impl EvceCore {
@@ -384,21 +381,17 @@ impl EvceCore {
             //int            parent_split_allow[6];
 
             //one picture that arranges cu pixels and neighboring pixels for deblocking (just to match the interface of deblocking functions)
-            /*delta_dist: [i64; N_C], //delta distortion from filtering (negative values mean distortion reduced)
-            dist_nofilt: [i64; N_C], //distortion of not filtered samples
-            dist_filter: [i64; N_C], //distortion of filtered samples
+            delta_dist: [0; N_C], //delta distortion from filtering (negative values mean distortion reduced)
+            dist_nofilt: [0; N_C], //distortion of not filtered samples
+            dist_filter: [0; N_C], //distortion of filtered samples
             /* RDOQ related variables*/
-            rdoq_est_cbf_all: [i64; 2],
-            rdoq_est_cbf_luma: [i64; 2],
-            rdoq_est_cbf_cb: [i64; 2],
-            rdoq_est_cbf_cr: [i64; 2],
-            //rdoq_est_sig_coeff: [[i64; 2]; NUM_CTX_SIG_COEFF_FLAG],
-            rdoq_est_gtx: [[i64; 2]; NUM_CTX_GTX],
-            rdoq_est_last_sig_coeff_x: [[i64; 2]; NUM_CTX_LAST_SIG_COEFF],
-            rdoq_est_last_sig_coeff_y: [[i64; 2]; NUM_CTX_LAST_SIG_COEFF],
-            rdoq_est_run: [[i32; 2]; NUM_CTX_CC_RUN],
-            rdoq_est_level: [[i32; 2]; NUM_CTX_CC_LEVEL],
-            rdoq_est_last: [[i32; 2]; NUM_CTX_CC_LAST],*/
+            rdoq_est_cbf_all: [0; 2],
+            rdoq_est_cbf_luma: [0; 2],
+            rdoq_est_cbf_cb: [0; 2],
+            rdoq_est_cbf_cr: [0; 2],
+            rdoq_est_run: [[0; 2]; NUM_CTX_CC_RUN],
+            rdoq_est_level: [[0; 2]; NUM_CTX_CC_LEVEL],
+            rdoq_est_last: [[0; 2]; NUM_CTX_CC_LAST],
             evc_tbl_qp_chroma_dynamic_ext, // [[i8; MAX_QP_TABLE_SIZE_EXT]; 2],
             ..Default::default()
         }

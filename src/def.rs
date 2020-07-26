@@ -129,6 +129,11 @@ pub(crate) const AVAIL_RI_UP: u16 = (1 << AVAIL_BIT_RI_UP);
 pub(crate) const AVAIL_UP_LE_LE: u16 = (1 << AVAIL_BIT_UP_LE_LE);
 pub(crate) const AVAIL_UP_RI_RI: u16 = (1 << AVAIL_BIT_UP_RI_RI);
 
+pub(crate) const LR_00: u16 = 0;
+pub(crate) const LR_10: u16 = 1;
+pub(crate) const LR_01: u16 = 2;
+pub(crate) const LR_11: u16 = 3;
+
 /* MB availability check macro */
 #[inline]
 pub(crate) fn IS_AVAIL(avail: u16, pos: u16) -> bool {

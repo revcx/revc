@@ -82,10 +82,10 @@ pub(crate) struct EvcePInter {
     /* picture width in SCU unit */
     w_scu: u16,
     /* QP for luma of current encoding CU */
-    qp_y: u8,
+    pub(crate) qp_y: u8,
     /* QP for chroma of current encoding CU */
-    qp_u: u8,
-    qp_v: u8,
+    pub(crate) qp_u: u8,
+    pub(crate) qp_v: u8,
     lambda_mv: u32,
     /* reference pictures */
     refp: Option<Rc<RefCell<Vec<Vec<EvcRefP>>>>>,
