@@ -11,14 +11,13 @@ pub(crate) struct EvceCUData {
     qp_u: Vec<u8>,
     qp_v: Vec<u8>,
     pred_mode: Vec<PredMode>,
-    pred_mode_chroma: Vec<PredMode>,
     ipm: Vec<Vec<IntraPredDir>>,
     skip_flag: Vec<bool>,
     refi: Vec<Vec<i8>>,
     mvp_idx: Vec<Vec<u8>>,
     mv: Vec<Vec<Vec<i16>>>,  //[MAX_CU_CNT_IN_LCU][REFP_NUM][MV_D];
     mvd: Vec<Vec<Vec<i16>>>, //[MAX_CU_CNT_IN_LCU][REFP_NUM][MV_D];
-    nnz: Vec<Vec<bool>>,     //[N_C];
+    nnz: Vec<Vec<u16>>,      //[N_C];
     map_scu: Vec<MCU>,
     map_cu_mode: Vec<MCU>,
     depth: Vec<i8>,
@@ -51,14 +50,13 @@ impl EvceCUData {
             qp_u: vec![0; cu_cnt],
             qp_v: vec![0; cu_cnt],
             pred_mode: vec![PredMode::MODE_INTRA; cu_cnt],
-            pred_mode_chroma: vec![PredMode::MODE_INTRA; cu_cnt],
             ipm: vec![vec![IntraPredDir::IPD_DC_B; cu_cnt]; 2],
             skip_flag: vec![false; cu_cnt],
             refi: vec![vec![0; REFP_NUM]; cu_cnt],
             mvp_idx: vec![vec![0; REFP_NUM]; cu_cnt],
             mv: vec![vec![vec![0; MV_D]; REFP_NUM]; cu_cnt],
             mvd: vec![vec![vec![0; MV_D]; REFP_NUM]; cu_cnt],
-            nnz: vec![vec![false; cu_cnt]; N_C],
+            nnz: vec![vec![0; cu_cnt]; N_C],
             map_scu: vec![MCU::default(); cu_cnt],
             map_cu_mode: vec![MCU::default(); cu_cnt],
             depth: vec![0; cu_cnt],
@@ -196,8 +194,6 @@ impl EvceCUData {
 
                 self.ipm[1][idx_dst..idx_dst + size]
                     .copy_from_slice(&src.ipm[1][idx_src..idx_src + size]);
-                self.pred_mode_chroma[idx_dst..idx_dst + size]
-                    .copy_from_slice(&src.pred_mode_chroma[idx_src..idx_src + size]);
 
                 self.nnz[U_C][idx_dst..idx_dst + size]
                     .copy_from_slice(&src.nnz[U_C][idx_src..idx_src + size]);
@@ -255,6 +251,152 @@ impl EvceCUData {
                         dst[y + j][x + i] = src[j * w + i];
                     }
                 }
+            }
+        }
+    }
+
+    pub(crate) fn copy_to_cu_data(
+        &mut self,
+        cu_mode: PredMode,
+        cuw: u16,
+        cuh: u16,
+        cud: u16,
+        coef_src: &CUBuffer<i16>,
+        rec_src: &CUBuffer<pel>,
+        tree_cons: &TREE_CONS,
+        slice_num: usize,
+        ipm: &[IntraPredDir],
+        mi: &EvceMode,
+        qp: u8,
+        qp_y: u8,
+        qp_u: u8,
+        qp_v: u8,
+        nnz: &[u16],
+    ) {
+        let log2_cuw = CONV_LOG2(cuw as usize);
+        let log2_cuh = CONV_LOG2(cuh as usize);
+
+        if evc_check_luma(tree_cons) {
+            let size = cuw as usize * cuh as usize;
+
+            /* copy coef */
+            self.coef[Y_C][0..size].copy_from_slice(&coef_src.data[Y_C][0..size]);
+
+            /* copy reco */
+            self.reco[Y_C][0..size].copy_from_slice(&rec_src.data[Y_C][0..size]);
+
+            //#if TRACE_ENC_CU_DATA_CHECK
+            //   evc_assert(self.core.trace_idx == mi.trace_cu_idx);
+            //   evc_assert(self.core.trace_idx != 0);
+            //#endif
+
+            /* copy mode info */
+
+            let mut idx = 0;
+            for j in 0..(cuh as usize) >> MIN_CU_LOG2 {
+                for i in 0..(cuw as usize) >> MIN_CU_LOG2 {
+                    self.pred_mode[idx + i] = cu_mode;
+                    self.skip_flag[idx + i] = cu_mode == PredMode::MODE_SKIP;
+                    self.nnz[Y_C][idx + i] = nnz[Y_C];
+
+                    self.qp_y[idx + i] = qp_y;
+                    self.map_scu[idx + i].RESET_QP();
+                    self.map_scu[idx + i].SET_IF_COD_SN_QP(
+                        if cu_mode == PredMode::MODE_INTRA {
+                            1
+                        } else {
+                            0
+                        },
+                        slice_num as u32,
+                        qp,
+                    );
+
+                    if self.skip_flag[idx + i] {
+                        self.map_scu[idx + i].SET_SF();
+                    } else {
+                        self.map_scu[idx + i].CLR_SF();
+                    }
+
+                    self.depth[idx + i] = cud as i8;
+
+                    self.map_cu_mode[idx + i].SET_LOGW(log2_cuw as u32);
+                    self.map_cu_mode[idx + i].SET_LOGH(log2_cuh as u32);
+
+                    if cu_mode == PredMode::MODE_INTRA {
+                        self.ipm[0][idx + i] = ipm[0];
+                        self.mv[idx + i][REFP_0][MV_X] = 0;
+                        self.mv[idx + i][REFP_0][MV_Y] = 0;
+                        self.mv[idx + i][REFP_1][MV_X] = 0;
+                        self.mv[idx + i][REFP_1][MV_Y] = 0;
+                        self.refi[idx + i][REFP_0] = -1;
+                        self.refi[idx + i][REFP_1] = -1;
+                    } else {
+                        self.refi[idx + i][REFP_0] = mi.refi[REFP_0];
+                        self.refi[idx + i][REFP_1] = mi.refi[REFP_1];
+                        self.mvp_idx[idx + i][REFP_0] = mi.mvp_idx[REFP_0];
+                        self.mvp_idx[idx + i][REFP_1] = mi.mvp_idx[REFP_1];
+
+                        {
+                            self.mv[idx + i][REFP_0][MV_X] = mi.mv[REFP_0][MV_X];
+                            self.mv[idx + i][REFP_0][MV_Y] = mi.mv[REFP_0][MV_Y];
+                            self.mv[idx + i][REFP_1][MV_X] = mi.mv[REFP_1][MV_X];
+                            self.mv[idx + i][REFP_1][MV_Y] = mi.mv[REFP_1][MV_Y];
+                        }
+
+                        self.mvd[idx + i][REFP_0][MV_X] = mi.mvd[REFP_0][MV_X];
+                        self.mvd[idx + i][REFP_0][MV_Y] = mi.mvd[REFP_0][MV_Y];
+                        self.mvd[idx + i][REFP_1][MV_X] = mi.mvd[REFP_1][MV_X];
+                        self.mvd[idx + i][REFP_1][MV_Y] = mi.mvd[REFP_1][MV_Y];
+                    }
+                    /*        #if TRACE_ENC_CU_DATA
+                                self.trace_idx[idx + i] = self.core.trace_idx;
+                    #endif*/
+                }
+
+                idx += (cuw as usize) >> MIN_CU_LOG2;
+            }
+
+            /*
+            #if TRACE_ENC_CU_DATA_CHECK
+                int w = PEL2SCU(self.core.cuw);
+                int h = PEL2SCU(self.core.cuh);
+                idx = 0;
+                for (j = 0; j < h; ++j, idx += w)
+                {
+                    for (i = 0; i < w; ++i)
+                    {
+                        evc_assert(self.trace_idx[idx + i] == self.core.trace_idx);
+                    }
+                }
+            #endif
+                */
+        }
+        if evc_check_chroma(tree_cons) {
+            let size = (cuw as usize * cuh as usize) >> 2;
+
+            /* copy coef */
+            self.coef[U_C][0..size].copy_from_slice(&coef_src.data[U_C][0..size]);
+            self.coef[V_C][0..size].copy_from_slice(&coef_src.data[V_C][0..size]);
+
+            /* copy reco */
+            self.reco[U_C][0..size].copy_from_slice(&rec_src.data[U_C][0..size]);
+            self.reco[V_C][0..size].copy_from_slice(&rec_src.data[V_C][0..size]);
+
+            /* copy mode info */
+            let mut idx = 0;
+            for j in 0..(cuh as usize) >> MIN_CU_LOG2 {
+                for i in 0..(cuw as usize) >> MIN_CU_LOG2 {
+                    self.nnz[U_C][idx + i] = nnz[U_C];
+                    self.nnz[V_C][idx + i] = nnz[V_C];
+
+                    self.qp_u[idx + i] = qp_u;
+                    self.qp_v[idx + i] = qp_v;
+
+                    if cu_mode == PredMode::MODE_INTRA {
+                        self.ipm[1][idx + i] = ipm[1];
+                    }
+                }
+                idx += (cuw as usize) >> MIN_CU_LOG2;
             }
         }
     }
@@ -323,10 +465,10 @@ impl EvceMode {
         self.refi[REFP_1] = src.refi[idx_src][REFP_1];
 
         /*#if TRACE_ENC_CU_DATA
-            mi->trace_cu_idx = src->trace_idx[idx_src];
+            mi.trace_cu_idx = src->trace_idx[idx_src];
         #endif
         #if TRACE_ENC_CU_DATA_CHECK
-            evc_assert(mi->trace_cu_idx != 0);
+            evc_assert(mi.trace_cu_idx != 0);
         #endif*/
     }
 }
@@ -484,7 +626,7 @@ impl EvceCtx {
         let mut cost_temp_dqp = 0.0f64;
         let mut cost_best_dqp = MAX_COST;
         let mut dqp_coded = 0;
-        let mut cu_mode_dqp = MCU::default();
+        let mut cu_mode_dqp = PredMode::MODE_INTRA;
         let mut dist_cu_best_dqp = 0;
 
         self.core.tree_cons = tree_cons;
@@ -989,11 +1131,10 @@ impl EvceCtx {
     }
 
     fn mode_coding_unit(&mut self, x: u16, y: u16, log2_cuw: u8, log2_cuh: u8, cud: u16) -> f64 {
-        /*s16(*coef)[MAX_CU_DIM] = core->ctmp;
+        /*s16(*coef)[MAX_CU_DIM] = self.core.ctmp;
         pel    *rec[N_C];
         double  cost_best, cost;
         int     i, s_rec[N_C];*/
-        let mut cost_best = 0.0f64;
         let start_comp = if evc_check_luma(&self.core.tree_cons) {
             Y_C
         } else {
@@ -1015,154 +1156,173 @@ impl EvceCtx {
             self.w_scu,
             &self.map_scu,
         );
-        //evc_get_ctx_some_flags(core->x_scu, core->y_scu, 1 << log2_cuw, 1 << log2_cuh, self.w_scu, self.map_scu, self.map_cu_mode, core->ctx_flags, self.sh.slice_type, self.sps.tool_cm_init
-        //                     , self.param.use_ibc_flag, self.sps.ibc_log_max_size, self.map_tidx);
+
+        let mut cost = MAX_COST;
+        let mut cost_best = MAX_COST;
+        self.core.cost_best = MAX_COST;
 
         /*
-            /* inter *************************************************************/
-            cost_best = MAX_COST;
-            core->cost_best = MAX_COST;
-
-            if(self.slice_type != SLICE_I && (self.sps.tool_admvp == 0 || !(log2_cuw <= MIN_CU_LOG2 && log2_cuh <= MIN_CU_LOG2)) && (!evce_check_only_intra(ctx, core)))
-            {
-                core->avail_cu = evc_get_avail_inter(core->x_scu, core->y_scu, self.w_scu, self.h_scu, core->scup, core->cuw, core->cuh, self.map_scu, self.map_tidx);
-                cost = self.fn_pinter_analyze_cu(ctx, core, x, y, log2_cuw, log2_cuh, mi, coef, rec, s_rec);
-
-                if(cost < cost_best)
-                {
-                    cost_best = cost;
-        #if TRACE_ENC_CU_DATA
-                    mi->trace_cu_idx = core->trace_idx;
-        #endif
-        #if TRACE_ENC_HISTORIC
-                    evc_mcpy(&mi->history_buf, &core->history_buffer, sizeof(core->history_buffer));
-        #endif
-        #if TRACE_ENC_CU_DATA_CHECK
-                    evc_assert(core->trace_idx != 0);
-        #endif
-
-                    for (i = start_comp; i < end_comp; i++)
+                    /* inter *************************************************************/
+                    if(self.slice_type != SLICE_I && (self.sps.tool_admvp == 0 || !(log2_cuw <= MIN_CU_LOG2 && log2_cuh <= MIN_CU_LOG2)) && (!evce_check_only_intra(ctx, core)))
                     {
-                        mi->rec[i] = rec[i];
-                        mi->s_rec[i] = s_rec[i];
+                        self.core.avail_cu = evc_get_avail_inter(self.core.x_scu, self.core.y_scu, self.w_scu, self.h_scu, self.core.scup, self.core.cuw, self.core.cuh, self.map_scu, self.map_tidx);
+                        cost = self.fn_pinter_analyze_cu(ctx, core, x, y, log2_cuw, log2_cuh, mi, coef, rec, s_rec);
+
+                        if(cost < cost_best)
+                        {
+                            cost_best = cost;
+                #if TRACE_ENC_CU_DATA
+                            mi.trace_cu_idx = self.core.trace_idx;
+                #endif
+                #if TRACE_ENC_HISTORIC
+                            evc_mcpy(&mi.history_buf, &self.core.history_buffer, sizeof(self.core.history_buffer));
+                #endif
+                #if TRACE_ENC_CU_DATA_CHECK
+                            evc_assert(self.core.trace_idx != 0);
+                #endif
+
+                            for (i = start_comp; i < end_comp; i++)
+                            {
+                                mi.rec[i] = rec[i];
+                                mi.s_rec[i] = s_rec[i];
+                            }
+                #if DQP_RDO
+                            if (self.pps.cu_qp_delta_enabled_flag)
+                            {
+                                evce_set_qp(ctx, core, self.core.dqp_next_best[log2_cuw - 2][log2_cuh - 2].prev_QP);
+                            }
+                #endif
+                            copy_to_cu_data(ctx, core, mi, coef);
+                        }
                     }
-        #if DQP_RDO
-                    if (self.pps.cu_qp_delta_enabled_flag)
+
                     {
-                        evce_set_qp(ctx, core, core->dqp_next_best[log2_cuw - 2][log2_cuh - 2].prev_QP);
+                      if (self.param.use_ibc_flag == 1 && (self.core.nnz[Y_C] != 0 || self.core.nnz[U_C] != 0 || self.core.nnz[V_C] != 0 || cost_best == MAX_COST)
+                          && (!evce_check_only_inter(ctx, core)) && evce_check_luma(ctx, core) )
+                      {
+                        if (log2_cuw <= self.sps.ibc_log_max_size && log2_cuh <= self.sps.ibc_log_max_size)
+                        {
+                          self.core.avail_cu = evc_get_avail_ibc(self.core.x_scu, self.core.y_scu, self.w_scu, self.h_scu, self.core.scup, self.core.cuw, self.core.cuh, self.map_scu, self.map_tidx);
+                          cost = self.fn_pibc_analyze_cu(ctx, core, x, y, log2_cuw, log2_cuh, mi, coef, rec, s_rec);
+
+                          if (cost < cost_best)
+                          {
+                            cost_best = cost;
+                            self.core.cu_mode = MODE_IBC;
+                            self.core.ibc_flag = 1;
+
+                            SBAC_STORE(self.core.s_next_best[log2_cuw - 2][log2_cuh - 2], self.core.s_temp_best);
+                #if DQP_RDO
+                            DQP_STORE(self.core.dqp_next_best[log2_cuw - 2][log2_cuh - 2], self.core.dqp_temp_best);
+                #endif
+
+                            mi.pred_y_best = self.pibc.pred[0][Y_C];
+
+                            /* save all cu inforamtion ********************/
+                            mi.mvp_idx[0] = self.pibc.mvp_idx;
+                            {
+                              mi.mv[0][MV_X] = self.pibc.mv[0][MV_X];
+                              mi.mv[0][MV_Y] = self.pibc.mv[0][MV_Y];
+                            }
+
+                            mi.mvd[0][MV_X] = self.pibc.mvd[MV_X];
+                            mi.mvd[0][MV_Y] = self.pibc.mvd[MV_Y];
+
+                            for (i = start_comp; i < end_comp; i++)
+                            {
+                              mi.rec[i] = rec[i];
+                              mi.s_rec[i] = s_rec[i];
+                            }
+
+                            self.core.skip_flag = 0;
+                            self.core.affine_flag = 0;
+
+                #if DMVR_FLAG
+                            self.core.dmvr_flag = 0;
+                #endif
+                            copy_to_cu_data(ctx, core, mi, coef);
+                          }
+                        }
+                      }
                     }
-        #endif
-                    copy_to_cu_data(ctx, core, mi, coef);
-                }
+        */
+        /* intra *************************************************************/
+        if (self.slice_type == SliceType::EVC_ST_I
+            || self.core.nnz[Y_C] != 0
+            || self.core.nnz[U_C] != 0
+            || self.core.nnz[V_C] != 0
+            || cost_best == MAX_COST)
+            && !evc_check_only_inter(&self.core.tree_cons)
+        {
+            self.core.cost_best = cost_best;
+            self.core.dist_cu_best = i32::MAX;
+
+            if self.core.cost_best != MAX_COST {
+                unimplemented!();
+            //self.core.inter_satd = evce_satd_16b(log2_cuw, log2_cuh, pi->o[Y_C] + (y * pi->s_o[Y_C]) + x, mi.pred_y_best, pi->s_o[Y_C], 1 << log2_cuw);
+            } else {
+                self.core.inter_satd = u32::MAX;
+            }
+            if self.pps.cu_qp_delta_enabled_flag {
+                self.evce_set_qp(
+                    self.core.dqp_curr_best[log2_cuw as usize - 2][log2_cuh as usize - 2].curr_QP
+                        as u8,
+                );
             }
 
-            {
-              if (self.param.use_ibc_flag == 1 && (core->nnz[Y_C] != 0 || core->nnz[U_C] != 0 || core->nnz[V_C] != 0 || cost_best == MAX_COST)
-                  && (!evce_check_only_inter(ctx, core)) && evce_check_luma(ctx, core) )
-              {
-                if (log2_cuw <= self.sps.ibc_log_max_size && log2_cuh <= self.sps.ibc_log_max_size)
-                {
-                  core->avail_cu = evc_get_avail_ibc(core->x_scu, core->y_scu, self.w_scu, self.h_scu, core->scup, core->cuw, core->cuh, self.map_scu, self.map_tidx);
-                  cost = self.fn_pibc_analyze_cu(ctx, core, x, y, log2_cuw, log2_cuh, mi, coef, rec, s_rec);
+            self.core.avail_cu = evc_get_avail_intra(
+                self.core.x_scu as usize,
+                self.core.y_scu as usize,
+                self.w_scu as usize,
+                self.h_scu as usize,
+                self.core.scup as usize,
+                log2_cuw,
+                log2_cuh,
+                &self.map_scu,
+            );
+            //cost = self.fn_pintra_analyze_cu(ctx, core, x, y, log2_cuw, log2_cuh, mi, coef, rec, s_rec);
 
-                  if (cost < cost_best)
-                  {
-                    cost_best = cost;
-                    core->cu_mode = MODE_IBC;
-                    core->ibc_flag = 1;
+            if cost < cost_best {
+                cost_best = cost;
+                /* #if TRACE_ENC_CU_DATA
+                            mi.trace_cu_idx = self.core.trace_idx;
+                #endif
+                #if TRACE_ENC_CU_DATA_CHECK
+                            evc_assert(self.core.trace_idx != 0);
+                #endif*/
+                self.core.cu_mode = PredMode::MODE_INTRA;
+                self.core.s_next_best[log2_cuw as usize - 2][log2_cuh as usize - 2] =
+                    self.core.s_temp_best;
+                self.core.dqp_next_best[log2_cuw as usize - 2][log2_cuh as usize - 2] =
+                    self.core.dqp_temp_best;
+                self.core.dist_cu_best = self.core.dist_cu;
 
-                    SBAC_STORE(core->s_next_best[log2_cuw - 2][log2_cuh - 2], core->s_temp_best);
-        #if DQP_RDO
-                    DQP_STORE(core->dqp_next_best[log2_cuw - 2][log2_cuh - 2], core->dqp_temp_best);
-        #endif
+                //for i in start_comp..end_comp {
+                //self.mode.rec[i] = rec[i];
+                //self.mode.s_rec[i] = s_rec[i];
+                //}
 
-                    mi->pred_y_best = self.pibc.pred[0][Y_C];
-
-                    /* save all cu inforamtion ********************/
-                    mi->mvp_idx[0] = self.pibc.mvp_idx;
-                    {
-                      mi->mv[0][MV_X] = self.pibc.mv[0][MV_X];
-                      mi->mv[0][MV_Y] = self.pibc.mv[0][MV_Y];
-                    }
-
-                    mi->mvd[0][MV_X] = self.pibc.mvd[MV_X];
-                    mi->mvd[0][MV_Y] = self.pibc.mvd[MV_Y];
-
-                    for (i = start_comp; i < end_comp; i++)
-                    {
-                      mi->rec[i] = rec[i];
-                      mi->s_rec[i] = s_rec[i];
-                    }
-
-                    core->skip_flag = 0;
-                    core->affine_flag = 0;
-
-        #if DMVR_FLAG
-                    core->dmvr_flag = 0;
-        #endif
-                    copy_to_cu_data(ctx, core, mi, coef);
-                  }
-                }
-              }
+                let cu_data =
+                    &mut self.core.cu_data_temp[log2_cuw as usize - 2][log2_cuh as usize - 2];
+                cu_data.copy_to_cu_data(
+                    self.core.cu_mode,
+                    self.core.cuw,
+                    self.core.cuh,
+                    self.core.cud,
+                    &self.core.ctmp,
+                    &self.pintra.rec,
+                    &self.core.tree_cons,
+                    self.slice_num,
+                    &self.core.ipm,
+                    &self.mode,
+                    self.core.qp,
+                    self.core.qp_y,
+                    self.core.qp_u,
+                    self.core.qp_v,
+                    &self.core.nnz,
+                );
             }
-
-            /* intra *************************************************************/
-            if( (self.slice_type == SLICE_I || core->nnz[Y_C] != 0 || core->nnz[U_C] != 0 || core->nnz[V_C] != 0 || cost_best == MAX_COST)
-                && (!evce_check_only_inter(ctx, core)))
-            {
-                core->cost_best = cost_best;
-                core->dist_cu_best = EVC_INT32_MAX;
-
-                if(core->cu_mode != MODE_IBC && core->cost_best != MAX_COST)
-                {
-
-                    EVCE_PINTRA *pi = &self.pintra;
-
-                    core->inter_satd = evce_satd_16b(log2_cuw, log2_cuh, pi->o[Y_C] + (y * pi->s_o[Y_C]) + x, mi->pred_y_best, pi->s_o[Y_C], 1 << log2_cuw);
-                }
-                else
-                {
-                    core->inter_satd = EVC_UINT32_MAX;
-                }
-        #if DQP_RDO
-                if (self.pps.cu_qp_delta_enabled_flag)
-                {
-                    evce_set_qp(ctx, core, core->dqp_curr_best[log2_cuw - 2][log2_cuh - 2].curr_QP);
-                }
-        #endif
-                core->avail_cu = evc_get_avail_intra(core->x_scu, core->y_scu, self.w_scu, self.h_scu, core->scup, log2_cuw, log2_cuh, self.map_scu, self.map_tidx);
-                cost = self.fn_pintra_analyze_cu(ctx, core, x, y, log2_cuw, log2_cuh, mi, coef, rec, s_rec);
-
-                if(cost < cost_best)
-                {
-                    cost_best = cost;
-        #if TRACE_ENC_CU_DATA
-                    mi->trace_cu_idx = core->trace_idx;
-        #endif
-        #if TRACE_ENC_HISTORIC
-                    evc_mcpy(&mi->history_buf, &core->history_buffer, sizeof(core->history_buffer));
-        #endif
-        #if TRACE_ENC_CU_DATA_CHECK
-                    evc_assert(core->trace_idx != 0);
-        #endif
-                    core->cu_mode = MODE_INTRA;
-                    core->ibc_flag = 0;
-                    SBAC_STORE(core->s_next_best[log2_cuw - 2][log2_cuh - 2], core->s_temp_best);
-        #if DQP_RDO
-                    DQP_STORE(core->dqp_next_best[log2_cuw - 2][log2_cuh - 2], core->dqp_temp_best);
-        #endif
-                    core->dist_cu_best = core->dist_cu;
-
-                    for (i = start_comp; i < end_comp; i++)
-                    {
-                        mi->rec[i] = rec[i];
-                        mi->s_rec[i] = s_rec[i];
-                    }
-
-                    core->affine_flag = 0;
-                    copy_to_cu_data(ctx, core, mi, coef);
-                }
-            }*/
+        }
 
         cost_best
     }
@@ -1170,7 +1330,7 @@ impl EvceCtx {
     fn mode_cu_init(&mut self, x: u16, y: u16, log2_cuw: u8, log2_cuh: u8, cud: u16) {
         /*#if TRACE_ENC_CU_DATA
             static u64  trace_idx = 1;
-            core->trace_idx = trace_idx++;
+            self.core.trace_idx = trace_idx++;
         #endif*/
         self.core.cuw = 1 << log2_cuw;
         self.core.cuh = 1 << log2_cuh;
@@ -1186,7 +1346,7 @@ impl EvceCtx {
         self.core.nnz[U_C] = 0;
         self.core.nnz[V_C] = 0;
         self.core.cud = cud;
-        self.core.cu_mode = (PredMode::MODE_INTRA as u32).into();
+        self.core.cu_mode = PredMode::MODE_INTRA;
 
         /* Getting the appropriate QP based on dqp table*/
 

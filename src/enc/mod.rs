@@ -3,6 +3,7 @@ pub(crate) mod eco;
 pub(crate) mod mode;
 pub(crate) mod pinter;
 pub(crate) mod pintra;
+pub(crate) mod sad;
 pub(crate) mod sbac;
 pub(crate) mod tbl;
 pub(crate) mod util;
@@ -169,7 +170,7 @@ pub(crate) struct EvceCore {
     avail_lr: u16,
     bef_data_idx: u16,
     /* CU mode */
-    cu_mode: MCU,
+    cu_mode: PredMode,
     /* intra prediction mode */
     //u8             mpm[2]; /* mpm table pointer*/
     //u8             mpm_ext[8];

@@ -100,7 +100,6 @@ pub(crate) struct EvcdCore {
     mvp_idx: [u8; REFP_NUM],
     mvd: [[i16; MV_D]; REFP_NUM],
     inter_dir: InterPredDir,
-    bi_idx: i16,
     ctx_flags: [u8; CtxNevIdx::NUM_CNID as usize],
     tree_cons: TREE_CONS,
 
@@ -598,7 +597,6 @@ impl EvcdCtx {
         core.mvp_idx[REFP_0] = 0;
         core.mvp_idx[REFP_1] = 0;
         core.inter_dir = InterPredDir::PRED_L0;
-        core.bi_idx = 0;
         for i in 0..REFP_NUM {
             for j in 0..MV_D {
                 core.mvd[i][j] = 0;

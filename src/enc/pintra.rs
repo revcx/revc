@@ -16,7 +16,7 @@ pub(crate) struct EvcePIntra {
     //pred_cache: [[pel; MAX_CU_DIM]; IntraPredDir::IPD_CNT_B as usize], // only for luma
 
     /* reconstruction buffer */
-    rec: CUBuffer<pel>, //[N_C][MAX_CU_DIM];
+    pub(crate) rec: CUBuffer<pel>, //[N_C][MAX_CU_DIM];
 
     coef_tmp: CUBuffer<i16>,  //[N_C][MAX_CU_DIM];
     coef_best: CUBuffer<i16>, //[N_C][MAX_CU_DIM];
@@ -29,14 +29,14 @@ pub(crate) struct EvcePIntra {
     pic_m: Option<Rc<RefCell<EvcPic>>>,
 
     /* QP for luma */
-    qp_y: u8,
+    pub(crate) qp_y: u8,
     /* QP for chroma */
-    qp_u: u8,
-    qp_v: u8,
+    pub(crate) qp_u: u8,
+    pub(crate) qp_v: u8,
 
-    slice_type: SliceType,
+    pub(crate) slice_type: SliceType,
 
-    complexity: i64,
+    pub(crate) complexity: i64,
     //void              * pdata[4];
     //int               * ndata[4];
 }
