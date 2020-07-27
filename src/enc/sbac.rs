@@ -222,7 +222,7 @@ impl EvceSbac {
         }
     }
 
-    fn write_unary_sym(
+    pub(crate) fn write_unary_sym(
         &mut self,
         bs: &mut EvceBsw,
         model: &mut [SBAC_CTX_MODEL],

@@ -207,9 +207,11 @@ impl Default for InterPredDir {
 /*****************************************************************************
  * intra prediction direction
  *****************************************************************************/
+pub(crate) const IPD_RDO_CNT: usize = 5;
+
 #[derive(Clone, Copy, PartialEq)]
 pub(crate) enum IntraPredDir {
-    IPD_UNKNOWN = -1,
+    IPD_INVALID = -1,
     IPD_DC_B = 0,
     IPD_HOR_B = 1, /* Luma, Horizontal */
     IPD_VER_B = 2, /* Luma, Vertical */
@@ -220,7 +222,7 @@ pub(crate) enum IntraPredDir {
 
 impl Default for IntraPredDir {
     fn default() -> Self {
-        IntraPredDir::IPD_UNKNOWN
+        IntraPredDir::IPD_INVALID
     }
 }
 
@@ -234,7 +236,7 @@ impl From<u8> for IntraPredDir {
             3 => IPD_UL_B,
             4 => IPD_UR_B,
             5 => IPD_CNT_B,
-            _ => IPD_UNKNOWN,
+            _ => IPD_INVALID,
         }
     }
 }

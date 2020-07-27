@@ -57,3 +57,24 @@ pub(crate) fn evce_eco_split_mode(
     EVC_TRACE_INT(split_mode);
     EVC_TRACE_STR("\n");*/
 }
+
+pub(crate) fn evce_eco_intra_dir_b(
+    bs: &mut EvceBsw,
+    sbac: &mut EvceSbac,
+    sbac_ctx: &mut EvcSbacCtx,
+    ipm: u8,
+    mpm: &[u8],
+) {
+    sbac.write_unary_sym(bs, &mut sbac_ctx.intra_dir, mpm[ipm as usize] as u32, 2);
+    /* EVC_TRACE_COUNTER;
+    #if TRACE_ADDITIONAL_FLAGS
+        EVC_TRACE_STR("mpm list: ");
+        for (int i = 0; i < IPD_CNT_B; i++)
+        {
+            EVC_TRACE_INT(mpm[i]);
+        }
+    #endif
+        EVC_TRACE_STR("ipm Y ");
+        EVC_TRACE_INT(ipm);
+        EVC_TRACE_STR("\n");*/
+}

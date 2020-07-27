@@ -745,17 +745,17 @@ impl EvcdCtx {
         let constrained_intra_flag =
             self.core.pred_mode == PredMode::MODE_INTRA && self.pps.constrained_intra_pred_flag;
 
-        if evc_check_luma(&self.core.tree_cons) {
-            if let Some(pic) = &self.pic {
+        if let Some(pic) = &self.pic {
+            let frame = &pic.borrow().frame;
+            let planes = &frame.borrow().planes;
+            if evc_check_luma(&self.core.tree_cons) {
                 /* Y */
-                let frame = &mut pic.borrow_mut().frame;
-                let rec = &mut frame.borrow_mut().planes[Y_C];
                 evc_get_nbr_b(
                     x as usize,
                     y as usize,
                     cuw as usize,
                     cuh as usize,
-                    &rec.as_region(),
+                    &planes[Y_C].as_region(),
                     self.core.avail_cu,
                     &mut self.core.nb.data[Y_C],
                     self.core.scup as usize,
@@ -766,55 +766,46 @@ impl EvcdCtx {
                     constrained_intra_flag,
                 );
             }
-        }
-        if evc_check_chroma(&self.core.tree_cons) {
-            if let Some(pic) = &self.pic {
+
+            if evc_check_chroma(&self.core.tree_cons) {
                 cuw >>= 1;
                 cuh >>= 1;
                 x >>= 1;
                 y >>= 1;
 
-                {
-                    /* U */
-                    let frame = &mut pic.borrow_mut().frame;
-                    let rec = &mut frame.borrow_mut().planes[U_C];
-                    evc_get_nbr_b(
-                        x as usize,
-                        y as usize,
-                        cuw as usize,
-                        cuh as usize,
-                        &rec.as_region(),
-                        self.core.avail_cu,
-                        &mut self.core.nb.data[U_C],
-                        self.core.scup as usize,
-                        &self.map_scu,
-                        self.w_scu as usize,
-                        self.h_scu as usize,
-                        U_C,
-                        constrained_intra_flag,
-                    );
-                }
+                /* U */
+                evc_get_nbr_b(
+                    x as usize,
+                    y as usize,
+                    cuw as usize,
+                    cuh as usize,
+                    &planes[U_C].as_region(),
+                    self.core.avail_cu,
+                    &mut self.core.nb.data[U_C],
+                    self.core.scup as usize,
+                    &self.map_scu,
+                    self.w_scu as usize,
+                    self.h_scu as usize,
+                    U_C,
+                    constrained_intra_flag,
+                );
 
-                {
-                    /* V */
-                    let frame = &mut pic.borrow_mut().frame;
-                    let rec = &mut frame.borrow_mut().planes[V_C];
-                    evc_get_nbr_b(
-                        x as usize,
-                        y as usize,
-                        cuw as usize,
-                        cuh as usize,
-                        &rec.as_region(),
-                        self.core.avail_cu,
-                        &mut self.core.nb.data[V_C],
-                        self.core.scup as usize,
-                        &self.map_scu,
-                        self.w_scu as usize,
-                        self.h_scu as usize,
-                        V_C,
-                        constrained_intra_flag,
-                    );
-                }
+                /* V */
+                evc_get_nbr_b(
+                    x as usize,
+                    y as usize,
+                    cuw as usize,
+                    cuh as usize,
+                    &planes[V_C].as_region(),
+                    self.core.avail_cu,
+                    &mut self.core.nb.data[V_C],
+                    self.core.scup as usize,
+                    &self.map_scu,
+                    self.w_scu as usize,
+                    self.h_scu as usize,
+                    V_C,
+                    constrained_intra_flag,
+                );
             }
         }
     }
