@@ -6,6 +6,7 @@ pub(crate) mod pintra;
 pub(crate) mod sad;
 pub(crate) mod sbac;
 pub(crate) mod tbl;
+pub(crate) mod tq;
 pub(crate) mod util;
 
 use super::api::frame::*;

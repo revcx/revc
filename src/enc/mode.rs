@@ -11,14 +11,14 @@ pub(crate) struct EvceCUData {
     qp_u: Vec<u8>,
     qp_v: Vec<u8>,
     pred_mode: Vec<PredMode>,
-    ipm: Vec<Vec<IntraPredDir>>,
+    pub(crate) ipm: Vec<Vec<IntraPredDir>>,
     skip_flag: Vec<bool>,
     refi: Vec<Vec<i8>>,
     mvp_idx: Vec<Vec<u8>>,
     mv: Vec<Vec<Vec<i16>>>,  //[MAX_CU_CNT_IN_LCU][REFP_NUM][MV_D];
     mvd: Vec<Vec<Vec<i16>>>, //[MAX_CU_CNT_IN_LCU][REFP_NUM][MV_D];
     nnz: Vec<Vec<u16>>,      //[N_C];
-    map_scu: Vec<MCU>,
+    pub(crate) map_scu: Vec<MCU>,
     map_cu_mode: Vec<MCU>,
     depth: Vec<i8>,
     coef: Vec<Vec<i16>>, //[N_C];

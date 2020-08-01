@@ -117,3 +117,18 @@ pub(crate) fn evce_satd_16b(w: usize, h: usize, org: &PlaneRegion<'_, pel>, cur:
 
     sum >> (BIT_DEPTH - 8)
 }
+
+/* DIFF **********************************************************************/
+pub(crate) fn evce_diff_16b(
+    w: usize,
+    h: usize,
+    src1: &PlaneRegion<'_, pel>,
+    src2: &[pel],
+    diff: &mut [i16],
+) {
+    for j in 0..h {
+        for i in 0..w {
+            diff[j * w + h] = src1[j][i] as i16 - src2[j * w + i] as i16;
+        }
+    }
+}
