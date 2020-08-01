@@ -39,6 +39,9 @@ pub(crate) const MIN_QUANT: u8 = 0;
 
 pub(crate) const GOP_P: usize = 8;
 
+pub(crate) const USE_RDOQ: bool = true; // Use RDOQ
+pub(crate) const MAX_TX_DYNAMIC_RANGE: usize = 15;
+
 /* count of picture including encoding and reference pictures
 0: encoding picture buffer
 1: forward reference picture buffer
