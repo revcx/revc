@@ -8,6 +8,38 @@ use crate::util::*;
 const TX_SHIFT1: usize = BIT_DEPTH - 8 - 1;
 const TX_SHIFT2: usize = 6;
 const quant_scale: [u16; 6] = [26214, 23302, 20560, 18396, 16384, 14564];
+const GET_IEP_RATE: i32 = (32768);
+
+const FAST_RDOQ_INTRA_RND_OFST: i64 = 201; //171
+const FAST_RDOQ_INTER_RND_OFST: i64 = 153; //85
+
+lazy_static! {
+    static ref err_scale_tbl: [Box<[i64]>; 6] = {
+        [
+            evce_init_err_scale(0),
+            evce_init_err_scale(1),
+            evce_init_err_scale(2),
+            evce_init_err_scale(3),
+            evce_init_err_scale(4),
+            evce_init_err_scale(5),
+        ]
+    };
+}
+
+fn evce_init_err_scale(qp: usize) -> Box<[i64]> {
+    let mut tbl = vec![0; MAX_CU_DEPTH].into_boxed_slice();
+    let q_value = quant_scale[qp];
+
+    for i in 0..MAX_CU_DEPTH {
+        let tr_shift = MAX_TX_DYNAMIC_RANGE as f64 - BIT_DEPTH as f64 - (i as f64 + 1.0);
+
+        let mut err_scale = (1 << SCALE_BITS) as f64 * (2.0f64).powf(-tr_shift);
+        err_scale = err_scale / q_value as f64 / (1 << (BIT_DEPTH - 8)) as f64;
+        tbl[i] = (err_scale * (1 << ERR_SCALE_PRECISION_BITS) as f64) as i64;
+    }
+
+    tbl
+}
 
 fn evc_get_transform_shift(log2_size: usize, typ: u8) -> usize {
     if typ == 0 {
@@ -808,21 +840,242 @@ fn evce_trans(coef: &mut [i16], log2_cuw: usize, log2_cuh: usize) {
     tbl_txb1[log2_cuh - 1](&tb, coef, (shift1 + shift2), 1 << log2_cuw);
 }
 
+fn get_ic_rate_cost_rl(
+    abs_level: u32,
+    run: u32,
+    ctx_run: usize,
+    ctx_level: usize,
+    lambda: i64,
+    rdoq_est: &EvceRdoqEst,
+) -> i64 {
+    let mut rate = 0i32;
+    if abs_level == 0 {
+        rate = 0;
+        if run == 0 {
+            rate += rdoq_est.run[ctx_run][1];
+        } else {
+            rate += rdoq_est.run[ctx_run + 1][1];
+        }
+    } else {
+        rate = GET_IEP_RATE;
+        if run == 0 {
+            rate += rdoq_est.run[ctx_run][0];
+        } else {
+            rate += rdoq_est.run[ctx_run + 1][0];
+        }
+
+        if abs_level == 1 {
+            rate += rdoq_est.level[ctx_level][0];
+        } else {
+            rate += rdoq_est.level[ctx_level][1];
+            rate += rdoq_est.level[ctx_level + 1][1] * (abs_level as i32 - 2);
+            rate += rdoq_est.level[ctx_level + 1][0];
+        }
+    }
+
+    rate as i64 * lambda
+}
+
+fn get_coded_level_rl(
+    rd64_uncoded_cost: &mut i64,
+    rd64_coded_cost: &mut i64,
+    level_double: i64,
+    max_abs_level: u32,
+    run: u32,
+    ctx_run: usize,
+    ctx_level: usize,
+    q_bits: usize,
+    err_scale: i64,
+    lambda: i64,
+    rdoq_est: &EvceRdoqEst,
+) -> u32 {
+    let mut best_abs_level = 0;
+    let err1 = (level_double * err_scale) >> ERR_SCALE_PRECISION_BITS;
+
+    *rd64_uncoded_cost = err1 * err1;
+    *rd64_coded_cost =
+        *rd64_uncoded_cost + get_ic_rate_cost_rl(0, run, ctx_run, ctx_level, lambda, rdoq_est);
+
+    let min_abs_level = if max_abs_level > 1 {
+        max_abs_level - 1
+    } else {
+        1
+    };
+    for abs_level in (min_abs_level..=max_abs_level).rev() {
+        let i64Delta = level_double - ((abs_level as i64) << q_bits);
+        let err = (i64Delta * err_scale) >> ERR_SCALE_PRECISION_BITS;
+        let dCurrCost =
+            err * err + get_ic_rate_cost_rl(abs_level, run, ctx_run, ctx_level, lambda, rdoq_est);
+
+        if dCurrCost < *rd64_coded_cost {
+            best_abs_level = abs_level;
+            *rd64_coded_cost = dCurrCost;
+        }
+    }
+    best_abs_level
+}
+
 fn evce_rdoq_run_length_cc(
     qp: u8,
     d_lambda: f64,
     is_intra: bool,
-    src_coef: &[i16],
-    dst_tmp: &[i16],
+    coef: &mut [i16],
     log2_cuw: usize,
     log2_cuh: usize,
     ch_type: usize,
+    rdoq_est: &EvceRdoqEst,
 ) -> u16 {
-    0
-}
+    let qp_rem = qp as usize % 6;
+    let ns_shift = if ((log2_cuw + log2_cuh) & 1) != 0 {
+        7
+    } else {
+        0
+    };
+    let ns_scale = if ((log2_cuw + log2_cuh) & 1) != 0 {
+        181
+    } else {
+        1
+    };
+    let ns_offset = if ((log2_cuw + log2_cuh) & 1) != 0 {
+        (1 << (ns_shift - 1))
+    } else {
+        0
+    };
+    let q_value = (quant_scale[qp_rem] * ns_scale + ns_offset) >> ns_shift;
+    let log2_size = (log2_cuw + log2_cuh) >> 1;
+    let tr_shift = MAX_TX_DYNAMIC_RANGE - BIT_DEPTH - (log2_size);
+    let max_num_coef = 1 << (log2_cuw + log2_cuh);
+    let scan = &evc_scan_tbl[log2_cuw - 1];
+    let ctx_last = if ch_type == Y_C { 0 } else { 1 };
+    let q_bits = QUANT_SHIFT + tr_shift + (qp as usize / 6);
+    let mut nnz = 0;
+    let mut sum_all = 0;
 
-const FAST_RDOQ_INTRA_RND_OFST: i64 = 201; //171
-const FAST_RDOQ_INTER_RND_OFST: i64 = 153; //85
+    let mut best_last_idx_p1 = 0;
+    let mut tmp_coef = [0i16; MAX_TR_DIM];
+    let mut tmp_level_double = [0i64; MAX_TR_DIM];
+    let mut tmp_dst_coef = [0i16; MAX_TR_DIM];
+    let lambda = (d_lambda * (1 << SCALE_BITS) as f64 + 0.5) as i64;
+    let err_scale = err_scale_tbl[qp_rem][log2_size - 1];
+    let mut d64_best_cost = 0;
+    let mut d64_base_cost = 0;
+    let mut d64_coded_cost = 0;
+    let mut d64_uncoded_cost = 0;
+    let mut d64_block_uncoded_cost = 0;
+
+    /* ===== quantization ===== */
+    for scan_pos in 0..max_num_coef {
+        let blk_pos = scan[scan_pos] as usize;
+        let temp_level = coef[blk_pos].abs() as i64 * q_value as i64;
+        let level_double = std::cmp::min(temp_level, i32::MAX as i64 - (1i64 << (q_bits - 1)));
+        tmp_level_double[blk_pos] = level_double;
+        let mut max_abs_level = (level_double >> q_bits) as u32;
+        let lower_int =
+            (level_double - ((max_abs_level as i64) << q_bits)) < (1i64 << (q_bits - 1));
+
+        if !lower_int {
+            max_abs_level += 1;
+        }
+
+        let err_val = (level_double * err_scale) >> ERR_SCALE_PRECISION_BITS;
+        d64_block_uncoded_cost += err_val * err_val;
+        tmp_coef[blk_pos] = if coef[blk_pos] > 0 {
+            max_abs_level as i16
+        } else {
+            -(max_abs_level as i16)
+        };
+        sum_all += max_abs_level;
+    }
+
+    for v in &mut coef[0..max_num_coef] {
+        *v = 0;
+    }
+
+    if sum_all == 0 {
+        return nnz;
+    }
+
+    if !is_intra && ch_type == Y_C {
+        d64_best_cost = d64_block_uncoded_cost + (rdoq_est.cbf_all[0] * lambda);
+        d64_base_cost = d64_block_uncoded_cost + (rdoq_est.cbf_all[1] * lambda);
+    } else {
+        if ch_type == Y_C {
+            d64_best_cost = d64_block_uncoded_cost + (rdoq_est.cbf_luma[0] * lambda);
+            d64_base_cost = d64_block_uncoded_cost + (rdoq_est.cbf_luma[1] * lambda);
+        } else if ch_type == U_C {
+            d64_best_cost = d64_block_uncoded_cost + (rdoq_est.cbf_cb[0] * lambda);
+            d64_base_cost = d64_block_uncoded_cost + (rdoq_est.cbf_cb[1] * lambda);
+        } else {
+            d64_best_cost = d64_block_uncoded_cost + (rdoq_est.cbf_cr[0] * lambda);
+            d64_base_cost = d64_block_uncoded_cost + (rdoq_est.cbf_cr[1] * lambda);
+        }
+    }
+
+    let mut run = 0;
+    let mut prev_level = 6;
+
+    for scan_pos in 0..max_num_coef {
+        let blk_pos = scan[scan_pos] as usize;
+        let ctx_run = if ch_type == Y_C { 0 } else { 2 };
+        let ctx_level = if ch_type == Y_C { 0 } else { 2 };
+
+        let level = get_coded_level_rl(
+            &mut d64_uncoded_cost,
+            &mut d64_coded_cost,
+            tmp_level_double[blk_pos],
+            tmp_coef[blk_pos].abs() as u32,
+            run,
+            ctx_run,
+            ctx_level,
+            q_bits,
+            err_scale,
+            lambda,
+            rdoq_est,
+        );
+        tmp_dst_coef[blk_pos] = if tmp_coef[blk_pos] < 0 {
+            -(level as i16)
+        } else {
+            level as i16
+        };
+        d64_base_cost -= d64_uncoded_cost;
+        d64_base_cost += d64_coded_cost;
+
+        if level != 0 {
+            /* ----- check for last flag ----- */
+            let d64_cost_last_zero = (rdoq_est.last[ctx_last][0] as i64 * lambda);
+            let d64_cost_last_one = (rdoq_est.last[ctx_last][1] as i64 * lambda);
+            let d64_cur_is_last_cost = d64_base_cost + d64_cost_last_one;
+
+            d64_base_cost += d64_cost_last_zero;
+
+            if d64_cur_is_last_cost < d64_best_cost {
+                d64_best_cost = d64_cur_is_last_cost;
+                best_last_idx_p1 = scan_pos + 1;
+            }
+            run = 0;
+            prev_level = level;
+        } else {
+            run += 1;
+        }
+    }
+
+    /* ===== clean uncoded coeficients ===== */
+    for scan_pos in 0..max_num_coef {
+        let blk_pos = scan[scan_pos] as usize;
+
+        if scan_pos < best_last_idx_p1 {
+            if tmp_dst_coef[blk_pos] != 0 {
+                nnz += 1;
+            }
+        } else {
+            tmp_dst_coef[blk_pos] = 0;
+        }
+
+        coef[blk_pos] = tmp_dst_coef[blk_pos];
+    }
+
+    nnz
+}
 
 fn evce_quant_nnz(
     qp: u8,
@@ -834,6 +1087,7 @@ fn evce_quant_nnz(
     scale: u16,
     ch_type: usize,
     slice_type: SliceType,
+    rdqo_est: &EvceRdoqEst,
 ) -> u16 {
     let mut nnz = 0;
     let log2_size = (log2_cuw + log2_cuh) >> 1;
@@ -879,7 +1133,7 @@ fn evce_quant_nnz(
 
     if USE_RDOQ {
         nnz = evce_rdoq_run_length_cc(
-            qp, lambda, is_intra, coef, coef, log2_cuw, log2_cuh, ch_type,
+            qp, lambda, is_intra, coef, log2_cuw, log2_cuh, ch_type, rdqo_est,
         );
     } else {
         let offset = if slice_type == SliceType::EVC_ST_I {
@@ -910,11 +1164,12 @@ fn evce_tq_nnz(
     slice_type: SliceType,
     ch_type: usize,
     is_intra: bool,
+    rdqo_est: &EvceRdoqEst,
 ) -> u16 {
     evce_trans(coef, log2_cuw, log2_cuh);
 
     return evce_quant_nnz(
-        qp, lambda, is_intra, coef, log2_cuw, log2_cuh, scale, ch_type, slice_type,
+        qp, lambda, is_intra, coef, log2_cuw, log2_cuh, scale, ch_type, slice_type, rdqo_est,
     );
 }
 
@@ -933,6 +1188,7 @@ pub(crate) fn evce_sub_block_tq(
     lambda_v: f64,
     mut run_stats: u8,
     tree_cons: &TREE_CONS,
+    rdqo_est: &EvceRdoqEst,
 ) -> u16 {
     run_stats = evc_get_run(run_stats, tree_cons);
     let run = [run_stats & 1, (run_stats >> 1) & 1, (run_stats >> 2) & 1];
@@ -957,6 +1213,7 @@ pub(crate) fn evce_sub_block_tq(
                 slice_type,
                 c,
                 is_intra,
+                rdqo_est,
             );
         } else {
             nnz[c] = 0;

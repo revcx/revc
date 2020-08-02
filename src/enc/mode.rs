@@ -1380,27 +1380,27 @@ impl EvceCtx {
     fn evce_rdoq_bit_est(&mut self, log2_cuw: u8, log2_cuh: u8) {
         let sbac_ctx = &self.core.c_curr_best[log2_cuw as usize - 2][log2_cuh as usize - 2];
         for bin in 0..2 {
-            self.core.rdoq_est_cbf_luma[bin] = biari_no_bits(bin, sbac_ctx.cbf_luma[0]) as i64;
-            self.core.rdoq_est_cbf_cb[bin] = biari_no_bits(bin, sbac_ctx.cbf_cb[0]) as i64;
-            self.core.rdoq_est_cbf_cr[bin] = biari_no_bits(bin, sbac_ctx.cbf_cr[0]) as i64;
-            self.core.rdoq_est_cbf_all[bin] = biari_no_bits(bin, sbac_ctx.cbf_all[0]) as i64;
+            self.core.rdoq_est.cbf_luma[bin] = biari_no_bits(bin, sbac_ctx.cbf_luma[0]) as i64;
+            self.core.rdoq_est.cbf_cb[bin] = biari_no_bits(bin, sbac_ctx.cbf_cb[0]) as i64;
+            self.core.rdoq_est.cbf_cr[bin] = biari_no_bits(bin, sbac_ctx.cbf_cr[0]) as i64;
+            self.core.rdoq_est.cbf_all[bin] = biari_no_bits(bin, sbac_ctx.cbf_all[0]) as i64;
         }
 
         for ctx in 0..NUM_CTX_CC_RUN {
             for bin in 0..2 {
-                self.core.rdoq_est_run[ctx][bin] = biari_no_bits(bin, sbac_ctx.run[ctx]);
+                self.core.rdoq_est.run[ctx][bin] = biari_no_bits(bin, sbac_ctx.run[ctx]);
             }
         }
 
         for ctx in 0..NUM_CTX_CC_LEVEL {
             for bin in 0..2 {
-                self.core.rdoq_est_level[ctx][bin] = biari_no_bits(bin, sbac_ctx.level[ctx]);
+                self.core.rdoq_est.level[ctx][bin] = biari_no_bits(bin, sbac_ctx.level[ctx]);
             }
         }
 
         for ctx in 0..NUM_CTX_CC_LAST {
             for bin in 0..2 {
-                self.core.rdoq_est_last[ctx][bin] = biari_no_bits(bin, sbac_ctx.last[ctx]);
+                self.core.rdoq_est.last[ctx][bin] = biari_no_bits(bin, sbac_ctx.last[ctx]);
             }
         }
     }

@@ -111,6 +111,17 @@ pub(crate) struct EvceDQP {
     cu_qp_delta_code: i8,
 }
 
+#[derive(Default)]
+pub(crate) struct EvceRdoqEst {
+    cbf_all: [i64; 2],
+    cbf_luma: [i64; 2],
+    cbf_cb: [i64; 2],
+    cbf_cr: [i64; 2],
+    run: [[i32; 2]; NUM_CTX_CC_RUN],
+    level: [[i32; 2]; NUM_CTX_CC_LEVEL],
+    last: [[i32; 2]; NUM_CTX_CC_LAST],
+}
+
 /*****************************************************************************
  * CORE information used for encoding process.
  *
@@ -235,14 +246,10 @@ pub(crate) struct EvceCore {
     delta_dist: [i64; N_C], //delta distortion from filtering (negative values mean distortion reduced)
     dist_nofilt: [i64; N_C], //distortion of not filtered samples
     dist_filter: [i64; N_C], //distortion of filtered samples
+
     /* RDOQ related variables*/
-    rdoq_est_cbf_all: [i64; 2],
-    rdoq_est_cbf_luma: [i64; 2],
-    rdoq_est_cbf_cb: [i64; 2],
-    rdoq_est_cbf_cr: [i64; 2],
-    rdoq_est_run: [[i32; 2]; NUM_CTX_CC_RUN],
-    rdoq_est_level: [[i32; 2]; NUM_CTX_CC_LEVEL],
-    rdoq_est_last: [[i32; 2]; NUM_CTX_CC_LAST],
+    rdoq_est: EvceRdoqEst,
+
     evc_tbl_qp_chroma_dynamic_ext: Vec<Vec<i8>>, // [[i8; MAX_QP_TABLE_SIZE_EXT]; 2],
 }
 impl EvceCore {
@@ -389,14 +396,7 @@ impl EvceCore {
             delta_dist: [0; N_C], //delta distortion from filtering (negative values mean distortion reduced)
             dist_nofilt: [0; N_C], //distortion of not filtered samples
             dist_filter: [0; N_C], //distortion of filtered samples
-            /* RDOQ related variables*/
-            rdoq_est_cbf_all: [0; 2],
-            rdoq_est_cbf_luma: [0; 2],
-            rdoq_est_cbf_cb: [0; 2],
-            rdoq_est_cbf_cr: [0; 2],
-            rdoq_est_run: [[0; 2]; NUM_CTX_CC_RUN],
-            rdoq_est_level: [[0; 2]; NUM_CTX_CC_LEVEL],
-            rdoq_est_last: [[0; 2]; NUM_CTX_CC_LAST],
+
             evc_tbl_qp_chroma_dynamic_ext, // [[i8; MAX_QP_TABLE_SIZE_EXT]; 2],
             ..Default::default()
         }
