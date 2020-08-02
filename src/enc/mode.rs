@@ -1448,6 +1448,7 @@ impl EvceCtx {
             -1,
             self.core.qp,
         );
+
         if self.pps.cu_qp_delta_enabled_flag {
             self.core.dqp_temp_run.cu_qp_delta_code = self.core.cu_qp_delta_code;
             self.core.dqp_temp_run.cu_qp_delta_is_coded = self.core.cu_qp_delta_is_coded;
@@ -1469,6 +1470,64 @@ impl EvceCtx {
             -1,
             0,
         );
+    }
+
+    pub(crate) fn evce_rdo_bit_cnt_cu_intra(&mut self, slice_type: SliceType) {
+        let log2_cuw = self.core.log2_cuw;
+        let log2_cuh = self.core.log2_cuh;
+
+        if slice_type != SliceType::EVC_ST_I && evc_check_all_preds(&self.core.tree_cons) {
+            self.core.s_temp_run.encode_bin(
+                &mut self.core.bs_temp,
+                &mut self.core.c_temp_run.skip_flag
+                    [self.core.ctx_flags[CtxNevIdx::CNID_SKIP_FLAG as usize] as usize],
+                0,
+            ); /* skip_flag */
+            evce_eco_pred_mode(
+                &mut self.core.bs_temp,
+                &mut self.core.s_temp_run,
+                &mut self.core.c_temp_run,
+                PredMode::MODE_INTRA,
+                self.core.ctx_flags[CtxNevIdx::CNID_PRED_MODE as usize] as usize,
+            );
+        }
+
+        if evc_check_luma(&self.core.tree_cons) {
+            evce_eco_intra_dir_b(
+                &mut self.core.bs_temp,
+                &mut self.core.s_temp_run,
+                &mut self.core.c_temp_run,
+                self.core.ipm[0] as u8,
+                self.core.mpm_b_list,
+            );
+        }
+
+        if self.pps.cu_qp_delta_enabled_flag {
+            self.core.cu_qp_delta_code = self.core.dqp_temp_run.cu_qp_delta_code;
+            self.core.cu_qp_delta_is_coded = self.core.dqp_temp_run.cu_qp_delta_is_coded;
+            self.core.qp_prev_eco = self.core.dqp_temp_run.prev_QP;
+        }
+
+        self.evce_eco_coef(
+            log2_cuw,
+            log2_cuh,
+            PredMode::MODE_INTRA,
+            false,
+            TQC_RUN::RUN_L as u8 | TQC_RUN::RUN_CB as u8 | TQC_RUN::RUN_CR as u8,
+            if self.pps.cu_qp_delta_enabled_flag {
+                1
+            } else {
+                0
+            },
+            self.core.qp,
+        );
+
+        if self.pps.cu_qp_delta_enabled_flag {
+            self.core.dqp_temp_run.cu_qp_delta_code = self.core.cu_qp_delta_code;
+            self.core.dqp_temp_run.cu_qp_delta_is_coded = self.core.cu_qp_delta_is_coded;
+            self.core.dqp_temp_run.prev_QP = self.core.qp_prev_eco;
+            self.core.dqp_temp_run.curr_QP = self.core.qp;
+        }
     }
 
     pub(crate) fn calc_delta_dist_filter_boundary(

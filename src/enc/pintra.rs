@@ -137,6 +137,7 @@ impl EvceCtx {
 
         let cuw = 1 << log2_cuw;
         let cuh = 1 << log2_cuh;
+        let cuwxh = cuw * cuh;
 
         if let Some(pic) = &self.pintra.pic_m {
             let frame = &pic.borrow().frame;
@@ -207,6 +208,34 @@ impl EvceCtx {
                 self.core.ipm[1] = IntraPredDir::IPD_INVALID;
                 cost_t =
                     self.pintra_residue_rdo(log2_cuw, log2_cuh, coef, &mut dist_t, false, x, y);
+
+                /*#if TRACE_COSTS
+                EVC_TRACE_COUNTER;
+                EVC_TRACE_STR("Luma mode ");
+                EVC_TRACE_INT(i);
+                EVC_TRACE_STR(" cost is ");
+                EVC_TRACE_DOUBLE(cost_t);
+                EVC_TRACE_STR("\n");
+                #endif*/
+
+                if cost_t < cost {
+                    cost = cost_t;
+                    best_dist_y = dist_t;
+
+                    if sec_best_ipd != best_ipd {
+                        sec_best_ipd = best_ipd;
+                    }
+
+                    best_ipd = i;
+
+                    self.pintra.coef_best.data[Y_C][0..cuwxh]
+                        .copy_from_slice(&coef.data[Y_C][0..cuwxh]);
+                    self.pintra.rec_best.data[Y_C][0..cuwxh]
+                        .copy_from_slice(&self.pintra.rec.data[Y_C][0..cuwxh]);
+
+                    self.pintra.nnz_best[Y_C] = self.core.nnz[Y_C];
+                    self.core.s_temp_prev_comp_best = self.core.s_temp_run;
+                }
             }
         } else {
             let luma_cup = evc_get_luma_cup(
@@ -246,55 +275,59 @@ impl EvceCtx {
                 self.pintra.nnz_best[j] = self.core.nnz[j];
             }
         }
-        /*
-                int start_comp = evce_check_luma(ctx, core) ? Y_C : U_C;
-                int end_comp = evce_check_chroma(ctx, core) ? N_C : U_C;
-                for (j = start_comp; j < end_comp; j++)
-                {
-                    int size_tmp = (cuw * cuh) >> (j == 0 ? 0 : 2);
-                    evc_mcpy(coef[j], pi->coef_best[j], size_tmp * sizeof(u16));
-                    evc_mcpy(pi->rec[j], pi->rec_best[j], size_tmp * sizeof(pel));
-                    core.nnz[j] = pi->nnz_best[j];
-                    rec[j] = pi->rec[j];
-                    s_rec[j] = cuw >> (j == 0 ? 0 : 1);
-                }
 
-                if (evce_check_luma(ctx, core))
-                {
-                    core.ipm[0] = best_ipd;
-                }
-                if (evce_check_chroma(ctx, core))
-                {
-                    core.ipm[1] = best_ipd_c;
-                    evc_assert(best_ipd_c != IPD_INVALID);
-                }
+        let start_comp = if evc_check_luma(&self.core.tree_cons) {
+            Y_C
+        } else {
+            U_C
+        };
+        let end_comp = if evc_check_chroma(&self.core.tree_cons) {
+            N_C
+        } else {
+            U_C
+        };
+        for j in start_comp..end_comp {
+            let size_tmp = (cuw * cuh) >> (if j == 0 { 0 } else { 2 });
+            coef.data[j][0..size_tmp].copy_from_slice(&self.pintra.coef_best.data[j][0..size_tmp]);
+            self.pintra.rec.data[j][0..size_tmp]
+                .copy_from_slice(&self.pintra.rec_best.data[j][0..size_tmp]);
+            self.core.nnz[j] = self.pintra.nnz_best[j];
+            //rec[j] = pi->rec[j];
+            //s_rec[j] = cuw >> (j == 0 ? 0 : 1);
+        }
 
-                /* cost calculation */
-                SBAC_LOAD(core.s_temp_run, core.s_curr_best[log2_cuw - 2][log2_cuh - 2]);
-                DQP_STORE(core.dqp_temp_run, core.dqp_curr_best[log2_cuw - 2][log2_cuh - 2]);
+        if evc_check_luma(&self.core.tree_cons) {
+            self.core.ipm[0] = best_ipd;
+        }
+        if evc_check_chroma(&self.core.tree_cons) {
+            self.core.ipm[1] = best_ipd_c;
+            assert!(best_ipd_c != IntraPredDir::IPD_INVALID);
+        }
 
-                evce_sbac_bit_reset(&core.s_temp_run);
-                evce_rdo_bit_cnt_cu_intra(ctx, core, ctx->sh.slice_type, core.scup, coef);
+        /* cost calculation */
+        self.core.s_temp_run = self.core.s_curr_best[log2_cuw - 2][log2_cuh - 2];
+        self.core.dqp_temp_run = self.core.dqp_curr_best[log2_cuw - 2][log2_cuh - 2];
 
-                bit_cnt = evce_get_bit_number(&core.s_temp_run);
-                cost = RATE_TO_COST_LAMBDA(ctx->lambda[0], bit_cnt);
+        self.core.s_temp_run.bit_reset();
+        self.evce_rdo_bit_cnt_cu_intra(self.sh.slice_type);
 
-                core.dist_cu = 0;
-                if (evce_check_luma(ctx, core))
-                {
-                    cost += best_dist_y;
-                    core.dist_cu += best_dist_y;
-                }
-                if (evce_check_chroma(ctx, core))
-                {
-                    cost += best_dist_c;
-                    core.dist_cu += best_dist_c;
-                }
+        let bit_cnt = self.core.s_temp_run.get_bit_number();
+        cost = (self.lambda[0] * bit_cnt as f64);
 
-                SBAC_STORE(core.s_temp_best, core.s_temp_run);
-                DQP_STORE(core.dqp_temp_best, core.dqp_temp_run);
-        */
-        return cost;
+        self.core.dist_cu = 0;
+        if evc_check_luma(&self.core.tree_cons) {
+            cost += best_dist_y as f64;
+            self.core.dist_cu += best_dist_y;
+        }
+        if evc_check_chroma(&self.core.tree_cons) {
+            cost += best_dist_c as f64;
+            self.core.dist_cu += best_dist_c;
+        }
+
+        self.core.s_temp_best = self.core.s_temp_run;
+        self.core.dqp_temp_best = self.core.dqp_temp_run;
+
+        cost
     }
 
     fn make_ipred_list(
