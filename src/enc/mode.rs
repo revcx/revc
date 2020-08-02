@@ -1,3 +1,4 @@
+use super::sad::*;
 use super::util::*;
 use super::*;
 use crate::api::*;
@@ -1131,10 +1132,6 @@ impl EvceCtx {
     }
 
     fn mode_coding_unit(&mut self, x: u16, y: u16, log2_cuw: u8, log2_cuh: u8, cud: u16) -> f64 {
-        /*s16(*coef)[MAX_CU_DIM] = self.core.ctmp;
-        pel    *rec[N_C];
-        double  cost_best, cost;
-        int     i, s_rec[N_C];*/
         let start_comp = if evc_check_luma(&self.core.tree_cons) {
             Y_C
         } else {
@@ -1259,7 +1256,18 @@ impl EvceCtx {
 
             if self.core.cost_best != MAX_COST {
                 unimplemented!();
-            //self.core.inter_satd = evce_satd_16b(log2_cuw, log2_cuh, pi->o[Y_C] + (y * pi->s_o[Y_C]) + x, mi.pred_y_best, pi->s_o[Y_C], 1 << log2_cuw);
+            /*if let Some(pic) = &self.pintra.pic_o {
+                let frame = &pic.borrow().frame;
+                let planes = &frame.borrow().planes;
+                self.core.inter_satd = evce_satd_16b(
+                    x as usize,
+                    y as usize,
+                    log2_cuw as usize,
+                    log2_cuh as usize,
+                    &planes[Y_C].as_region(),
+                    &self.mode.pred_y_best.data,
+                );
+            }*/
             } else {
                 self.core.inter_satd = u32::MAX;
             }
@@ -1280,7 +1288,12 @@ impl EvceCtx {
                 log2_cuh,
                 &self.map_scu,
             );
-            //cost = self.fn_pintra_analyze_cu(ctx, core, x, y, log2_cuw, log2_cuh, mi, coef, rec, s_rec);
+            cost = self.pintra_analyze_cu(
+                x as usize,
+                y as usize,
+                log2_cuw as usize,
+                log2_cuh as usize,
+            );
 
             if cost < cost_best {
                 cost_best = cost;

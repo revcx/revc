@@ -21,21 +21,21 @@ use std::rc::Rc;
 //#[derive(Default)]
 pub(crate) struct EvcePIntra {
     /* temporary prediction buffer */
-    pred: CUBuffer<pel>, //[N_C][MAX_CU_DIM];
-    pred_cache: [[pel; MAX_CU_DIM]; IntraPredDir::IPD_CNT_B as usize], // only for luma
+    pub(crate) pred: CUBuffer<pel>, //[N_C][MAX_CU_DIM];
+    pub(crate) pred_cache: [[pel; MAX_CU_DIM]; IntraPredDir::IPD_CNT_B as usize], // only for luma
 
     /* reconstruction buffer */
     pub(crate) rec: CUBuffer<pel>, //[N_C][MAX_CU_DIM];
 
-    pub(crate) coef_tmp: CUBuffer<i16>, //[N_C][MAX_CU_DIM];
-    coef_best: CUBuffer<i16>,           //[N_C][MAX_CU_DIM];
-    nnz_best: [u16; N_C],
-    rec_best: CUBuffer<pel>, //[N_C][MAX_CU_DIM];
+    pub(crate) coef_tmp: CUBuffer<i16>,  //[N_C][MAX_CU_DIM];
+    pub(crate) coef_best: CUBuffer<i16>, //[N_C][MAX_CU_DIM];
+    pub(crate) nnz_best: [u16; N_C],
+    pub(crate) rec_best: CUBuffer<pel>, //[N_C][MAX_CU_DIM];
 
     /* original (input) picture buffer */
-    pic_o: Option<Rc<RefCell<EvcPic>>>,
+    pub(crate) pic_o: Option<Rc<RefCell<EvcPic>>>,
     /* mode picture buffer */
-    pic_m: Option<Rc<RefCell<EvcPic>>>,
+    pub(crate) pic_m: Option<Rc<RefCell<EvcPic>>>,
 
     /* QP for luma */
     pub(crate) qp_y: u8,
@@ -110,13 +110,8 @@ impl EvceCtx {
         y: usize,
         log2_cuw: usize,
         log2_cuh: usize,
-        mi: &EvceMode,
-        coef: &mut CUBuffer<i16>,
-        rec: &CUBuffer<pel>,
-        /*map_scu: &[MCU],
-        w_scu: usize,
-        h_scu: usize,
-        constrained_intra_pred_flag: bool,*/
+        //coef: &mut CUBuffer<i16>,
+        //rec: &CUBuffer<pel>,
     ) -> f64 {
         //int i, j, s_org, s_org_c, s_mod, s_mod_c, cuw, cuh;
         let mut best_ipd = IntraPredDir::IPD_INVALID;
@@ -194,7 +189,7 @@ impl EvceCtx {
             );
         }
         if evc_check_luma(&self.core.tree_cons) {
-            pred_cnt = self.make_ipred_list(log2_cuw, log2_cuh, &mut ipred_list);
+            pred_cnt = self.make_ipred_list(x, y, log2_cuw, log2_cuh, &mut ipred_list);
             if pred_cnt == 0 {
                 return MAX_COST;
             }
@@ -206,8 +201,7 @@ impl EvceCtx {
                 let i = ipred_list[j];
                 self.core.ipm[0] = i;
                 self.core.ipm[1] = IntraPredDir::IPD_INVALID;
-                cost_t =
-                    self.pintra_residue_rdo(log2_cuw, log2_cuh, coef, &mut dist_t, false, x, y);
+                cost_t = self.pintra_residue_rdo(x, y, log2_cuw, log2_cuh, &mut dist_t, false);
 
                 /*#if TRACE_COSTS
                 EVC_TRACE_COUNTER;
@@ -229,7 +223,7 @@ impl EvceCtx {
                     best_ipd = i;
 
                     self.pintra.coef_best.data[Y_C][0..cuwxh]
-                        .copy_from_slice(&coef.data[Y_C][0..cuwxh]);
+                        .copy_from_slice(&self.core.ctmp.data[Y_C][0..cuwxh]);
                     self.pintra.rec_best.data[Y_C][0..cuwxh]
                         .copy_from_slice(&self.pintra.rec.data[Y_C][0..cuwxh]);
 
@@ -261,14 +255,14 @@ impl EvceCtx {
             self.core.ipm[0] = best_ipd;
             self.core.ipm[1] = best_ipd;
 
-            cost_t = self.pintra_residue_rdo(log2_cuw, log2_cuh, coef, &mut dist_tc, true, x, y);
+            cost_t = self.pintra_residue_rdo(x, y, log2_cuw, log2_cuh, &mut dist_tc, true);
 
             best_ipd_c = self.core.ipm[1];
             best_dist_c = dist_tc;
             for j in U_C..N_C {
                 let size_tmp = (cuw * cuh) >> (if j == 0 { 0 } else { 2 });
                 self.pintra.coef_best.data[j][0..size_tmp]
-                    .copy_from_slice(&coef.data[j][0..size_tmp]);
+                    .copy_from_slice(&self.core.ctmp.data[j][0..size_tmp]);
                 self.pintra.rec_best.data[j][0..size_tmp]
                     .copy_from_slice(&self.pintra.rec.data[j][0..size_tmp]);
 
@@ -288,7 +282,8 @@ impl EvceCtx {
         };
         for j in start_comp..end_comp {
             let size_tmp = (cuw * cuh) >> (if j == 0 { 0 } else { 2 });
-            coef.data[j][0..size_tmp].copy_from_slice(&self.pintra.coef_best.data[j][0..size_tmp]);
+            self.core.ctmp.data[j][0..size_tmp]
+                .copy_from_slice(&self.pintra.coef_best.data[j][0..size_tmp]);
             self.pintra.rec.data[j][0..size_tmp]
                 .copy_from_slice(&self.pintra.rec_best.data[j][0..size_tmp]);
             self.core.nnz[j] = self.pintra.nnz_best[j];
@@ -332,6 +327,8 @@ impl EvceCtx {
 
     fn make_ipred_list(
         &mut self,
+        x: usize,
+        y: usize,
         log2_cuw: usize,
         log2_cuh: usize,
         ipred_list: &mut [IntraPredDir],
@@ -374,7 +371,7 @@ impl EvceCtx {
             if let Some(pic) = &pi.pic_o {
                 let frame = &pic.borrow().frame;
                 let org = &frame.borrow().planes[Y_C];
-                cost_satd = evce_satd_16b(cuw, cuh, &org.as_region(), pred_buf);
+                cost_satd = evce_satd_16b(x, y, cuw, cuh, &org.as_region(), pred_buf);
                 cost = cost_satd as f64;
             }
             core.s_temp_run = core.s_curr_best[log2_cuw - 2][log2_cuh - 2];
@@ -423,13 +420,13 @@ impl EvceCtx {
 
     fn pintra_residue_rdo(
         &mut self,
-        log2_cuw: usize,
-        log2_cuh: usize,
-        coef: &mut CUBuffer<i16>,
-        dist: &mut i32,
-        chroma: bool,
         x: usize,
         y: usize,
+        log2_cuw: usize,
+        log2_cuh: usize,
+        //coef: &mut CUBuffer<i16>,
+        dist: &mut i32,
+        chroma: bool,
     ) -> f64 {
         let mut cost = 0f64;
         let mut tmp_cbf_l = 0;
@@ -444,6 +441,8 @@ impl EvceCtx {
                 let frame = &pic.borrow().frame;
                 let planes = &frame.borrow().planes;
                 evce_diff_16b(
+                    x,
+                    y,
                     cuw,
                     cuh,
                     &planes[Y_C].as_region(),
@@ -475,7 +474,7 @@ impl EvceCtx {
                 return MAX_COST;
             }
 
-            coef.data[Y_C][0..cuw * cuh]
+            self.core.ctmp.data[Y_C][0..cuw * cuh]
                 .copy_from_slice(&self.pintra.coef_tmp.data[Y_C][0..cuw * cuh]);
 
             self.core.s_temp_run = self.core.s_curr_best[log2_cuw - 2][log2_cuh - 2];
@@ -513,6 +512,8 @@ impl EvceCtx {
                 let frame = &pic.borrow().frame;
                 let planes = &frame.borrow().planes;
                 cost += evce_ssd_16b(
+                    x,
+                    y,
                     log2_cuw,
                     log2_cuh,
                     &planes[Y_C].as_region(),
@@ -550,6 +551,8 @@ impl EvceCtx {
                 let frame = &pic.borrow().frame;
                 let planes = &frame.borrow().planes;
                 evce_diff_16b(
+                    x >> 1,
+                    y >> 1,
                     log2_cuw - 1,
                     log2_cuh - 1,
                     &planes[U_C].as_region(),
@@ -557,6 +560,8 @@ impl EvceCtx {
                     &mut self.pintra.coef_tmp.data[U_C],
                 );
                 evce_diff_16b(
+                    x >> 1,
+                    y >> 1,
                     log2_cuw - 1,
                     log2_cuh - 1,
                     &planes[V_C].as_region(),
@@ -583,9 +588,9 @@ impl EvceCtx {
                 &self.core.rdoq_est,
             );
 
-            coef.data[U_C][0..(cuw * cuh) >> 2]
+            self.core.ctmp.data[U_C][0..(cuw * cuh) >> 2]
                 .copy_from_slice(&self.pintra.coef_tmp.data[U_C][0..(cuw * cuh) >> 2]);
-            coef.data[V_C][0..(cuw * cuh) >> 2]
+            self.core.ctmp.data[V_C][0..(cuw * cuh) >> 2]
                 .copy_from_slice(&self.pintra.coef_tmp.data[V_C][0..(cuw * cuh) >> 2]);
 
             //TODO: how to only do U/V?
@@ -633,6 +638,8 @@ impl EvceCtx {
                 let planes = &frame.borrow().planes;
                 cost += self.dist_chroma_weight[0]
                     * evce_ssd_16b(
+                        x >> 1,
+                        y >> 1,
                         log2_cuw - 1,
                         log2_cuh - 1,
                         &planes[U_C].as_region(),
@@ -640,12 +647,16 @@ impl EvceCtx {
                     ) as f64;
                 cost += self.dist_chroma_weight[1]
                     * evce_ssd_16b(
+                        x >> 1,
+                        y >> 1,
                         log2_cuw - 1,
                         log2_cuh - 1,
                         &planes[V_C].as_region(),
                         &self.pintra.rec.data[V_C],
                     ) as f64;
                 cost += evce_ssd_16b(
+                    x,
+                    y,
                     log2_cuw,
                     log2_cuh,
                     &planes[Y_C].as_region(),
