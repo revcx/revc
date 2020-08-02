@@ -23,6 +23,7 @@ use pinter::*;
 use pintra::*;
 use sbac::*;
 use tbl::*;
+use util::*;
 
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -105,8 +106,8 @@ pub(crate) struct EvcePicOrg {
 
 #[derive(Default, Copy, Clone)]
 pub(crate) struct EvceDQP {
-    prev_QP: i8,
-    curr_QP: i8,
+    prev_QP: u8,
+    curr_QP: u8,
     cu_qp_delta_is_coded: bool,
     cu_qp_delta_code: i8,
 }
@@ -147,9 +148,10 @@ pub(crate) struct EvceCore {
     lcu_num: u16,
     /*QP for current encoding CU. Used to derive Luma and chroma qp*/
     qp: u8,
-    cu_qp_delta_code: u8,
-    cu_qp_delta_is_coded: u8,
+    cu_qp_delta_code: i8,
+    cu_qp_delta_is_coded: bool,
     cu_qp_delta_code_mode: u8,
+    qp_prev_eco: u8,
     dqp_curr_best: Vec<Vec<EvceDQP>>, //[[EVCE_DQP; MAX_CU_DEPTH]; MAX_CU_DEPTH],
     dqp_next_best: Vec<Vec<EvceDQP>>, //[[EVCE_DQP; MAX_CU_DEPTH]; MAX_CU_DEPTH],
     dqp_temp_best: EvceDQP,
@@ -995,13 +997,13 @@ impl EvceCtx {
                 sh.qp_prev_eco = sh.qp;
                 sh.qp_prev_mode = sh.qp;
                 core.dqp_data[self.log2_max_cuwh as usize - 2][self.log2_max_cuwh as usize - 2]
-                    .prev_QP = sh.qp_prev_mode as i8;
+                    .prev_QP = sh.qp_prev_mode;
                 core.dqp_curr_best[self.log2_max_cuwh as usize - 2]
                     [self.log2_max_cuwh as usize - 2]
-                    .curr_QP = sh.qp as i8;
+                    .curr_QP = sh.qp;
                 core.dqp_curr_best[self.log2_max_cuwh as usize - 2]
                     [self.log2_max_cuwh as usize - 2]
-                    .prev_QP = sh.qp as i8;
+                    .prev_QP = sh.qp;
             }
 
             self.sbac_enc
@@ -1350,5 +1352,82 @@ impl EvceCtx {
         self.sqrt_lambda[0] = self.lambda[0].sqrt();
         self.sqrt_lambda[1] = self.lambda[1].sqrt();
         self.sqrt_lambda[2] = self.lambda[2].sqrt();
+    }
+
+    pub(crate) fn evce_eco_coef(
+        &mut self,
+        log2_cuw: u8,
+        log2_cuh: u8,
+        pred_mode: PredMode,
+        b_no_cbf: bool,
+        run_stats: u8,
+        enc_dqp: i8,
+        cur_qp: u8,
+    ) {
+        let bs = &mut self.core.bs_temp;
+        let sbac = &mut self.core.s_temp_run;
+        let sbac_ctx = &mut self.core.c_temp_run;
+        let tree_cons = &self.core.tree_cons;
+        let nnz = &self.core.nnz;
+        let coef = &self.pintra.coef_tmp;
+
+        let run_stats = evc_get_run(run_stats, tree_cons);
+        let run = [
+            run_stats & 1 != 0,
+            (run_stats >> 1) & 1 != 0,
+            (run_stats >> 2) & 1 != 0,
+        ];
+
+        if !evc_check_luma(tree_cons) {
+            assert!(!run[0]);
+        }
+        if !evc_check_chroma(tree_cons) {
+            assert!(!run[1] && !run[2]);
+        }
+        assert!(run_stats != 0);
+
+        let mut cbf_all = 0;
+        let is_intra = pred_mode == PredMode::MODE_INTRA;
+
+        for c in 0..N_C {
+            if run[c] {
+                cbf_all += if nnz[c] != 0 { 1 } else { 0 };
+            }
+        }
+
+        evce_eco_cbf(
+            bs, sbac, sbac_ctx, nnz[Y_C], nnz[U_C], nnz[V_C], pred_mode, b_no_cbf, cbf_all, &run,
+            tree_cons,
+        );
+        if self.pps.cu_qp_delta_enabled_flag {
+            if enc_dqp == 1 {
+                let cbf_for_dqp = nnz[Y_C] != 0 || nnz[U_C] != 0 || nnz[V_C] != 0;
+                if ((!(self.sps.dquant_flag)
+                    || (self.core.cu_qp_delta_code == 1 && !self.core.cu_qp_delta_is_coded))
+                    && (cbf_for_dqp))
+                    || (self.core.cu_qp_delta_code == 2 && !self.core.cu_qp_delta_is_coded)
+                {
+                    evce_eco_dqp(bs, sbac, sbac_ctx, self.core.qp_prev_eco, cur_qp);
+                    self.core.cu_qp_delta_is_coded = true;
+                    self.core.qp_prev_eco = cur_qp;
+                }
+            }
+        }
+
+        for c in 0..N_C {
+            if nnz[c] != 0 && run[c] {
+                let chroma = if c > 0 { 1 } else { 0 };
+                evce_eco_xcoef(
+                    bs,
+                    sbac,
+                    sbac_ctx,
+                    &coef.data[c],
+                    log2_cuw - chroma,
+                    log2_cuh - chroma,
+                    nnz[c],
+                    c,
+                );
+            }
+        }
     }
 }

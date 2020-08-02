@@ -184,7 +184,7 @@ impl EvceSbac {
         self.bitcounter += len as u32;
     }
 
-    fn encode_bin_ep(&mut self, bs: &mut EvceBsw, bin: u32) {
+    pub(crate) fn encode_bin_ep(&mut self, bs: &mut EvceBsw, bin: u32) {
         self.bin_counter += 1;
 
         self.range >>= 1;
@@ -225,13 +225,13 @@ impl EvceSbac {
     pub(crate) fn write_unary_sym(
         &mut self,
         bs: &mut EvceBsw,
-        model: &mut [SBAC_CTX_MODEL],
+        models: &mut [SBAC_CTX_MODEL],
         mut sym: u32,
         num_ctx: u32,
     ) {
         let mut ctx_idx = 0;
 
-        self.encode_bin(bs, &mut model[0], if sym != 0 { 1 } else { 0 });
+        self.encode_bin(bs, &mut models[0], if sym != 0 { 1 } else { 0 });
 
         if sym == 0 {
             return;
@@ -243,7 +243,7 @@ impl EvceSbac {
             }
             self.encode_bin(
                 bs,
-                &mut model[ctx_idx as usize],
+                &mut models[ctx_idx as usize],
                 if sym != 0 { 1 } else { 0 },
             );
             sym -= 1;
@@ -253,7 +253,7 @@ impl EvceSbac {
     fn write_truncate_unary_sym(
         &mut self,
         bs: &mut EvceBsw,
-        model: &mut [SBAC_CTX_MODEL],
+        models: &mut [SBAC_CTX_MODEL],
         mut sym: u32,
         num_ctx: u32,
         max_num: u32,
@@ -266,7 +266,7 @@ impl EvceSbac {
                 } else {
                     ctx_idx
                 } as usize;
-                self.encode_bin(bs, &mut model[idx], symbol);
+                self.encode_bin(bs, &mut models[idx], symbol);
 
                 if symbol == 0 {
                     break;

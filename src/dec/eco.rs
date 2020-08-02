@@ -672,7 +672,7 @@ pub(crate) fn evcd_eco_run_length_cc(
     log2_h: u8,
     ch_type: usize,
 ) -> Result<(), EvcError> {
-    let scanp = &evc_scan_tbl[log2_w as usize - 1][..];
+    let scanp = &evc_scan_tbl[log2_w as usize - 1];
     let num_coeff = 1 << (log2_w + log2_h) as u32;
     let mut scan_pos_offset = 0;
     let mut prev_level = 6;
