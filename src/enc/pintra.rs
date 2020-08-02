@@ -9,6 +9,7 @@ use crate::ipred::*;
 use crate::itdq::*;
 use crate::picman::*;
 use crate::plane::*;
+use crate::recon::*;
 use crate::region::*;
 
 use std::cell::RefCell;
@@ -405,7 +406,7 @@ impl EvceCtx {
 
         if !chroma {
             assert!(evc_check_luma(&self.core.tree_cons));
-            let pred = &self.pintra.pred_cache[self.core.ipm[0] as usize];
+
             if let Some(pic) = &self.pintra.pic_m {
                 let frame = &pic.borrow().frame;
                 let planes = &frame.borrow().planes;
@@ -413,7 +414,7 @@ impl EvceCtx {
                     cuw,
                     cuh,
                     &planes[Y_C].as_region(),
-                    pred,
+                    &self.pintra.pred_cache[self.core.ipm[0] as usize],
                     &mut self.pintra.coef_tmp.data[Y_C],
                 );
             }
@@ -465,7 +466,15 @@ impl EvceCtx {
                 self.core.qp_v,
                 &is_coef,
             );
-        //evc_recon(pi->coef_tmp[Y_C], pred, core->nnz[Y_C], cuw, cuh, cuw, pi->rec[Y_C], core->ats_inter_info);
+
+            evc_recon(
+                &self.pintra.coef_tmp.data[Y_C],
+                &self.pintra.pred_cache[self.core.ipm[0] as usize],
+                self.core.nnz[Y_C] != 0,
+                cuw,
+                cuh,
+                &mut self.pintra.rec.data[Y_C],
+            );
 
         /*cost += evce_ssd_16b(log2_cuw, log2_cuh, pi->rec[Y_C], org_luma, cuw, s_org);
 
