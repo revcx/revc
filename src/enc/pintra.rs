@@ -448,7 +448,7 @@ impl EvceCtx {
             self.core.s_temp_run = self.core.s_curr_best[log2_cuw - 2][log2_cuh - 2];
             self.core.dqp_temp_run = self.core.dqp_curr_best[log2_cuw - 2][log2_cuh - 2];
             self.core.s_temp_run.bit_reset();
-            self.evce_rdo_bit_cnt_cu_intra_luma(self.sh.slice_type, self.core.scup);
+            self.evce_rdo_bit_cnt_cu_intra_luma(self.sh.slice_type);
             let bit_cnt = self.core.s_temp_run.get_bit_number();
 
             let is_coef = [
@@ -476,12 +476,21 @@ impl EvceCtx {
                 &mut self.pintra.rec.data[Y_C],
             );
 
-        /*cost += evce_ssd_16b(log2_cuw, log2_cuh, pi->rec[Y_C], org_luma, cuw, s_org);
+            if let Some(pic) = &self.pintra.pic_o {
+                let frame = &pic.borrow().frame;
+                let planes = &frame.borrow().planes;
+                cost += evce_ssd_16b(
+                    log2_cuw,
+                    log2_cuh,
+                    &planes[Y_C].as_region(),
+                    &self.pintra.rec.data[Y_C],
+                ) as f64;
+            }
 
-        calc_delta_dist_filter_boundary(ctx, PIC_MODE(ctx), PIC_ORIG(ctx), cuw, cuh, pi->rec, cuw, x, y, core->avail_lr, 1, core->nnz[Y_C] != 0, NULL, NULL, 0, core->ats_inter_info, core);
-        cost += core->delta_dist[Y_C];
-        *dist = (s32)cost;
-        cost += RATE_TO_COST_LAMBDA(ctx->lambda[0], bit_cnt);*/
+            self.calc_delta_dist_filter_boundary(); //, PIC_MODE(ctx), PIC_ORIG(ctx), cuw, cuh, pi->rec, cuw, x, y, core->avail_lr, 1, core->nnz[Y_C] != 0, NULL, NULL, 0, core->ats_inter_info, core);
+            cost += self.core.delta_dist[Y_C] as f64;
+            *dist = cost as i32;
+            cost += (self.lambda[0] * bit_cnt as f64);
         } else {
             assert!(evc_check_chroma(&self.core.tree_cons));
 
@@ -503,42 +512,123 @@ impl EvceCtx {
                 cuw as usize >> 1,
                 cuh as usize >> 1,
             );
-            /*
-            evce_diff_16b(log2_cuw - 1, log2_cuh - 1, org_cb, pi -> pred[U_C], s_org_c, cuw >> 1, cuw >> 1, pi -> coef_tmp[U_C]);
-            evce_diff_16b(log2_cuw - 1, log2_cuh - 1, org_cr, pi -> pred[V_C], s_org_c, cuw >> 1, cuw >> 1, pi -> coef_tmp[V_C]);
 
-            evce_sub_block_tq(pi -> coef_tmp, log2_cuw, log2_cuh, core -> qp_y, core -> qp_u, core -> qp_v, pi -> slice_type, core -> nnz, core -> nnz_sub
-            , 1, ctx -> lambda[0], ctx -> lambda[1], ctx -> lambda[2], RUN_CB | RUN_CR, ctx -> sps.tool_cm_init, ctx -> sps.tool_iqt
-            , core -> ats_intra_cu, core -> ats_mode, 0, ctx -> sps.tool_adcc, core -> tree_cons, core);
-
-            evc_mcpy(coef[U_C], pi -> coef_tmp[U_C], sizeof(u16) * (cuw * cuh) >> 2);
-            evc_mcpy(coef[V_C], pi -> coef_tmp[V_C], sizeof(u16) * (cuw * cuh) >> 2);
-
-            evc_sub_block_itdq(pi -> coef_tmp, log2_cuw, log2_cuh, core -> qp_y, core -> qp_u, core -> qp_v, core -> nnz, core -> nnz_sub, ctx -> sps.tool_iqt, core -> ats_intra_cu, core -> ats_mode, 0);
-
-            evc_recon(pi -> coef_tmp[U_C], pi -> pred[U_C], core -> nnz[U_C], cuw >> 1, cuh >> 1, cuw >> 1, pi -> rec[U_C], 0);
-            evc_recon(pi -> coef_tmp[V_C], pi -> pred[V_C], core -> nnz[V_C], cuw >> 1, cuh >> 1, cuw >> 1, pi -> rec[V_C], 0);
-
-            evce_sbac_bit_reset(&core -> s_temp_run);
-
-            evce_rdo_bit_cnt_cu_intra_chroma(ctx, core, ctx -> sh.slice_type, core -> scup, coef);
-
-            bit_cnt = evce_get_bit_number(&core -> s_temp_run);
-
-            cost += ctx -> dist_chroma_weight[0] * evce_ssd_16b(log2_cuw - 1, log2_cuh - 1, pi -> rec[U_C], org_cb, cuw >> 1, s_org_c);
-            cost += ctx -> dist_chroma_weight[1] * evce_ssd_16b(log2_cuw - 1, log2_cuh - 1, pi -> rec[V_C], org_cr, cuw >> 1, s_org_c);
-            {
-                calc_delta_dist_filter_boundary(ctx, PIC_MODE(ctx), PIC_ORIG(ctx), cuw, cuh, pi -> rec, cuw, x, y, core -> avail_lr, 1,
-                !evce_check_luma(ctx, core)?
-                core -> cu_data_temp[log2_cuw - 2][log2_cuh - 2].nnz[Y_C] != 0:
-                core -> nnz[Y_C] != 0, NULL, NULL, 0, core -> ats_inter_info, core);
-                cost += (core -> delta_dist[U_C] * ctx -> dist_chroma_weight[0]) + (core -> delta_dist[V_C] * ctx -> dist_chroma_weight[1]);
+            if let Some(pic) = &self.pintra.pic_m {
+                let frame = &pic.borrow().frame;
+                let planes = &frame.borrow().planes;
+                evce_diff_16b(
+                    log2_cuw - 1,
+                    log2_cuh - 1,
+                    &planes[U_C].as_region(),
+                    &self.pintra.pred.data[U_C],
+                    &mut self.pintra.coef_tmp.data[U_C],
+                );
+                evce_diff_16b(
+                    log2_cuw - 1,
+                    log2_cuh - 1,
+                    &planes[V_C].as_region(),
+                    &self.pintra.pred.data[V_C],
+                    &mut self.pintra.coef_tmp.data[V_C],
+                );
             }
-            *dist = (s32)
-            cost;
 
-            cost += evce_ssd_16b(log2_cuw, log2_cuh, pi -> rec[Y_C], org_luma, cuw, s_org);
-            cost += RATE_TO_COST_LAMBDA(ctx -> lambda[0], bit_cnt);*/
+            evce_sub_block_tq(
+                &mut self.pintra.coef_tmp,
+                log2_cuw,
+                log2_cuh,
+                self.core.qp_y,
+                self.core.qp_u,
+                self.core.qp_v,
+                self.pintra.slice_type,
+                &mut self.core.nnz,
+                true,
+                self.lambda[0],
+                self.lambda[1],
+                self.lambda[2],
+                TQC_RUN::RUN_CB as u8 | TQC_RUN::RUN_CR as u8,
+                &self.core.tree_cons,
+                &self.core.rdoq_est,
+            );
+
+            coef.data[U_C][0..(cuw * cuh) >> 2]
+                .copy_from_slice(&self.pintra.coef_tmp.data[U_C][0..(cuw * cuh) >> 2]);
+            coef.data[V_C][0..(cuw * cuh) >> 2]
+                .copy_from_slice(&self.pintra.coef_tmp.data[V_C][0..(cuw * cuh) >> 2]);
+
+            //TODO: how to only do U/V?
+            let is_coef = [
+                self.core.nnz[Y_C] != 0,
+                self.core.nnz[U_C] != 0,
+                self.core.nnz[V_C] != 0,
+            ];
+            evc_sub_block_itdq(
+                &mut self.bs_temp.tracer,
+                &mut self.pintra.coef_tmp.data,
+                log2_cuw as u8,
+                log2_cuh as u8,
+                self.core.qp_y,
+                self.core.qp_u,
+                self.core.qp_v,
+                &is_coef,
+            );
+
+            evc_recon(
+                &self.pintra.coef_tmp.data[U_C],
+                &self.pintra.pred.data[U_C],
+                self.core.nnz[U_C] != 0,
+                cuw >> 1,
+                cuh >> 1,
+                &mut self.pintra.rec.data[U_C],
+            );
+            evc_recon(
+                &self.pintra.coef_tmp.data[V_C],
+                &self.pintra.pred.data[V_C],
+                self.core.nnz[V_C] != 0,
+                cuw >> 1,
+                cuh >> 1,
+                &mut self.pintra.rec.data[V_C],
+            );
+
+            self.core.s_temp_run.bit_reset();
+
+            self.evce_rdo_bit_cnt_cu_intra_chroma(self.sh.slice_type);
+
+            let bit_cnt = self.core.s_temp_run.get_bit_number();
+
+            if let Some(pic) = &self.pintra.pic_o {
+                let frame = &pic.borrow().frame;
+                let planes = &frame.borrow().planes;
+                cost += self.dist_chroma_weight[0]
+                    * evce_ssd_16b(
+                        log2_cuw - 1,
+                        log2_cuh - 1,
+                        &planes[U_C].as_region(),
+                        &self.pintra.rec.data[U_C],
+                    ) as f64;
+                cost += self.dist_chroma_weight[1]
+                    * evce_ssd_16b(
+                        log2_cuw - 1,
+                        log2_cuh - 1,
+                        &planes[V_C].as_region(),
+                        &self.pintra.rec.data[V_C],
+                    ) as f64;
+                cost += evce_ssd_16b(
+                    log2_cuw,
+                    log2_cuh,
+                    &planes[Y_C].as_region(),
+                    &self.pintra.rec.data[Y_C],
+                ) as f64;
+            }
+
+            self.calc_delta_dist_filter_boundary(); //ctx, PIC_MODE(ctx), PIC_ORIG(ctx), cuw, cuh, pi -> rec, cuw, x, y, core -> avail_lr, 1,
+                                                    // !evce_check_luma(ctx, core)?
+                                                    // core -> cu_data_temp[log2_cuw - 2][log2_cuh - 2].nnz[Y_C] != 0:
+                                                    // core -> nnz[Y_C] != 0, NULL, NULL, 0, core -> ats_inter_info, core);
+
+            cost += (self.core.delta_dist[U_C] as f64 * self.dist_chroma_weight[0])
+                + (self.core.delta_dist[V_C] as f64 * self.dist_chroma_weight[1]);
+            *dist = cost as i32;
+            cost += (self.lambda[0] * bit_cnt as f64);
         }
 
         return cost;

@@ -132,3 +132,18 @@ pub(crate) fn evce_diff_16b(
         }
     }
 }
+
+/* SSD ***********************************************************************/
+pub(crate) fn evce_ssd_16b(w: usize, h: usize, src1: &PlaneRegion<'_, pel>, src2: &[pel]) -> i64 {
+    let shift = (BIT_DEPTH - 8) << 1;
+    let mut ssd = 0;
+
+    for j in 0..h {
+        for i in 0..w {
+            let diff = src1[j][i] as i64 - src2[j * w + i] as i64;
+            ssd += (diff * diff) >> shift;
+        }
+    }
+
+    ssd
+}

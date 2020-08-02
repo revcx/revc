@@ -1405,12 +1405,9 @@ impl EvceCtx {
         }
     }
 
-    pub(crate) fn evce_rdo_bit_cnt_cu_intra_luma(&mut self, slice_type: SliceType, cup: u32) {
-        //EVCE_SBAC *sbac = &core->s_temp_run;
+    pub(crate) fn evce_rdo_bit_cnt_cu_intra_luma(&mut self, slice_type: SliceType) {
         let log2_cuw = self.core.log2_cuw;
         let log2_cuh = self.core.log2_cuh;
-
-        //int* nnz = core->nnz;
 
         if slice_type != SliceType::EVC_ST_I && evc_check_all_preds(&self.core.tree_cons) {
             self.core.s_temp_run.encode_bin(
@@ -1456,6 +1453,63 @@ impl EvceCtx {
             self.core.dqp_temp_run.cu_qp_delta_is_coded = self.core.cu_qp_delta_is_coded;
             self.core.dqp_temp_run.prev_QP = self.core.qp_prev_eco;
             self.core.dqp_temp_run.curr_QP = self.core.qp;
+        }
+    }
+
+    pub(crate) fn evce_rdo_bit_cnt_cu_intra_chroma(&mut self, slice_type: SliceType) {
+        let log2_cuw = self.core.log2_cuw;
+        let log2_cuh = self.core.log2_cuh;
+
+        self.evce_eco_coef(
+            log2_cuw,
+            log2_cuh,
+            PredMode::MODE_INTRA,
+            false,
+            TQC_RUN::RUN_CB as u8 | TQC_RUN::RUN_CR as u8,
+            -1,
+            0,
+        );
+    }
+
+    pub(crate) fn calc_delta_dist_filter_boundary(
+        &mut self, /*, EVC_PIC *pic_rec, EVC_PIC *pic_org, int cuw, int cuh,
+                   pel(*src)[MAX_CU_DIM], int s_src, int x, int y, u16 avail_lr, u8 intra_flag,
+                   u8 cbf_l, s8 *refi, s16(*mv)[MV_D], u8 is_mv_from_mvf*/
+    ) {
+        /*int i, j;
+        int log2_cuw = CONV_LOG2(cuw);
+        int log2_cuh = CONV_LOG2(cuh);
+        int x_offset = 8; //for preparing deblocking filter taps
+        int y_offset = 8;
+        int x_tm = 4; //for calculating template dist
+        int y_tm = 4; //must be the same as x_tm
+        int log2_x_tm = CONV_LOG2(x_tm);
+        int log2_y_tm = CONV_LOG2(y_tm);
+        EVC_PIC * pic_dbk = ctx -> pic_dbk;
+        int s_l_dbk = pic_dbk ->s_l;
+        int s_c_dbk = pic_dbk -> s_c;
+        int s_l_org = pic_org -> s_l;
+        int s_c_org = pic_org-> s_c;
+        pel * dst_y = pic_dbk -> y + y * s_l_dbk + x;
+        pel * dst_u = pic_dbk -> u + (y > > 1) * s_c_dbk + (x > > 1);
+        pel * dst_v = pic_dbk -> v + (y > > 1) * s_c_dbk + (x > > 1);
+        pel * org_y = pic_org-> y + y * s_l_org + x;
+        pel* org_u = pic_org -> u + (y >> 1) * s_c_org + (x > > 1);
+        pel * org_v = pic_org -> v + (y > > 1) * s_c_org + (x > > 1);
+        int x_scu = x > > MIN_CU_LOG2;
+        int y_scu = y >> MIN_CU_LOG2;
+        int t = x_scu + y_scu * ctx -> w_scu;
+        //cu info to save
+        u8 intra_flag_save, cbf_l_save;*/
+        //let do_filter = false;
+        //int y_begin = ((ctx -> tile[core-> tile_num].ctba_rs_first) / ctx -> w_lcu) < < ctx -> log2_max_cuwh;
+        //int y_begin_uv = (((ctx -> tile[core -> tile_num].ctba_rs_first) / ctx -> w_lcu) << ctx -> log2_max_cuwh) > > 1;
+
+        if !self.sh.deblocking_filter_on {
+            self.core.delta_dist[Y_C] = 0;
+            self.core.delta_dist[U_C] = 0;
+            self.core.delta_dist[V_C] = 0;
+            return; //if no filter is applied, just return delta_dist as 0
         }
     }
 }
