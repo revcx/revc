@@ -1043,22 +1043,19 @@ impl EvceCtx {
                 self.mode_analyze_lcu();
 
                 /* entropy coding ************************************************/
-                /*ret = self.evce_eco_tree(
+                self.evce_eco_tree(
                     self.core.x_pel,
                     self.core.y_pel,
-                    0,
                     self.max_cuwh,
                     self.max_cuwh,
                     0,
-                    1,
-                    SplitMode::NO_SPLIT,
-                    split_mode_child,
                     0,
-                    split_allow,
+                    true,
                     0,
                     0,
                     evc_get_default_tree_cons(),
-                );*/
+                );
+
                 /* prepare next step *********************************************/
                 self.core.x_lcu += 1;
                 if self.core.x_lcu >= self.w_lcu {
