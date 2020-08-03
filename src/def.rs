@@ -687,6 +687,11 @@ pub(crate) type SBAC_CTX_MODEL = u16;
 pub(crate) const PROB_INIT: SBAC_CTX_MODEL = (512); /* 1/2 of initialization with mps = 0 */
 /* CABAC (END) */
 
+/* Multiple Referene (START) */
+pub(crate) const MAX_NUM_ACTIVE_REF_FRAME_B: u8 = 2; /* Maximum number of active reference frames for RA condition */
+pub(crate) const MAX_NUM_ACTIVE_REF_FRAME_LDB: u8 = 4; /* Maximum number of active reference frames for LDB condition */
+/* Multiple Reference (END) */
+
 pub(crate) const NUM_CTX_SKIP_FLAG: usize = 2;
 pub(crate) const NUM_CTX_CBF_LUMA: usize = 1;
 pub(crate) const NUM_CTX_CBF_CB: usize = 1;

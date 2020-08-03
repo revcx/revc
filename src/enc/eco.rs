@@ -6,6 +6,15 @@ use crate::def::*;
 use crate::tbl::*;
 use crate::util::*;
 
+pub(crate) fn evce_eco_nalu(bs: &mut EvceBsw, nalu: &EvcNalu) {
+    bs.write(nalu.nal_unit_size, 32, None);
+    bs.write(nalu.forbidden_zero_bit as u32, 1, None);
+    bs.write(nalu.nal_unit_type as u32 + 1, 6, None);
+    bs.write(nalu.nuh_temporal_id as u32, 3, None);
+    bs.write(nalu.nuh_reserved_zero_5bits as u32, 5, None);
+    bs.write(nalu.nuh_extension_flag as u32, 1, None);
+}
+
 pub(crate) fn evce_eco_tile_end_flag(bs: &mut EvceBsw, sbac: &mut EvceSbac, flag: u32) {
     sbac.encode_bin_trm(bs, flag);
 }

@@ -1300,6 +1300,79 @@ impl EvceCtx {
         }
     }
 
+    fn set_sps(&mut self) {
+        let sps = &mut self.sps;
+        sps.profile_idc = 0; // baseline profile only
+        sps.level_idc = self.param.level * 3;
+        sps.pic_width_in_luma_samples = self.param.width as u16;
+        sps.pic_height_in_luma_samples = self.param.height as u16;
+        sps.toolset_idc_h = 0;
+        sps.toolset_idc_l = 0;
+        sps.bit_depth_luma_minus8 = 0; //TODO: self.param.out_bit_depth - 8;
+        sps.bit_depth_chroma_minus8 = 0; //TODO: self.cdsc.out_bit_depth - 8;
+        sps.chroma_format_idc = 1; // YCbCr 4:2:0
+        if self.param.max_b_frames > 0 {
+            sps.max_num_ref_pics = MAX_NUM_ACTIVE_REF_FRAME_B;
+        } else {
+            sps.max_num_ref_pics = MAX_NUM_ACTIVE_REF_FRAME_LDB;
+        }
+        sps.sps_btt_flag = false;
+        sps.sps_suco_flag = false;
+        sps.tool_amvr = false;
+        sps.tool_mmvd = false;
+        sps.tool_affine = false;
+        sps.tool_dmvr = false;
+        sps.tool_addb = false;
+        sps.tool_dra = false;
+        sps.tool_alf = false;
+        sps.tool_htdf = false;
+        sps.tool_admvp = false;
+        sps.tool_hmvp = false;
+        sps.tool_eipd = false;
+        sps.tool_iqt = false;
+        sps.tool_adcc = false;
+        sps.tool_cm_init = false;
+        sps.tool_ats = false;
+        sps.tool_rpl = false;
+        sps.tool_pocs = false;
+
+        sps.log2_sub_gop_length = ((self.gop_size as f32).log2() + 0.5f32) as u8;
+        self.ref_pic_gap_length = self.param.ref_pic_gap_length as u32;
+        sps.log2_ref_pic_gap_length =
+            ((self.param.ref_pic_gap_length as f32).log2() + 0.5f32) as u8;
+
+        sps.vui_parameters_present_flag = false;
+        sps.dquant_flag = false; /*Baseline : Active SPSs shall have sps_dquant_flag equal to 0 only*/
+
+        //if (self.cdsc.chroma_qp_table_struct.chroma_qp_table_present_flag)
+        //{
+        //    evce_copy_chroma_qp_mapping_params(&(sps.chroma_qp_table_struct), &(self.cdsc.chroma_qp_table_struct));
+        //}
+
+        sps.picture_cropping_flag = false; //self.cdsc.picture_cropping_flag;
+                                           /*if (sps.picture_cropping_flag)
+                                           {
+                                               sps.picture_crop_left_offset = self.cdsc.picture_crop_left_offset;
+                                               sps.picture_crop_right_offset = self.cdsc.picture_crop_right_offset;
+                                               sps.picture_crop_top_offset = self.cdsc.picture_crop_top_offset;
+                                               sps.picture_crop_bottom_offset = self.cdsc.picture_crop_bottom_offset;
+                                           }*/
+    }
+
+    fn set_pps(&mut self) {
+        let pps = &mut self.pps;
+
+        pps.single_tile_in_pic_flag = true;
+        pps.constrained_intra_pred_flag = self.param.enable_cip;
+        pps.cu_qp_delta_enabled_flag = false; //self.param.use_dqp;
+        pps.cu_qp_delta_area = self.param.cu_qp_delta_area;
+        pps.single_tile_in_pic_flag = true;
+        pps.arbitrary_slice_present_flag = false;
+        pps.tile_id_len_minus1 = 0;
+        pps.num_ref_idx_default_active_minus1[REFP_0] = 0; /* To be checked */
+        pps.num_ref_idx_default_active_minus1[REFP_1] = 0; /* To be checked */
+    }
+
     fn set_sh(&mut self) {
         let sh = &mut self.sh;
 
@@ -1968,5 +2041,30 @@ impl EvceCtx {
             }
         }
         //}
+    }
+
+    fn evce_encode_sps(&mut self) {
+        /* bitsteam initialize for sequence */
+        self.bs.init();
+
+        /* nalu header */
+        self.nalu.set_nalu(NaluType::EVC_SPS_NUT, 0);
+
+        evce_eco_nalu(&mut self.bs, &self.nalu);
+
+        /* sequence parameter set*/
+        self.set_sps();
+        //evce_eco_sps(bs, sps);
+
+        /* de-init BSW */
+        self.bs.deinit();
+
+        /* write the bitstream size */
+        //evce_bsw_write_nalu_size(bs);
+
+        /* set stat ***************************************************************/
+        //evc_mset(stat, 0, sizeof(EVCE_STAT));
+        //stat->write = EVC_BSW_GET_WRITE_BYTE(bs);
+        //stat->nalu_type = EVC_SPS_NUT;
     }
 }
