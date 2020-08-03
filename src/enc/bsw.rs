@@ -19,7 +19,10 @@ impl EvceBsw {
         EvceBsw {
             code: 0,
             leftbits: 0,
-            pkt: Packet::default(),
+            pkt: Packet {
+                data: Vec::with_capacity(1024), // 1K?
+                pts: 0,
+            },
             tracer: OPEN_TRACE(),
         }
     }

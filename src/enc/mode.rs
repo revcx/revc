@@ -68,8 +68,8 @@ impl EvceCUData {
         }
     }
     pub(crate) fn init(&mut self, log2_cuw: u8, log2_cuh: u8, qp_y: u8, qp_u: u8, qp_v: u8) {
-        let cuw_scu = 1 << log2_cuw as usize;
-        let cuh_scu = 1 << log2_cuh as usize;
+        let cuw_scu = 1 << (log2_cuw as usize - MIN_CU_LOG2);
+        let cuh_scu = 1 << (log2_cuh as usize - MIN_CU_LOG2);
 
         let cu_cnt = cuw_scu * cuh_scu;
         let pixel_cnt = cu_cnt << 4;
