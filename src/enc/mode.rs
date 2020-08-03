@@ -8,25 +8,26 @@ use crate::plane::*;
 #[derive(Default)]
 pub(crate) struct EvceCUData {
     pub(crate) split_mode: LcuSplitMode,
-    qp_y: Vec<u8>,
-    qp_u: Vec<u8>,
-    qp_v: Vec<u8>,
-    pred_mode: Vec<PredMode>,
+    pub(crate) qp_y: Vec<u8>,
+    pub(crate) qp_u: Vec<u8>,
+    pub(crate) qp_v: Vec<u8>,
+    pub(crate) pred_mode: Vec<PredMode>,
+    pub(crate) pred_mode_chroma: Vec<PredMode>,
     pub(crate) ipm: Vec<Vec<IntraPredDir>>,
-    skip_flag: Vec<bool>,
-    refi: Vec<Vec<i8>>,
-    mvp_idx: Vec<Vec<u8>>,
-    mv: Vec<Vec<Vec<i16>>>,  //[MAX_CU_CNT_IN_LCU][REFP_NUM][MV_D];
-    mvd: Vec<Vec<Vec<i16>>>, //[MAX_CU_CNT_IN_LCU][REFP_NUM][MV_D];
-    nnz: Vec<Vec<u16>>,      //[N_C];
+    pub(crate) skip_flag: Vec<bool>,
+    pub(crate) refi: Vec<Vec<i8>>,
+    pub(crate) mvp_idx: Vec<Vec<u8>>,
+    pub(crate) mv: Vec<Vec<Vec<i16>>>, //[MAX_CU_CNT_IN_LCU][REFP_NUM][MV_D];
+    pub(crate) mvd: Vec<Vec<Vec<i16>>>, //[MAX_CU_CNT_IN_LCU][REFP_NUM][MV_D];
+    pub(crate) nnz: Vec<Vec<u16>>,     //[N_C];
     pub(crate) map_scu: Vec<MCU>,
-    map_cu_mode: Vec<MCU>,
-    depth: Vec<i8>,
-    coef: Vec<Vec<i16>>, //[N_C];
-    reco: Vec<Vec<pel>>, //[N_C];
-                         //#if TRACE_ENC_CU_DATA
-                         //  u64  trace_idx[MAX_CU_CNT_IN_LCU];
-                         //#endif
+    pub(crate) map_cu_mode: Vec<MCU>,
+    pub(crate) depth: Vec<i8>,
+    pub(crate) coef: Vec<Vec<i16>>, //[N_C];
+    pub(crate) reco: Vec<Vec<pel>>, //[N_C];
+                                    //#if TRACE_ENC_CU_DATA
+                                    //  u64  trace_idx[MAX_CU_CNT_IN_LCU];
+                                    //#endif
 }
 
 impl EvceCUData {
@@ -51,6 +52,7 @@ impl EvceCUData {
             qp_u: vec![0; cu_cnt],
             qp_v: vec![0; cu_cnt],
             pred_mode: vec![PredMode::MODE_INTRA; cu_cnt],
+            pred_mode_chroma: vec![PredMode::MODE_INTRA; cu_cnt],
             ipm: vec![vec![IntraPredDir::IPD_DC_B; cu_cnt]; 2],
             skip_flag: vec![false; cu_cnt],
             refi: vec![vec![0; REFP_NUM]; cu_cnt],

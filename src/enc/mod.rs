@@ -12,6 +12,7 @@ pub(crate) mod util;
 use super::api::frame::*;
 use super::api::*;
 use super::def::*;
+use super::ipred::*;
 use super::picman::*;
 use super::tbl::*;
 use super::util::*;
@@ -1549,5 +1550,426 @@ impl EvceCtx {
             core.cu_qp_delta_code = cu_qp_delta_code;
             //evce_eco_unit(ctx, core, x0, y0, cup, cuw, cuh, tree_cons);
         }
+    }
+
+    fn evce_eco_unit(
+        &mut self,
+        x: u16,
+        y: u16,
+        cup: usize,
+        cuw: u16,
+        cuh: u16,
+        tree_cons: TREE_CONS,
+    ) {
+        //core.tree_cons = tree_cons;
+        // s16(*coef)[MAX_CU_DIM] = core.ctmp;
+        /*
+            EVC_BSW *bs;
+
+            u32 *map_scu;
+            int slice_type, refi0, refi1;
+            int i, j, w, h;
+            EVCE_CU_DATA *cu_data = &self.map_cu_data[core.lcu_num];
+            u32 *map_cu_mode;
+            u32 *map_affine;
+        #if TRACE_ENC_CU_DATA
+            core.trace_idx = cu_data->trace_idx[cup];
+        #endif
+        #if TRACE_ENC_CU_DATA_CHECK
+            evc_assert(core.trace_idx != 0);
+        #endif*/
+        let enc_dqp = 0;
+        let slice_type = self.slice_type;
+
+        // bs = &self.bs;
+
+        self.cu_init(x, y, cup, cuw, cuh);
+        /*
+               EVC_TRACE_COUNTER;
+               EVC_TRACE_STR("poc: ");
+               EVC_TRACE_INT(self.poc.poc_val);
+               EVC_TRACE_STR("x pos ");
+               EVC_TRACE_INT(core.x_pel + ((cup % (self.max_cuwh >> MIN_CU_LOG2)) << MIN_CU_LOG2));
+               EVC_TRACE_STR("y pos ");
+               EVC_TRACE_INT(core.y_pel + ((cup / (self.max_cuwh >> MIN_CU_LOG2)) << MIN_CU_LOG2));
+               EVC_TRACE_STR("width ");
+               EVC_TRACE_INT(cuw);
+               EVC_TRACE_STR("height ");
+               EVC_TRACE_INT(cuh);
+
+           #if ENC_DEC_TRACE
+               if (self.sh.slice_type != SLICE_I && self.sps.sps_btt_flag)
+               {
+                   EVC_TRACE_STR("tree status ");
+                   EVC_TRACE_INT(core.tree_cons.tree_type);
+                   EVC_TRACE_STR("mode status ");
+                   EVC_TRACE_INT(core.tree_cons.mode_cons);
+               }
+           #endif
+
+               EVC_TRACE_STR("\n");
+        */
+        {
+            let core = &mut self.core;
+            let cu_data = &mut self.map_cu_data[core.lcu_num as usize];
+            let bs = &mut self.bs;
+            let sbac = &mut self.sbac_enc;
+            let sbac_ctx = &mut self.sbac_ctx;
+
+            if !core.skip_flag {
+                /* get coefficients and tq */
+                coef_rect_to_series(
+                    &mut core.ctmp,
+                    &cu_data.coef,
+                    self.log2_max_cuwh,
+                    x,
+                    y,
+                    cuw,
+                    cuh,
+                    &core.tree_cons,
+                );
+
+                for i in 0..N_C {
+                    core.nnz[i] = cu_data.nnz[i][cup as usize];
+                }
+            } else {
+                for i in 0..N_C {
+                    core.nnz[i] = 0;
+                }
+            }
+
+            /* entropy coding a CU */
+            if slice_type != SliceType::EVC_ST_I && !evc_check_only_intra(&core.tree_cons) {
+                evce_eco_skip_flag(
+                    bs,
+                    sbac,
+                    sbac_ctx,
+                    core.skip_flag as u32,
+                    core.ctx_flags[CtxNevIdx::CNID_SKIP_FLAG as usize] as usize,
+                );
+
+                if core.skip_flag {
+                    evce_eco_mvp_idx(
+                        bs,
+                        sbac,
+                        sbac_ctx,
+                        cu_data.mvp_idx[cup as usize][REFP_0] as u32,
+                    );
+
+                    if slice_type == SliceType::EVC_ST_B {
+                        evce_eco_mvp_idx(
+                            bs,
+                            sbac,
+                            sbac_ctx,
+                            cu_data.mvp_idx[cup as usize][REFP_1] as u32,
+                        );
+                    }
+                } else {
+                    if evc_check_all_preds(&core.tree_cons) {
+                        evce_eco_pred_mode(
+                            bs,
+                            sbac,
+                            sbac_ctx,
+                            core.cu_mode,
+                            core.ctx_flags[CtxNevIdx::CNID_PRED_MODE as usize] as usize,
+                        );
+                    }
+
+                    if core.cu_mode != PredMode::MODE_INTRA {
+                        evce_eco_direct_mode_flag(
+                            bs,
+                            sbac,
+                            sbac_ctx,
+                            if cu_data.pred_mode[cup as usize] == PredMode::MODE_DIR {
+                                1
+                            } else {
+                                0
+                            },
+                        );
+
+                        if cu_data.pred_mode[cup as usize] != PredMode::MODE_DIR {
+                            evce_eco_inter_pred_idc(
+                                bs,
+                                sbac,
+                                sbac_ctx,
+                                &cu_data.refi[cup as usize],
+                                slice_type,
+                            );
+
+                            let refi0 = cu_data.refi[cup as usize][REFP_0];
+                            let refi1 = cu_data.refi[cup as usize][REFP_1];
+                            if slice_type.IS_INTER_SLICE() && REFI_IS_VALID(refi0) {
+                                evce_eco_refi(bs, sbac, sbac_ctx, self.rpm.num_refp[REFP_0], refi0);
+                                evce_eco_mvp_idx(
+                                    bs,
+                                    sbac,
+                                    sbac_ctx,
+                                    cu_data.mvp_idx[cup as usize][REFP_0] as u32,
+                                );
+                                evce_eco_mvd(
+                                    bs,
+                                    sbac,
+                                    sbac_ctx,
+                                    &cu_data.mvd[cup as usize][REFP_0],
+                                );
+                            }
+
+                            if slice_type == SliceType::EVC_ST_B && REFI_IS_VALID(refi1) {
+                                evce_eco_refi(bs, sbac, sbac_ctx, self.rpm.num_refp[REFP_1], refi1);
+                                evce_eco_mvp_idx(
+                                    bs,
+                                    sbac,
+                                    sbac_ctx,
+                                    cu_data.mvp_idx[cup as usize][REFP_1] as u32,
+                                );
+                                evce_eco_mvd(
+                                    bs,
+                                    sbac,
+                                    sbac_ctx,
+                                    &cu_data.mvd[cup as usize][REFP_1],
+                                );
+                            }
+                        }
+                    }
+                }
+            }
+
+            if core.cu_mode == PredMode::MODE_INTRA {
+                assert!(cu_data.ipm[0][cup as usize] != IntraPredDir::IPD_INVALID);
+                assert!(cu_data.ipm[1][cup as usize] != IntraPredDir::IPD_INVALID);
+
+                core.mpm_b_list = evc_get_mpm_b(
+                    core.x_scu,
+                    core.y_scu,
+                    &self.map_scu,
+                    &self.map_ipm,
+                    core.scup,
+                    self.w_scu,
+                );
+
+                if evc_check_luma(&core.tree_cons) {
+                    evce_eco_intra_dir_b(
+                        bs,
+                        sbac,
+                        sbac_ctx,
+                        cu_data.ipm[0][cup] as u8,
+                        core.mpm_b_list,
+                    );
+                }
+            }
+        }
+
+        if !self.core.skip_flag {
+            self.evce_eco_coef(
+                self.core.log2_cuw,
+                self.core.log2_cuh,
+                self.core.cu_mode,
+                false,
+                TQC_RUN::RUN_L as u8 | TQC_RUN::RUN_CB as u8 | TQC_RUN::RUN_CR as u8,
+                1,
+                self.map_cu_data[self.core.lcu_num as usize].qp_y[cup] - 6 * (BIT_DEPTH as u8 - 8),
+            );
+        }
+
+        self.evce_set_enc_info();
+
+        /*#if TRACE_ENC_CU_DATA
+            EVC_TRACE_COUNTER;
+            EVC_TRACE_STR("RDO check id ");
+            EVC_TRACE_INT((int)core.trace_idx);
+            EVC_TRACE_STR("\n");
+            evc_assert(core.trace_idx != 0);
+        #endif
+        #if TRACE_ENC_HISTORIC
+            //if (core.cu_mode != MODE_INTRA)
+            {
+                EVC_TRACE_COUNTER;
+                EVC_TRACE_STR("Historic (");
+                EVC_TRACE_INT((int)core.history_buffer.currCnt);
+                EVC_TRACE_STR("): ");
+                for (int i = 0; i < core.history_buffer.currCnt; ++i)
+                {
+                    EVC_TRACE_STR("(");
+                    EVC_TRACE_INT((int)core.history_buffer.history_mv_table[i][REFP_0][MV_X]);
+                    EVC_TRACE_STR(", ");
+                    EVC_TRACE_INT((int)core.history_buffer.history_mv_table[i][REFP_0][MV_Y]);
+                    EVC_TRACE_STR("; ");
+                    EVC_TRACE_INT((int)core.history_buffer.history_refi_table[i][REFP_0]);
+                    EVC_TRACE_STR("), (");
+                    EVC_TRACE_INT((int)core.history_buffer.history_mv_table[i][REFP_1][MV_X]);
+                    EVC_TRACE_STR(", ");
+                    EVC_TRACE_INT((int)core.history_buffer.history_mv_table[i][REFP_1][MV_Y]);
+                    EVC_TRACE_STR("; ");
+                    EVC_TRACE_INT((int)core.history_buffer.history_refi_table[i][REFP_1]);
+                    EVC_TRACE_STR("); ");
+                }
+                EVC_TRACE_STR("\n");
+            }
+        #endif
+
+        #if MVF_TRACE
+            // Trace MVF in encoder
+            {
+                s8(*map_refi)[REFP_NUM];
+                s16(*map_mv)[REFP_NUM][MV_D];
+                u32  *map_scu;
+                map_refi = self.map_refi + core.scup;
+                map_scu = self.map_scu + core.scup;
+                map_mv = self.map_mv + core.scup;
+
+                for(i = 0; i < h; i++)
+                {
+                    for(j = 0; j < w; j++)
+                    {
+                        EVC_TRACE_COUNTER;
+                        EVC_TRACE_STR(" x: ");
+                        EVC_TRACE_INT(j);
+                        EVC_TRACE_STR(" y: ");
+                        EVC_TRACE_INT(i);
+
+                        EVC_TRACE_STR(" ref0: ");
+                        EVC_TRACE_INT(map_refi[j][REFP_0]);
+                        EVC_TRACE_STR(" mv: ");
+                        EVC_TRACE_MV(map_mv[j][REFP_0][MV_X], map_mv[j][REFP_0][MV_Y]);
+
+                        EVC_TRACE_STR(" ref1: ");
+                        EVC_TRACE_INT(map_refi[j][REFP_1]);
+                        EVC_TRACE_STR(" mv: ");
+                        EVC_TRACE_MV(map_mv[j][REFP_1][MV_X], map_mv[j][REFP_1][MV_Y]);
+
+                        EVC_TRACE_STR(" affine: ");
+                        EVC_TRACE_INT(MCU_GET_AFF(map_scu[j]));
+                        if(MCU_GET_AFF(map_scu[j]))
+                        {
+                            EVC_TRACE_STR(" logw: ");
+                            EVC_TRACE_INT(MCU_GET_AFF_LOGW(map_affine[j]));
+                            EVC_TRACE_STR(" logh: ");
+                            EVC_TRACE_INT(MCU_GET_AFF_LOGH(map_affine[j]));
+                            EVC_TRACE_STR(" xoff: ");
+                            EVC_TRACE_INT(MCU_GET_AFF_XOFF(map_affine[j]));
+                            EVC_TRACE_STR(" yoff: ");
+                            EVC_TRACE_INT(MCU_GET_AFF_YOFF(map_affine[j]));
+                        }
+
+                        EVC_TRACE_STR("\n");
+                    }
+
+                    map_refi += self.w_scu;
+                    map_mv += self.w_scu;
+                    map_scu += self.w_scu;
+                }
+            }
+        #endif*/
+    }
+
+    fn cu_init(&mut self, x: u16, y: u16, cup: usize, cuw: u16, cuh: u16) {
+        let core = &mut self.core;
+        let cu_data = &mut self.map_cu_data[core.lcu_num as usize];
+
+        core.cuw = cuw;
+        core.cuh = cuh;
+        core.log2_cuw = CONV_LOG2(cuw as usize);
+        core.log2_cuh = CONV_LOG2(cuh as usize);
+        core.x_scu = PEL2SCU(x as usize) as u16;
+        core.y_scu = PEL2SCU(y as usize) as u16;
+        core.scup = (core.y_scu as u32 * self.w_scu as u32) + core.x_scu as u32;
+        core.avail_cu = 0;
+        core.skip_flag = false;
+        core.nnz[Y_C] = 0;
+        core.nnz[U_C] = 0;
+        core.nnz[V_C] = 0;
+        core.cu_mode = if evc_check_luma(&core.tree_cons) {
+            cu_data.pred_mode[cup as usize]
+        } else {
+            cu_data.pred_mode_chroma[cup as usize]
+        };
+
+        if core.cu_mode == PredMode::MODE_INTRA {
+            core.avail_cu = evc_get_avail_intra(
+                core.x_scu as usize,
+                core.y_scu as usize,
+                self.w_scu as usize,
+                self.h_scu as usize,
+                core.scup as usize,
+                core.log2_cuw,
+                core.log2_cuh,
+                &self.map_scu,
+            );
+        } else {
+            assert!(evc_check_luma(&core.tree_cons));
+
+            if cu_data.pred_mode[cup as usize] == PredMode::MODE_SKIP {
+                core.skip_flag = true;
+            }
+
+            core.avail_cu = evc_get_avail_inter(
+                core.x_scu as usize,
+                core.y_scu as usize,
+                self.w_scu as usize,
+                self.h_scu as usize,
+                core.scup as usize,
+                core.cuw as usize,
+                core.cuh as usize,
+                &self.map_scu,
+            );
+        }
+
+        core.avail_lr = evc_check_nev_avail(core.x_scu, core.y_scu, cuw, self.w_scu, &self.map_scu);
+    }
+
+    fn evce_set_enc_info(&mut self) {
+        let w_scu = self.w_scu as usize;
+        let scup = self.core.scup as usize;
+        let w_cu = (1 << self.core.log2_cuw as usize) >> MIN_CU_LOG2;
+        let h_cu = (1 << self.core.log2_cuh as usize) >> MIN_CU_LOG2;
+        let flag = if self.core.cu_mode == PredMode::MODE_INTRA {
+            1
+        } else {
+            0
+        };
+
+        //if let (Some(map_refi), Some(map_mv)) = (&mut self.map_refi, &mut self.map_mv) {
+        //    let (mut refis, mut mvs) = (map_refi.borrow_mut(), map_mv.borrow_mut());
+
+        if evc_check_luma(&self.core.tree_cons) {
+            for i in 0..h_cu {
+                let map_scu = &mut self.map_scu[scup + i * w_scu..];
+                let map_ipm = &mut self.map_ipm[scup + i * w_scu..];
+                let map_cu_mode = &mut self.map_cu_mode[scup + i * w_scu..];
+                //let refi = &mut refis[scup + i * w_scu..];
+                //let mv = &mut mvs[scup + i * w_scu..];
+
+                for j in 0..w_cu {
+                    if self.core.cu_mode == PredMode::MODE_SKIP {
+                        map_scu[j].SET_SF();
+                    } else {
+                        map_scu[j].CLR_SF();
+                    }
+                    if self.core.nnz[Y_C] > 0 {
+                        map_scu[j].SET_CBFL();
+                    } else {
+                        map_scu[j].CLR_CBFL();
+                    }
+
+                    map_cu_mode[j].SET_LOGW(self.core.log2_cuw as u32);
+                    map_cu_mode[j].SET_LOGH(self.core.log2_cuh as u32);
+
+                    if self.pps.cu_qp_delta_enabled_flag {
+                        map_scu[j].RESET_QP();
+                    }
+                    map_scu[j].SET_IF_COD_SN_QP(flag, self.slice_num as u32, self.core.qp);
+
+                    map_ipm[j] = self.core.ipm[0];
+
+                    /*refi[j][REFP_0] = self.core.refi[REFP_0];
+                    refi[j][REFP_1] = self.core.refi[REFP_1];
+                    mv[j][REFP_0][MV_X] = self.core.mv[REFP_0][MV_X];
+                    mv[j][REFP_0][MV_Y] = self.core.mv[REFP_0][MV_Y];
+                    mv[j][REFP_1][MV_X] = self.core.mv[REFP_1][MV_X];
+                    mv[j][REFP_1][MV_Y] = self.core.mv[REFP_1][MV_Y];*/
+                }
+            }
+        }
+        //}
     }
 }

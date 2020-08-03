@@ -313,3 +313,222 @@ pub(crate) fn evce_eco_xcoef(
         EVC_TRACE_STR("\n");
     #endif*/
 }
+
+pub(crate) fn coef_rect_to_series(
+    coef_dst: &mut CUBuffer<i16>,
+    coef_src: &Vec<Vec<i16>>,
+    log2_max_cuwh: u8,
+    mut x: u16,
+    mut y: u16,
+    mut cuw: u16,
+    mut cuh: u16,
+    tree_cons: &TREE_CONS,
+) {
+    let max_cuwh = 1u16 << log2_max_cuwh;
+
+    let mut sidx = ((x & (max_cuwh - 1)) + ((y & (max_cuwh - 1)) << log2_max_cuwh)) as usize;
+    let mut didx = 0;
+
+    if evc_check_luma(tree_cons) {
+        for j in 0..cuh as usize {
+            for i in 0..cuw as usize {
+                coef_dst.data[Y_C][didx] = coef_src[Y_C][sidx + i];
+                didx += 1;
+            }
+            sidx += max_cuwh as usize;
+        }
+    }
+
+    if evc_check_chroma(tree_cons) {
+        x >>= 1;
+        y >>= 1;
+        cuw >>= 1;
+        cuh >>= 1;
+
+        sidx = ((x & ((max_cuwh >> 1) - 1)) + ((y & ((max_cuwh >> 1) - 1)) << (log2_max_cuwh - 1)))
+            as usize;
+        didx = 0;
+
+        for j in 0..cuh as usize {
+            for i in 0..cuw as usize {
+                coef_dst.data[U_C][didx] = coef_src[U_C][sidx + i];
+                coef_dst.data[V_C][didx] = coef_src[V_C][sidx + i];
+                didx += 1;
+            }
+            sidx += (max_cuwh >> 1) as usize;
+        }
+    }
+}
+
+pub(crate) fn evce_eco_skip_flag(
+    bs: &mut EvceBsw,
+    sbac: &mut EvceSbac,
+    sbac_ctx: &mut EvcSbacCtx,
+    flag: u32,
+    ctx: usize,
+) {
+    sbac.encode_bin(bs, &mut sbac_ctx.skip_flag[ctx], flag);
+
+    /*    EVC_TRACE_COUNTER;
+    EVC_TRACE_STR("skip flag ");
+    EVC_TRACE_INT(flag);
+    EVC_TRACE_STR("ctx ");
+    EVC_TRACE_INT(ctx);
+    EVC_TRACE_STR("\n");*/
+}
+
+pub(crate) fn evce_eco_mvp_idx(
+    bs: &mut EvceBsw,
+    sbac: &mut EvceSbac,
+    sbac_ctx: &mut EvcSbacCtx,
+    mvp_idx: u32,
+) {
+    sbac.write_truncate_unary_sym(bs, &mut sbac_ctx.mvp_idx, mvp_idx, 3, 4);
+
+    /*EVC_TRACE_COUNTER;
+    EVC_TRACE_STR("mvp idx ");
+    EVC_TRACE_INT(mvp_idx);
+    EVC_TRACE_STR("\n");*/
+}
+
+pub(crate) fn evce_eco_direct_mode_flag(
+    bs: &mut EvceBsw,
+    sbac: &mut EvceSbac,
+    sbac_ctx: &mut EvcSbacCtx,
+    direct_mode_flag: u32,
+) {
+    sbac.encode_bin(bs, &mut sbac_ctx.direct_mode_flag[0], direct_mode_flag);
+
+    /* EVC_TRACE_COUNTER;
+    EVC_TRACE_STR("direct_mode_flag ");
+    EVC_TRACE_INT(direct_mode_flag ? PRED_DIR : 0);
+    EVC_TRACE_STR("\n");*/
+}
+
+pub(crate) fn evce_eco_inter_pred_idc(
+    bs: &mut EvceBsw,
+    sbac: &mut EvceSbac,
+    sbac_ctx: &mut EvcSbacCtx,
+    refi: &[i8],
+    slice_type: SliceType,
+) {
+    if REFI_IS_VALID(refi[REFP_0]) && REFI_IS_VALID(refi[REFP_1]) {
+        /* PRED_BI */
+        assert!(check_bi_applicability(slice_type));
+        sbac.encode_bin(bs, &mut sbac_ctx.inter_dir[0], 0);
+    } else {
+        if check_bi_applicability(slice_type) {
+            sbac.encode_bin(bs, &mut sbac_ctx.inter_dir[0], 1);
+        }
+
+        if REFI_IS_VALID(refi[REFP_0]) {
+            /* PRED_L0 */
+            sbac.encode_bin(bs, &mut sbac_ctx.inter_dir[1], 0);
+        } else
+        /* PRED_L1 */
+        {
+            sbac.encode_bin(bs, &mut sbac_ctx.inter_dir[1], 1);
+        }
+    }
+    /*
+    #if ENC_DEC_TRACE
+        EVC_TRACE_COUNTER;
+        EVC_TRACE_STR("inter dir ");
+        EVC_TRACE_INT(REFI_IS_VALID(refi[REFP_0]) && REFI_IS_VALID(refi[REFP_1])? PRED_BI : (REFI_IS_VALID(refi[REFP_0]) ? PRED_L0 : PRED_L1));
+        EVC_TRACE_STR("\n");
+    #endif*/
+}
+
+pub(crate) fn evce_eco_refi(
+    bs: &mut EvceBsw,
+    sbac: &mut EvceSbac,
+    sbac_ctx: &mut EvcSbacCtx,
+    num_refp: u8,
+    refi: i8,
+) {
+    if num_refp > 1 {
+        if refi == 0 {
+            sbac.encode_bin(bs, &mut sbac_ctx.refi[0], 0);
+        } else {
+            sbac.encode_bin(bs, &mut sbac_ctx.refi[0], 1);
+            if num_refp > 2 {
+                for i in 2..num_refp {
+                    let bin = if i as i8 == (refi + 1) { 0 } else { 1 };
+                    if i == 2 {
+                        sbac.encode_bin(bs, &mut sbac_ctx.refi[1], bin);
+                    } else {
+                        sbac.encode_bin_ep(bs, bin);
+                    }
+                    if bin == 0 {
+                        break;
+                    }
+                }
+            }
+        }
+    }
+}
+
+fn evce_eco_abs_mvd(bs: &mut EvceBsw, sbac: &mut EvceSbac, model: &mut SBAC_CTX_MODEL, sym: u32) {
+    let val = sym;
+
+    let mut nn = ((val + 1) >> 1);
+    let mut len_i = 0;
+    while len_i < 16 && nn != 0 {
+        nn >>= 1;
+        len_i += 1;
+    }
+
+    let info = val + 1 - (1 << len_i);
+    let code = (1 << len_i) | ((info) & ((1 << len_i) - 1));
+
+    let len_c = (len_i << 1) + 1;
+
+    for i in 0..len_c {
+        let bin = (code >> (len_c - 1 - i)) & 0x01;
+        if i <= 1 {
+            sbac.encode_bin(bs, model, bin); /* use one context model for two bins */
+        } else {
+            sbac.encode_bin_ep(bs, bin);
+        }
+    }
+}
+
+pub(crate) fn evce_eco_mvd(
+    bs: &mut EvceBsw,
+    sbac: &mut EvceSbac,
+    sbac_ctx: &mut EvcSbacCtx,
+    mvd: &[i16],
+) {
+    let mut t0 = 0;
+
+    let mut mv = mvd[MV_X];
+    if mvd[MV_X] < 0 {
+        t0 = 1;
+        mv = -mvd[MV_X];
+    }
+    evce_eco_abs_mvd(bs, sbac, &mut sbac_ctx.mvd[0], mv as u32);
+
+    if mv != 0 {
+        sbac.encode_bin_ep(bs, t0);
+    }
+
+    t0 = 0;
+    mv = mvd[MV_Y];
+    if mvd[MV_Y] < 0 {
+        t0 = 1;
+        mv = -mvd[MV_Y];
+    }
+
+    evce_eco_abs_mvd(bs, sbac, &mut sbac_ctx.mvd[0], mv as u32);
+
+    if mv != 0 {
+        sbac.encode_bin_ep(bs, t0);
+    }
+
+    /*EVC_TRACE_COUNTER;
+    EVC_TRACE_STR("mvd x ");
+    EVC_TRACE_INT(mvd[MV_X]);
+    EVC_TRACE_STR("mvd y ");
+    EVC_TRACE_INT(mvd[MV_Y]);
+    EVC_TRACE_STR("\n");*/
+}

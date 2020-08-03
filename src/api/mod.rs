@@ -148,6 +148,18 @@ impl Default for SliceType {
     }
 }
 
+impl SliceType {
+    #[inline]
+    pub(crate) fn IS_INTRA_SLICE(&self) -> bool {
+        *self == SliceType::EVC_ST_I
+    }
+
+    #[inline]
+    pub(crate) fn IS_INTER_SLICE(&self) -> bool {
+        *self == SliceType::EVC_ST_P || *self == SliceType::EVC_ST_B
+    }
+}
+
 /*****************************************************************************
  * status after decoder/encoder operation
  *****************************************************************************/
