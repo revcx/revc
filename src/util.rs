@@ -85,7 +85,7 @@ pub(crate) struct EvcSplitStruct {
     pub(crate) x_pos: [u16; SPLIT_MAX_PART_COUNT],
     pub(crate) y_pos: [u16; SPLIT_MAX_PART_COUNT],
     pub(crate) cup: [u16; SPLIT_MAX_PART_COUNT],
-    //tree_cons: TREE_CONS,
+    pub(crate) tree_cons: TREE_CONS,
 }
 
 pub(crate) fn evc_split_get_part_structure(

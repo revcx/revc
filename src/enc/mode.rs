@@ -7,7 +7,7 @@ use crate::plane::*;
 
 #[derive(Default)]
 pub(crate) struct EvceCUData {
-    split_mode: LcuSplitMode,
+    pub(crate) split_mode: LcuSplitMode,
     qp_y: Vec<u8>,
     qp_u: Vec<u8>,
     qp_v: Vec<u8>,

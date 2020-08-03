@@ -64,7 +64,7 @@ pub(crate) const PIC_IDX_MODE: usize = 4;
 pub(crate) const PIC_D: usize = 5;
 
 /* check whether bumping is progress or not */
-// FORCE_OUT(ctx)          (ctx->param.force_output == 1)
+// FORCE_OUT(ctx)          (self.param.force_output == 1)
 
 /* motion vector accuracy level for inter-mode decision */
 pub(crate) const ME_LEV_IPEL: usize = 1;
@@ -109,7 +109,7 @@ pub(crate) struct EvceDQP {
     prev_QP: u8,
     curr_QP: u8,
     cu_qp_delta_is_coded: bool,
-    cu_qp_delta_code: i8,
+    cu_qp_delta_code: u8,
 }
 
 #[derive(Default)]
@@ -148,7 +148,7 @@ pub(crate) struct EvceCore {
     lcu_num: u16,
     /*QP for current encoding CU. Used to derive Luma and chroma qp*/
     qp: u8,
-    cu_qp_delta_code: i8,
+    cu_qp_delta_code: u8,
     cu_qp_delta_is_coded: bool,
     cu_qp_delta_code_mode: u8,
     qp_prev_eco: u8,
@@ -878,10 +878,10 @@ impl EvceCtx {
 
             /*if self.sps.picture_cropping_flag {
                 PIC_CURR(ctx)->imgb->crop_idx = 1;
-                PIC_CURR(ctx)->imgb->crop_l = ctx->sps.picture_crop_left_offset;
-                PIC_CURR(ctx)->imgb->crop_r = ctx->sps.picture_crop_right_offset;
-                PIC_CURR(ctx)->imgb->crop_t = ctx->sps.picture_crop_top_offset;
-                PIC_CURR(ctx)->imgb->crop_b = ctx->sps.picture_crop_bottom_offset;
+                PIC_CURR(ctx)->imgb->crop_l = self.sps.picture_crop_left_offset;
+                PIC_CURR(ctx)->imgb->crop_r = self.sps.picture_crop_right_offset;
+                PIC_CURR(ctx)->imgb->crop_t = self.sps.picture_crop_top_offset;
+                PIC_CURR(ctx)->imgb->crop_b = self.sps.picture_crop_bottom_offset;
             }*/
 
             self.pic[PIC_IDX_MODE] = Some(Rc::clone(pic));
@@ -906,17 +906,17 @@ impl EvceCtx {
 
         //TODO: initialize map here?
         /*
-        size = sizeof(s8) * ctx->f_scu * REFP_NUM;
-        evc_mset_x64a(ctx->map_refi, -1, size);
+        size = sizeof(s8) * self.f_scu * REFP_NUM;
+        evc_mset_x64a(self.map_refi, -1, size);
 
-        size = sizeof(s16) * ctx->f_scu * REFP_NUM * MV_D;
-        evc_mset_x64a(ctx->map_mv, 0, size);
+        size = sizeof(s16) * self.f_scu * REFP_NUM * MV_D;
+        evc_mset_x64a(self.map_mv, 0, size);
         /* initialize bitstream container */
-        evc_bsw_init(&ctx->bs, bitb->addr, bitb->bsize, NULL);
+        evc_bsw_init(&self.bs, bitb->addr, bitb->bsize, NULL);
 
         /* clear map */
-        evc_mset_x64a(ctx->map_scu, 0, sizeof(u32) * ctx->f_scu);
-        evc_mset_x64a(ctx->map_cu_mode, 0, sizeof(u32) * ctx->f_scu);
+        evc_mset_x64a(self.map_scu, 0, sizeof(u32) * self.f_scu);
+        evc_mset_x64a(self.map_cu_mode, 0, sizeof(u32) * self.f_scu);
         */
 
         //TODO: support MULTIPLE_NAL?
@@ -1086,7 +1086,7 @@ impl EvceCtx {
         //TODO: adding picture signature
 
         /* expand current encoding picture, if needs */
-        //ctx->fn_picbuf_expand(ctx, PIC_CURR(ctx));
+        //self.fn_picbuf_expand(ctx, PIC_CURR(ctx));
         let pic_curr = &self.pic[PIC_IDX_CURR];
         if let Some(pic) = &pic_curr {
             let frame = &pic.borrow().frame;
@@ -1214,7 +1214,7 @@ impl EvceCtx {
 
                 /* flush the first IDR picture */
                 self.pic[PIC_IDX_ORIG] = Some(Rc::clone(&self.pico_buf[0].pic));
-            //ctx->pico = ctx->pico_buf[0];
+            //self.pico = self.pico_buf[0];
             } else if self.force_slice {
                 force_cnt = self.force_ignored_cnt as usize;
                 while (force_cnt < gop_size) {
@@ -1320,7 +1320,7 @@ impl EvceCtx {
         sh.deblocking_filter_on = if self.param.disable_dbf { false } else { true };
 
         /* set lambda */
-        let mut qp = self.qp as i8; //EVC_CLIP3(0, MAX_QUANT, (ctx->param.qp_incread_frame != 0 && (int)(ctx->poc.poc_val) >= ctx->param.qp_incread_frame) ? ctx->qp + 1.0 : ctx->qp);
+        let mut qp = self.qp as i8; //EVC_CLIP3(0, MAX_QUANT, (self.param.qp_incread_frame != 0 && (int)(self.poc.poc_val) >= self.param.qp_incread_frame) ? self.qp + 1.0 : self.qp);
 
         if !self.param.disable_hgop {
             qp += qp_adapt_param[self.slice_depth as usize].qp_offset_layer;
@@ -1354,7 +1354,7 @@ impl EvceCtx {
         self.sqrt_lambda[2] = self.lambda[2].sqrt();
     }
 
-    pub(crate) fn evce_eco_coef(
+    fn evce_eco_coef(
         &mut self,
         log2_cuw: u8,
         log2_cuh: u8,
@@ -1428,6 +1428,126 @@ impl EvceCtx {
                     c,
                 );
             }
+        }
+    }
+
+    fn evce_eco_tree(
+        &mut self,
+        x0: u16,
+        y0: u16,
+        cuw: u16,
+        cuh: u16,
+        cup: u16,
+        cud: u16,
+        next_split: bool,
+        qt_depth: u8,
+        mut cu_qp_delta_code: u8,
+        tree_cons: TREE_CONS,
+    ) {
+        let core = &mut self.core;
+        let bs = &mut self.bs;
+        let sbac = &mut self.sbac_enc;
+        let sbac_ctx = &mut self.sbac_ctx;
+
+        core.tree_cons = tree_cons;
+
+        let split_mode = evc_get_split_mode(
+            cud,
+            cup,
+            cuw,
+            cuh,
+            self.max_cuwh,
+            &self.map_cu_data[core.lcu_num as usize].split_mode,
+        );
+
+        //same_layer_split[node_idx] = split_mode;
+
+        if self.pps.cu_qp_delta_enabled_flag && self.sps.dquant_flag {
+            if split_mode == SplitMode::NO_SPLIT
+                && (CONV_LOG2(cuw as usize) + CONV_LOG2(cuh as usize) >= self.pps.cu_qp_delta_area)
+                && cu_qp_delta_code != 2
+            {
+                if CONV_LOG2(cuw as usize) == 7 || CONV_LOG2(cuh as usize) == 7 {
+                    cu_qp_delta_code = 2;
+                } else {
+                    cu_qp_delta_code = 1;
+                }
+                core.cu_qp_delta_is_coded = false;
+            } else if CONV_LOG2(cuh as usize) + CONV_LOG2(cuw as usize) == self.pps.cu_qp_delta_area
+                && cu_qp_delta_code != 2
+            {
+                cu_qp_delta_code = 2;
+                core.cu_qp_delta_is_coded = false;
+            }
+        }
+
+        if split_mode != SplitMode::NO_SPLIT {
+            evce_eco_split_mode(
+                bs,
+                sbac,
+                sbac_ctx,
+                cud,
+                cup,
+                cuw,
+                cuh,
+                self.max_cuwh,
+                &self.map_cu_data[core.lcu_num as usize].split_mode,
+            );
+
+            let split_struct = evc_split_get_part_structure(
+                split_mode,
+                x0,
+                y0,
+                cuw,
+                cuh,
+                cup,
+                cud,
+                self.log2_culine,
+            );
+
+            for cur_part_num in 0..split_struct.part_count {
+                let sub_cuw = split_struct.width[cur_part_num];
+                let sub_cuh = split_struct.height[cur_part_num];
+                let x_pos = split_struct.x_pos[cur_part_num];
+                let y_pos = split_struct.y_pos[cur_part_num];
+
+                if x_pos < self.w && y_pos < self.h {
+                    self.evce_eco_tree(
+                        x_pos,
+                        y_pos,
+                        sub_cuw,
+                        sub_cuh,
+                        split_struct.cup[cur_part_num],
+                        split_struct.cud[cur_part_num],
+                        true,
+                        split_mode.inc_qt_depth(qt_depth),
+                        cu_qp_delta_code,
+                        split_struct.tree_cons,
+                    );
+                }
+            }
+        } else {
+            assert!(x0 + cuw <= self.w && y0 + cuh <= self.h);
+
+            if (cuw > MIN_CU_SIZE as u16 || cuh > MIN_CU_SIZE as u16)
+                && next_split
+                && evc_check_luma(&core.tree_cons)
+            {
+                evce_eco_split_mode(
+                    bs,
+                    sbac,
+                    sbac_ctx,
+                    cud,
+                    cup,
+                    cuw,
+                    cuh,
+                    self.max_cuwh,
+                    &self.map_cu_data[core.lcu_num as usize].split_mode,
+                );
+            }
+
+            core.cu_qp_delta_code = cu_qp_delta_code;
+            //evce_eco_unit(ctx, core, x0, y0, cup, cuw, cuh, tree_cons);
         }
     }
 }
