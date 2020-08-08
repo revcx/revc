@@ -66,6 +66,15 @@ impl EvceBsw {
         self.flush();
     }
 
+    pub(crate) fn write_nalu_size(&mut self) {
+        let size = self.GET_WRITE_BYTE() - 4;
+
+        self.pkt.data[0] = (size & 0x000000ff) as u8; //TBC(@Chernyak): is there a better way?
+        self.pkt.data[1] = ((size & 0x0000ff00) >> 8) as u8;
+        self.pkt.data[2] = ((size & 0x00ff0000) >> 16) as u8;
+        self.pkt.data[3] = ((size & 0xff000000) >> 24) as u8;
+    }
+
     pub(crate) fn write1(&mut self, val: u32, name: Option<&str>) {
         if let Some(name) = name {
             EVC_TRACE(&mut self.tracer, name);

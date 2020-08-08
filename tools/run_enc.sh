@@ -13,3 +13,4 @@ done
 
 
 # ./ffmpeg.exe -i foreman_qcif.y4m -vframes 8 -f yuv4mpegpipe foreman_qcif8.y4m
+# ./ffmpeg.exe -i foreman_qcif.y4m -vframes 8 -vf scale=16x16 foreman_mb8.yuv

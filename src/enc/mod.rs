@@ -673,9 +673,9 @@ impl EvceCtx {
             sbac_enc: EvceSbac::default(),
             sbac_ctx: EvcSbacCtx::default(),
             /* bitstream structure */
-            bs: EvceBsw::new(),
+            bs: EvceBsw::default(),
             /* bitstream structure for RDO */
-            bs_temp: EvceBsw::new(),
+            bs_temp: EvceBsw::default(),
             /* sequnce parameter set */
             sps: EvcSps::default(),
             /* picture parameter set */
@@ -912,10 +912,13 @@ impl EvceCtx {
 
         size = sizeof(s16) * self.f_scu * REFP_NUM * MV_D;
         evc_mset_x64a(self.map_mv, 0, size);
+         */
+
         /* initialize bitstream container */
-        evc_bsw_init(&self.bs, bitb->addr, bitb->bsize, NULL);
+        self.bs.init();
 
         /* clear map */
+        /*
         evc_mset_x64a(self.map_scu, 0, sizeof(u32) * self.f_scu);
         evc_mset_x64a(self.map_cu_mode, 0, sizeof(u32) * self.f_scu);
         */
@@ -2054,13 +2057,13 @@ impl EvceCtx {
 
         /* sequence parameter set*/
         self.set_sps();
-        //evce_eco_sps(bs, sps);
+        evce_eco_sps(&mut self.bs, &self.sps);
 
         /* de-init BSW */
         self.bs.deinit();
 
         /* write the bitstream size */
-        //evce_bsw_write_nalu_size(bs);
+        self.bs.write_nalu_size();
 
         /* set stat ***************************************************************/
         //evc_mset(stat, 0, sizeof(EVCE_STAT));

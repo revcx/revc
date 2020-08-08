@@ -4,15 +4,170 @@ use super::util::*;
 use crate::api::*;
 use crate::def::*;
 use crate::tbl::*;
+use crate::tracer::*;
 use crate::util::*;
 
 pub(crate) fn evce_eco_nalu(bs: &mut EvceBsw, nalu: &EvcNalu) {
     bs.write(nalu.nal_unit_size, 32, None);
-    bs.write(nalu.forbidden_zero_bit as u32, 1, None);
-    bs.write(nalu.nal_unit_type as u32 + 1, 6, None);
-    bs.write(nalu.nuh_temporal_id as u32, 3, None);
-    bs.write(nalu.nuh_reserved_zero_5bits as u32, 5, None);
-    bs.write(nalu.nuh_extension_flag as u32, 1, None);
+    bs.write(
+        nalu.forbidden_zero_bit as u32,
+        1,
+        Some("nalu->forbidden_zero_bit"),
+    );
+    bs.write(
+        nalu.nal_unit_type as u32 + 1,
+        6,
+        Some("nalu->nal_unit_type_plus1"),
+    );
+    bs.write(
+        nalu.nuh_temporal_id as u32,
+        3,
+        Some("nalu->nuh_temporal_id"),
+    );
+    bs.write(
+        nalu.nuh_reserved_zero_5bits as u32,
+        5,
+        Some("nalu->nuh_reserved_zero_5bits"),
+    );
+    bs.write(
+        nalu.nuh_extension_flag as u32,
+        1,
+        Some("nalu->nuh_extension_flag"),
+    );
+}
+
+pub(crate) fn evce_eco_sps(bs: &mut EvceBsw, sps: &EvcSps) {
+    EVC_TRACE(&mut bs.tracer, "***********************************\n");
+    EVC_TRACE(&mut bs.tracer, "************ SPS Start ************\n");
+
+    bs.write_ue(
+        sps.sps_seq_parameter_set_id as u32,
+        Some("sps->sps_seq_parameter_set_id"),
+    );
+    bs.write(sps.profile_idc as u32, 8, Some("sps->profile_idc"));
+    bs.write(sps.level_idc as u32, 8, Some("sps->level_idc"));
+    bs.write(sps.toolset_idc_h, 32, Some("sps->toolset_idc_h"));
+    bs.write(sps.toolset_idc_l, 32, Some("sps->toolset_idc_l"));
+    bs.write_ue(sps.chroma_format_idc as u32, Some("sps->chroma_format_idc"));
+    bs.write_ue(
+        sps.pic_width_in_luma_samples as u32,
+        Some("sps->pic_width_in_luma_samples"),
+    );
+    bs.write_ue(
+        sps.pic_height_in_luma_samples as u32,
+        Some("sps->pic_height_in_luma_samples"),
+    );
+    bs.write_ue(
+        sps.bit_depth_luma_minus8 as u32,
+        Some("sps->bit_depth_luma_minus8"),
+    );
+    bs.write_ue(
+        sps.bit_depth_chroma_minus8 as u32,
+        Some("sps->bit_depth_chroma_minus8"),
+    );
+    bs.write1(sps.sps_btt_flag as u32, Some("sps->sps_btt_flag"));
+    bs.write1(sps.sps_suco_flag as u32, Some("sps->sps_suco_flag"));
+    bs.write1(sps.tool_admvp as u32, Some("sps->tool_admvp"));
+    bs.write1(sps.tool_eipd as u32, Some("sps->tool_eipd"));
+    bs.write1(sps.tool_cm_init as u32, Some("sps->tool_cm_init"));
+    bs.write1(sps.tool_iqt as u32, Some("sps->tool_iqt"));
+    bs.write1(sps.tool_addb as u32, Some("sps->tool_addb"));
+    bs.write1(sps.tool_alf as u32, Some("sps->tool_alf"));
+    bs.write1(sps.tool_htdf as u32, Some("sps->tool_htdf"));
+    bs.write1(sps.tool_rpl as u32, Some("sps->tool_rpl"));
+    bs.write1(sps.tool_pocs as u32, Some("sps->tool_pocs"));
+    bs.write1(sps.dquant_flag as u32, Some("sps->dquant_flag"));
+    bs.write1(sps.tool_dra as u32, Some("sps->tool_dra"));
+    if !sps.tool_rpl || !sps.tool_pocs {
+        bs.write_ue(
+            sps.log2_sub_gop_length as u32,
+            Some("sps->log2_sub_gop_length"),
+        );
+        if sps.log2_sub_gop_length == 0 {
+            bs.write_ue(
+                sps.log2_ref_pic_gap_length as u32,
+                Some("sps->log2_ref_pic_gap_length"),
+            );
+        }
+    }
+    if !sps.tool_rpl {
+        bs.write_ue(sps.max_num_ref_pics as u32, Some("sps->max_num_ref_pics"));
+    }
+
+    bs.write1(
+        sps.picture_cropping_flag as u32,
+        Some("sps->picture_cropping_flag"),
+    );
+    if sps.picture_cropping_flag {
+        bs.write_ue(
+            sps.picture_crop_left_offset as u32,
+            Some("sps->picture_crop_left_offset"),
+        );
+        bs.write_ue(
+            sps.picture_crop_right_offset as u32,
+            Some("sps->picture_crop_right_offset"),
+        );
+        bs.write_ue(
+            sps.picture_crop_top_offset as u32,
+            Some("sps->picture_crop_top_offset"),
+        );
+        bs.write_ue(
+            sps.picture_crop_bottom_offset as u32,
+            Some("sps->picture_crop_bottom_offset"),
+        );
+    }
+
+    if sps.chroma_format_idc != 0 {
+        bs.write1(
+            sps.chroma_qp_table_struct.chroma_qp_table_present_flag as u32,
+            Some("sps->chroma_qp_table_struct.chroma_qp_table_present_flag"),
+        );
+        if sps.chroma_qp_table_struct.chroma_qp_table_present_flag {
+            bs.write1(
+                sps.chroma_qp_table_struct.same_qp_table_for_chroma as u32,
+                Some("sps->chroma_qp_table_struct.same_qp_table_for_chroma"),
+            );
+            bs.write1(
+                sps.chroma_qp_table_struct.global_offset_flag as u32,
+                Some("sps->chroma_qp_table_struct.global_offset_flag"),
+            );
+            for i in 0..if sps.chroma_qp_table_struct.same_qp_table_for_chroma {
+                1
+            } else {
+                2
+            } {
+                bs.write_ue(
+                    sps.chroma_qp_table_struct.num_points_in_qp_table_minus1[i] as u32,
+                    Some("sps->chroma_qp_table_struct.num_points_in_qp_table_minus1[i]"),
+                );
+                for j in 0..=sps.chroma_qp_table_struct.num_points_in_qp_table_minus1[i] {
+                    bs.write(
+                        sps.chroma_qp_table_struct.delta_qp_in_val_minus1[i][j] as u32,
+                        6,
+                        Some("sps->chroma_qp_table_struct.delta_qp_in_val_minus1[i][j]"),
+                    );
+                    bs.write_se(
+                        sps.chroma_qp_table_struct.delta_qp_out_val[i][j] as i32,
+                        Some("sps->chroma_qp_table_struct.delta_qp_out_val[i][j]"),
+                    );
+                }
+            }
+        }
+    }
+
+    bs.write1(
+        sps.vui_parameters_present_flag as u32,
+        Some("sps->vui_parameters_present_flag"),
+    );
+    if sps.vui_parameters_present_flag {
+        //evce_eco_vui(bs, &(sps.vui_parameters));
+    }
+    while !bs.IS_BYTE_ALIGN() {
+        bs.write1(0, Some("t0"));
+    }
+
+    EVC_TRACE(&mut bs.tracer, "************ SPS End   ************\n");
+    EVC_TRACE(&mut bs.tracer, "***********************************\n");
 }
 
 pub(crate) fn evce_eco_tile_end_flag(bs: &mut EvceBsw, sbac: &mut EvceSbac, flag: u32) {
