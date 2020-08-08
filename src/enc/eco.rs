@@ -170,6 +170,81 @@ pub(crate) fn evce_eco_sps(bs: &mut EvceBsw, sps: &EvcSps) {
     EVC_TRACE(&mut bs.tracer, "***********************************\n");
 }
 
+pub(crate) fn evce_eco_pps(bs: &mut EvceBsw, sps: &EvcSps, pps: &EvcPps) {
+    EVC_TRACE(&mut bs.tracer, "***********************************\n");
+    EVC_TRACE(&mut bs.tracer, "************ PPS Start ************\n");
+
+    bs.write_ue(
+        pps.pps_pic_parameter_set_id as u32,
+        Some("pps->pps_pic_parameter_set_id"),
+    );
+    bs.write_ue(
+        pps.pps_seq_parameter_set_id as u32,
+        Some("pps->pps_seq_parameter_set_id"),
+    );
+    bs.write_ue(
+        pps.num_ref_idx_default_active_minus1[0] as u32,
+        Some("pps->num_ref_idx_default_active_minus1[0]"),
+    );
+    bs.write_ue(
+        pps.num_ref_idx_default_active_minus1[1] as u32,
+        Some("pps->num_ref_idx_default_active_minus1[1]"),
+    );
+    bs.write_ue(
+        pps.additional_lt_poc_lsb_len as u32,
+        Some("pps->additional_lt_poc_lsb_len"),
+    );
+    bs.write1(
+        pps.rpl1_idx_present_flag as u32,
+        Some("pps->rpl1_idx_present_flag"),
+    );
+    bs.write1(
+        pps.single_tile_in_pic_flag as u32,
+        Some("pps->single_tile_in_pic_flag"),
+    );
+
+    bs.write_ue(
+        pps.tile_id_len_minus1 as u32,
+        Some("pps->tile_id_len_minus1"),
+    );
+    bs.write1(
+        pps.explicit_tile_id_flag as u32,
+        Some("pps->explicit_tile_id_flag"),
+    );
+
+    bs.write1(
+        pps.pic_dra_enabled_flag as u32,
+        Some("pps->pic_dra_enabled_flag"),
+    );
+
+    bs.write1(
+        pps.arbitrary_slice_present_flag as u32,
+        Some("pps->arbitrary_slice_present_flag"),
+    );
+    bs.write1(
+        pps.constrained_intra_pred_flag as u32,
+        Some("pps->constrained_intra_pred_flag"),
+    );
+
+    bs.write1(
+        pps.cu_qp_delta_enabled_flag as u32,
+        Some("pps->cu_qp_delta_enabled_flag"),
+    );
+    if pps.cu_qp_delta_enabled_flag {
+        bs.write_ue(
+            (pps.cu_qp_delta_area - 6) as u32,
+            Some("pps->cu_qp_delta_area"),
+        );
+    }
+
+    while !bs.IS_BYTE_ALIGN() {
+        bs.write1(0, Some("t0"));
+    }
+
+    EVC_TRACE(&mut bs.tracer, "************ PPS End   ************\n");
+    EVC_TRACE(&mut bs.tracer, "***********************************\n");
+}
+
 pub(crate) fn evce_eco_tile_end_flag(bs: &mut EvceBsw, sbac: &mut EvceSbac, flag: u32) {
     sbac.encode_bin_trm(bs, flag);
 }

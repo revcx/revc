@@ -2070,4 +2070,30 @@ impl EvceCtx {
         //stat->write = EVC_BSW_GET_WRITE_BYTE(bs);
         //stat->nalu_type = EVC_SPS_NUT;
     }
+
+    fn evce_encode_pps(&mut self) {
+        /* bitsteam initialize for sequence */
+        self.bs.init();
+
+        /* nalu header */
+        self.nalu
+            .set_nalu(NaluType::EVC_PPS_NUT, self.nalu.nuh_temporal_id);
+
+        evce_eco_nalu(&mut self.bs, &self.nalu);
+
+        /* sequence parameter set*/
+        self.set_pps();
+        evce_eco_pps(&mut self.bs, &self.sps, &self.pps);
+
+        /* de-init BSW */
+        self.bs.deinit();
+
+        /* write the bitstream size */
+        self.bs.write_nalu_size();
+
+        /* set stat ***************************************************************/
+        //evc_mset(stat, 0, sizeof(EVCE_STAT));
+        //stat->write = EVC_BSW_GET_WRITE_BYTE(bs);
+        //stat->nalu_type = EVC_PPS_NUT;
+    }
 }
