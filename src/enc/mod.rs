@@ -26,6 +26,7 @@ use sbac::*;
 use tbl::*;
 use util::*;
 
+use crate::tracer::{Tracer, OPEN_TRACE};
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -455,6 +456,8 @@ pub(crate) struct EvceCtx {
     /* SBAC */
     sbac_enc: EvceSbac,
     sbac_ctx: EvcSbacCtx,
+    /* debug tracer */
+    tracer: Option<Tracer>,
     /* bitstream structure */
     bs: EvceBsw,
     /* bitstream structure for RDO */
@@ -672,6 +675,7 @@ impl EvceCtx {
             /* SBAC */
             sbac_enc: EvceSbac::default(),
             sbac_ctx: EvcSbacCtx::default(),
+            tracer: OPEN_TRACE(),
             /* bitstream structure */
             bs: EvceBsw::default(),
             /* bitstream structure for RDO */
@@ -898,6 +902,11 @@ impl EvceCtx {
 
         self.decide_slice_type();
 
+        if self.slice_type == SliceType::EVC_ST_I {
+            self.evce_encode_sps();
+            self.evce_encode_pps();
+        }
+
         self.lcu_cnt = self.f_lcu;
         self.slice_num = 0;
 
@@ -915,7 +924,7 @@ impl EvceCtx {
          */
 
         /* initialize bitstream container */
-        self.bs.init();
+        self.bs.init(&mut self.tracer);
 
         /* clear map */
         /*
@@ -2048,7 +2057,7 @@ impl EvceCtx {
 
     fn evce_encode_sps(&mut self) {
         /* bitsteam initialize for sequence */
-        self.bs.init();
+        self.bs.init(&mut self.tracer);
 
         /* nalu header */
         self.nalu.set_nalu(NaluType::EVC_SPS_NUT, 0);
@@ -2060,7 +2069,7 @@ impl EvceCtx {
         evce_eco_sps(&mut self.bs, &self.sps);
 
         /* de-init BSW */
-        self.bs.deinit();
+        self.tracer = self.bs.deinit();
 
         /* write the bitstream size */
         self.bs.write_nalu_size();
@@ -2069,11 +2078,16 @@ impl EvceCtx {
         //evc_mset(stat, 0, sizeof(EVCE_STAT));
         //stat->write = EVC_BSW_GET_WRITE_BYTE(bs);
         //stat->nalu_type = EVC_SPS_NUT;
+
+        /* append bs.pkt to ctx.pkt */
+        if let Some(pkt) = self.bs.pkt.take() {
+            self.pkt.extend_from_slice(&pkt.data);
+        }
     }
 
     fn evce_encode_pps(&mut self) {
         /* bitsteam initialize for sequence */
-        self.bs.init();
+        self.bs.init(&mut self.tracer);
 
         /* nalu header */
         self.nalu
@@ -2086,7 +2100,7 @@ impl EvceCtx {
         evce_eco_pps(&mut self.bs, &self.sps, &self.pps);
 
         /* de-init BSW */
-        self.bs.deinit();
+        self.tracer = self.bs.deinit();
 
         /* write the bitstream size */
         self.bs.write_nalu_size();
@@ -2095,5 +2109,10 @@ impl EvceCtx {
         //evc_mset(stat, 0, sizeof(EVCE_STAT));
         //stat->write = EVC_BSW_GET_WRITE_BYTE(bs);
         //stat->nalu_type = EVC_PPS_NUT;
+
+        /* append bs.pkt to ctx.pkt */
+        if let Some(pkt) = self.bs.pkt.take() {
+            self.pkt.extend_from_slice(&pkt.data);
+        }
     }
 }

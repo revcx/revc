@@ -9,24 +9,12 @@ pub(crate) struct EvceBsw {
     /* bits left in buffer */
     leftbits: isize,
     /* buffer */
-    pkt: Packet,
+    pub(crate) pkt: Option<Packet>,
     /* trace */
     pub(crate) tracer: Option<Tracer>,
 }
 
 impl EvceBsw {
-    pub(crate) fn new() -> Self {
-        EvceBsw {
-            code: 0,
-            leftbits: 0,
-            pkt: Packet {
-                data: Vec::with_capacity(1024), // 1K?
-                pts: 0,
-            },
-            tracer: OPEN_TRACE(),
-        }
-    }
-
     /* is bitstream byte aligned? */
     #[inline]
     pub(crate) fn IS_BYTE_ALIGN(&self) -> bool {
@@ -36,7 +24,11 @@ impl EvceBsw {
     /* get number of byte written */
     #[inline]
     pub(crate) fn GET_WRITE_BYTE(&self) -> usize {
-        self.pkt.data.len()
+        if let Some(pkt) = &self.pkt {
+            pkt.data.len()
+        } else {
+            0
+        }
     }
 
     /* number of bytes to be sunk */
@@ -49,7 +41,9 @@ impl EvceBsw {
         let mut bytes = self.GET_SINK_BYTE();
 
         while bytes != 0 {
-            self.pkt.data.push(((self.code >> 24) & 0xFF) as u8);
+            if let Some(pkt) = &mut self.pkt {
+                pkt.data.push(((self.code >> 24) & 0xFF) as u8);
+            }
             self.code <<= 8;
             bytes -= 1;
         }
@@ -57,22 +51,30 @@ impl EvceBsw {
         self.leftbits = 32;
     }
 
-    pub(crate) fn init(&mut self) {
+    pub(crate) fn init(&mut self, tracer: &mut Option<Tracer>) {
         self.code = 0;
         self.leftbits = 32;
+        self.pkt = Some(Packet {
+            data: Vec::with_capacity(1024), // 1K?
+            pts: 0,
+        });
+        self.tracer = tracer.take();
     }
 
-    pub(crate) fn deinit(&mut self) {
+    pub(crate) fn deinit(&mut self) -> Option<Tracer> {
         self.flush();
+        self.tracer.take()
     }
 
     pub(crate) fn write_nalu_size(&mut self) {
         let size = self.GET_WRITE_BYTE() - 4;
 
-        self.pkt.data[0] = (size & 0x000000ff) as u8; //TBC(@Chernyak): is there a better way?
-        self.pkt.data[1] = ((size & 0x0000ff00) >> 8) as u8;
-        self.pkt.data[2] = ((size & 0x00ff0000) >> 16) as u8;
-        self.pkt.data[3] = ((size & 0xff000000) >> 24) as u8;
+        if let Some(pkt) = &mut self.pkt {
+            pkt.data[0] = (size & 0x000000ff) as u8; //TBC(@Chernyak): is there a better way?
+            pkt.data[1] = ((size & 0x0000ff00) >> 8) as u8;
+            pkt.data[2] = ((size & 0x00ff0000) >> 16) as u8;
+            pkt.data[3] = ((size & 0xff000000) >> 24) as u8;
+        }
     }
 
     pub(crate) fn write1(&mut self, val: u32, name: Option<&str>) {

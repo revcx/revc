@@ -14,3 +14,6 @@ done
 
 # ./ffmpeg.exe -i foreman_qcif.y4m -vframes 8 -f yuv4mpegpipe foreman_qcif8.y4m
 # ./ffmpeg.exe -i foreman_qcif.y4m -vframes 8 -vf scale=16x16 foreman_mb8.yuv
+
+# ./evca_encoder.exe                          -i       foreman_mb8.yuv -w 16 -h 16 -z 30 -f 1 -q 27 -r rec.yuv -o test_ld_p_q27.evc --config ../../cfg/encoder_lowdelay_P_baseline.cfg
+# cargo run --bin revce --features "trace" -- -i tools/foreman_mb8.yuv -w 16 -h 16 -z 30 -f 1 -q 27 -r rec.yuv --ref_pic_gap_length 8 -o tools/tmp/test.evc -v

@@ -13,7 +13,7 @@ pub(crate) fn OPEN_TRACE() -> Option<Tracer> {
     let fp_trace = OpenOptions::new()
         .append(true)
         .create(true)
-        .open("dec_trace.txt");
+        .open("trace.txt");
     if let Ok(fp) = fp_trace {
         Some((Box::new(fp), 0))
     } else {
