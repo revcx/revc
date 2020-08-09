@@ -77,7 +77,7 @@ fn tx_pb2b1(src: &[i32], dst: &mut [i16], shift: usize, line: usize) {
 fn tx_pb4b0(src: &[i16], dst: &mut [i32], shift: usize, line: usize) {
     let mut E = [0i64; 2];
     let mut O = [0i64; 2];
-    let add = 1 << (shift - 1);
+    let add = if shift == 0 { 0 } else { 1 << (shift - 1) };
 
     for j in 0..line {
         /* E and O */
@@ -103,7 +103,7 @@ fn tx_pb4b0(src: &[i16], dst: &mut [i32], shift: usize, line: usize) {
 fn tx_pb4b1(src: &[i32], dst: &mut [i16], shift: usize, line: usize) {
     let mut E = [0i64; 2];
     let mut O = [0i64; 2];
-    let add = 1 << (shift - 1);
+    let add = if shift == 0 { 0 } else { 1 << (shift - 1) };
 
     for j in 0..line {
         /* E and O */
@@ -132,7 +132,7 @@ fn tx_pb8b0(src: &[i16], dst: &mut [i32], shift: usize, line: usize) {
     let mut O = [0i64; 4];
     let mut EE = [0i64; 2];
     let mut EO = [0i64; 2];
-    let add = 1 << (shift - 1);
+    let add = if shift == 0 { 0 } else { 1 << (shift - 1) };
 
     for j in 0..line {
         /* E and O*/
@@ -190,7 +190,7 @@ fn tx_pb8b1(src: &[i32], dst: &mut [i16], shift: usize, line: usize) {
     let mut O = [0i64; 4];
     let mut EE = [0i64; 2];
     let mut EO = [0i64; 2];
-    let add = 1 << (shift - 1);
+    let add = if shift == 0 { 0 } else { 1 << (shift - 1) };
 
     for j in 0..line {
         /* E and O*/
@@ -251,7 +251,7 @@ fn tx_pb16b0(src: &[i16], dst: &mut [i32], shift: usize, line: usize) {
     let mut EO = [0i64; 4];
     let mut EEE = [0i64; 2];
     let mut EEO = [0i64; 2];
-    let add = 1 << (shift - 1);
+    let add = if shift == 0 { 0 } else { 1 << (shift - 1) };
 
     for j in 0..line {
         /* E and O*/
@@ -313,7 +313,7 @@ fn tx_pb16b1(src: &[i32], dst: &mut [i16], shift: usize, line: usize) {
     let mut EO = [0i64; 4];
     let mut EEE = [0i64; 2];
     let mut EEO = [0i64; 2];
-    let add = 1 << (shift - 1);
+    let add = if shift == 0 { 0 } else { 1 << (shift - 1) };
 
     for j in 0..line {
         /* E and O*/
@@ -378,7 +378,7 @@ fn tx_pb32b0(src: &[i16], dst: &mut [i32], shift: usize, line: usize) {
     let mut EEO = [0i64; 4];
     let mut EEEE = [0i64; 2];
     let mut EEEO = [0i64; 2];
-    let add = 1 << (shift - 1);
+    let add = if shift == 0 { 0 } else { 1 << (shift - 1) };
 
     for j in 0..line {
         /* E and O*/
@@ -465,7 +465,7 @@ fn tx_pb32b1(src: &[i32], dst: &mut [i16], shift: usize, line: usize) {
     let mut EEO = [0i64; 4];
     let mut EEEE = [0i64; 2];
     let mut EEEO = [0i64; 2];
-    let add = 1 << (shift - 1);
+    let add = if shift == 0 { 0 } else { 1 << (shift - 1) };
 
     for j in 0..line {
         /* E and O*/
@@ -555,7 +555,7 @@ fn tx_pb64b0(src: &[i16], dst: &mut [i32], shift: usize, line: usize) {
     let mut EEEO = [0i64; 4];
     let mut EEEEE = [0i64; 2];
     let mut EEEEO = [0i64; 2];
-    let add = 1 << (shift - 1);
+    let add = if shift == 0 { 0 } else { 1 << (shift - 1) };
 
     for j in 0..line {
         for k in 0..32 {
@@ -693,7 +693,7 @@ fn tx_pb64b1(src: &[i32], dst: &mut [i16], shift: usize, line: usize) {
     let mut EEEO = [0i64; 4];
     let mut EEEEE = [0i64; 2];
     let mut EEEEO = [0i64; 2];
-    let add = 1 << (shift - 1);
+    let add = if shift == 0 { 0 } else { 1 << (shift - 1) };
 
     for j in 0..line {
         for k in 0..32 {

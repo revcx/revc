@@ -430,7 +430,7 @@ pub(crate) struct EvceCtx {
     magic: u32,
 
     /* input frame */
-    frm: Option<Frame<pel>>,
+    //frm: Option<Frame<pel>>,
     /* output packet */
     pkt: Vec<u8>,
 
@@ -648,7 +648,7 @@ impl EvceCtx {
             /* magic code */
             magic: EVCE_MAGIC_CODE,
 
-            frm: None,
+            //frm: None,
             pkt: vec![],
 
             flush: false,
@@ -799,21 +799,27 @@ impl EvceCtx {
     }
 
     pub(crate) fn push_frm(&mut self, frm: &mut Option<Frame<pel>>) -> Result<(), EvcError> {
-        self.pico_idx = self.pic_icnt % self.pico_max_cnt;
-        let pico = &mut self.pico_buf[self.pico_idx];
-        pico.pic_icnt = self.pic_icnt;
-        pico.is_used = true;
-        self.pic_icnt += 1;
+        if frm.is_none() {
+            self.flush = true;
+        }
 
-        self.frm = frm.take();
+        let frm = frm.take();
+        if let Some(f) = frm {
+            self.pico_idx = self.pic_icnt % self.pico_max_cnt;
+            let pico = &mut self.pico_buf[self.pico_idx];
+            pico.pic_icnt = self.pic_icnt;
+            pico.is_used = true;
+            self.pic_icnt += 1;
+
+            pico.pic.borrow_mut().frame = Rc::new(RefCell::new(f));
+
+            self.pic[PIC_IDX_ORIG] = Some(Rc::clone(&pico.pic));
+        }
+
         Ok(())
     }
 
     pub(crate) fn encode_frm(&mut self) -> Result<EvcStat, EvcError> {
-        if self.frm.is_none() {
-            self.flush = true;
-        }
-
         /* bumping - check whether input pictures are remaining or not in pico_buf[] */
         self.check_more_frames()?;
         /* store input picture and return if needed */
@@ -872,6 +878,8 @@ impl EvceCtx {
     }
 
     fn evce_enc_pic_prepare(&mut self) -> Result<(), EvcError> {
+        //evc_assert_rv(PIC_ORIG(ctx) != NULL, EVC_ERR_UNEXPECTED);
+
         self.qp = self.param.qp;
 
         self.pic[PIC_IDX_CURR] = self.rpm.evc_picman_get_empty_pic()?;
@@ -1485,7 +1493,16 @@ impl EvceCtx {
         }
 
         evce_eco_cbf(
-            bs, sbac, sbac_ctx, nnz[Y_C], nnz[U_C], nnz[V_C], pred_mode, b_no_cbf, cbf_all, &run,
+            bs,
+            sbac,
+            sbac_ctx,
+            nnz[Y_C] != 0,
+            nnz[U_C] != 0,
+            nnz[V_C] != 0,
+            pred_mode,
+            b_no_cbf,
+            cbf_all,
+            &run,
             tree_cons,
         );
         if self.pps.cu_qp_delta_enabled_flag {

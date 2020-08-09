@@ -188,6 +188,16 @@ impl EvceCtx {
                 self.pps.constrained_intra_pred_flag,
             );
         }
+
+        self.core.mpm_b_list = evc_get_mpm_b(
+            self.core.x_scu,
+            self.core.y_scu,
+            &self.map_scu,
+            &self.map_ipm,
+            self.core.scup,
+            self.w_scu,
+        );
+
         if evc_check_luma(&self.core.tree_cons) {
             pred_cnt = self.make_ipred_list(x, y, log2_cuw, log2_cuh, &mut ipred_list);
             if pred_cnt == 0 {
