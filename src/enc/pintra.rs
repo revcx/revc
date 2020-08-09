@@ -213,14 +213,12 @@ impl EvceCtx {
                 self.core.ipm[1] = IntraPredDir::IPD_INVALID;
                 cost_t = self.pintra_residue_rdo(x, y, log2_cuw, log2_cuh, &mut dist_t, false);
 
-                /*#if TRACE_COSTS
-                EVC_TRACE_COUNTER;
-                EVC_TRACE_STR("Luma mode ");
-                EVC_TRACE_INT(i);
-                EVC_TRACE_STR(" cost is ");
-                EVC_TRACE_DOUBLE(cost_t);
-                EVC_TRACE_STR("\n");
-                #endif*/
+                EVC_TRACE_COUNTER(&mut self.core.bs_temp.tracer);
+                EVC_TRACE(&mut self.core.bs_temp.tracer, "Luma mode ");
+                EVC_TRACE(&mut self.core.bs_temp.tracer, i as u8);
+                EVC_TRACE(&mut self.core.bs_temp.tracer, "  cost is ");
+                EVC_TRACE(&mut self.core.bs_temp.tracer, cost_t);
+                EVC_TRACE(&mut self.core.bs_temp.tracer, " \n");
 
                 if cost_t < cost {
                     cost = cost_t;

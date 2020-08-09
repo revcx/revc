@@ -522,6 +522,7 @@ pub(crate) fn evce_eco_run_length_cc(
         }
     }
 
+    EVC_TRACE_COUNTER(&mut bs.tracer);
     EVC_TRACE(&mut bs.tracer, "coef luma ");
     for scan_pos in 0..num_coeff {
         EVC_TRACE(&mut bs.tracer, coef[scan_pos]);
@@ -542,21 +543,13 @@ pub(crate) fn evce_eco_xcoef(
 ) {
     evce_eco_run_length_cc(bs, sbac, sbac_ctx, coef, log2_w, log2_h, num_sig, ch_type);
 
-    /*#if TRACE_COEFFS
-        int cuw = 1 << log2_w;
-        int cuh = 1 << log2_h;
-        EVC_TRACE_COUNTER;
-        EVC_TRACE_STR("Coef for ");
-        EVC_TRACE_INT(ch_type);
-        EVC_TRACE_STR(": ");
-        for (int i = 0; i < (cuw * cuh); ++i)
-        {
-            if (i != 0)
-                EVC_TRACE_STR(", ");
-            EVC_TRACE_INT(coef[i]);
-        }
-        EVC_TRACE_STR("\n");
-    #endif*/
+    TRACE_COEF(
+        &mut bs.tracer,
+        ch_type,
+        1 << log2_w as usize,
+        1 << log2_h as usize,
+        coef,
+    );
 }
 
 pub(crate) fn coef_rect_to_series(
