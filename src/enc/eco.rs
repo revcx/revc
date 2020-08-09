@@ -253,11 +253,13 @@ pub(crate) fn evce_eco_split_mode(
     bs: &mut EvceBsw,
     sbac: &mut EvceSbac,
     sbac_ctx: &mut EvcSbacCtx,
+    x_pel: u16,
+    y_pel: u16,
     cud: u16,
     cup: u16,
     cuw: u16,
     cuh: u16,
-    lcu_s: u16,
+    max_cuwh: u16,
     split_mode_buf: &LcuSplitMode,
 ) {
     let mut split_mode = SplitMode::NO_SPLIT;
@@ -271,7 +273,7 @@ pub(crate) fn evce_eco_split_mode(
     }
 
     //evc_assert(evce_check_luma(c, core));
-    split_mode = evc_get_split_mode(cud, cup, cuw, cuh, lcu_s, split_mode_buf);
+    split_mode = evc_get_split_mode(cud, cup, cuw, cuh, max_cuwh, split_mode_buf);
 
     sbac.encode_bin(
         bs,
@@ -283,20 +285,26 @@ pub(crate) fn evce_eco_split_mode(
         },
     ); /* split_cu_flag */
 
-    /*EVC_TRACE_COUNTER;
-    EVC_TRACE_STR("x pos ");
-    EVC_TRACE_INT(core->x_pel + ((cup % (c->max_cuwh >> MIN_CU_LOG2)) << MIN_CU_LOG2));
-    EVC_TRACE_STR("y pos ");
-    EVC_TRACE_INT(core->y_pel + ((cup / (c->max_cuwh >> MIN_CU_LOG2)) << MIN_CU_LOG2));
-    EVC_TRACE_STR("width ");
-    EVC_TRACE_INT(cuw);
-    EVC_TRACE_STR("height ");
-    EVC_TRACE_INT(cuh);
-    EVC_TRACE_STR("depth ");
-    EVC_TRACE_INT(cud);
-    EVC_TRACE_STR("split mode ");
-    EVC_TRACE_INT(split_mode);
-    EVC_TRACE_STR("\n");*/
+    EVC_TRACE_COUNTER(&mut bs.tracer);
+    EVC_TRACE(&mut bs.tracer, "x pos ");
+    EVC_TRACE(
+        &mut bs.tracer,
+        x_pel + ((cup % (max_cuwh >> MIN_CU_LOG2)) << MIN_CU_LOG2),
+    );
+    EVC_TRACE(&mut bs.tracer, " y pos ");
+    EVC_TRACE(
+        &mut bs.tracer,
+        y_pel + ((cup / (max_cuwh >> MIN_CU_LOG2)) << MIN_CU_LOG2),
+    );
+    EVC_TRACE(&mut bs.tracer, " width ");
+    EVC_TRACE(&mut bs.tracer, cuw);
+    EVC_TRACE(&mut bs.tracer, " height ");
+    EVC_TRACE(&mut bs.tracer, cuh);
+    EVC_TRACE(&mut bs.tracer, " depth ");
+    EVC_TRACE(&mut bs.tracer, cud);
+    EVC_TRACE(&mut bs.tracer, " split mode ");
+    EVC_TRACE(&mut bs.tracer, split_mode as u32);
+    EVC_TRACE(&mut bs.tracer, " \n");
 }
 
 pub(crate) fn evce_eco_intra_dir_b(

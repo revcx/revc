@@ -15,6 +15,7 @@ use super::def::*;
 use super::ipred::*;
 use super::picman::*;
 use super::tbl::*;
+use super::tracer::*;
 use super::util::*;
 
 use bsw::*;
@@ -45,6 +46,8 @@ pub(crate) const GOP_P: usize = 8;
 pub(crate) const USE_RDOQ: bool = true; // Use RDOQ
 pub(crate) const MAX_TX_DYNAMIC_RANGE: usize = 15;
 
+pub(crate) const ENC_ECU_DEPTH_B: u16 = 8; // for early CU termination
+
 /* count of picture including encoding and reference pictures
 0: encoding picture buffer
 1: forward reference picture buffer
@@ -52,7 +55,6 @@ pub(crate) const MAX_TX_DYNAMIC_RANGE: usize = 15;
 3: original (input) picture buffer
 4: mode decision picture buffer, if exists
 */
-
 /* current encoding picture buffer index */
 pub(crate) const PIC_IDX_CURR: usize = 0;
 /* list0 reference picture buffer index */
@@ -1569,6 +1571,8 @@ impl EvceCtx {
                 bs,
                 sbac,
                 sbac_ctx,
+                x0,
+                y0,
                 cud,
                 cup,
                 cuw,
@@ -1620,6 +1624,8 @@ impl EvceCtx {
                     bs,
                     sbac,
                     sbac_ctx,
+                    x0,
+                    y0,
                     cud,
                     cup,
                     cuw,
@@ -1643,54 +1649,30 @@ impl EvceCtx {
         cuh: u16,
         tree_cons: TREE_CONS,
     ) {
-        //core.tree_cons = tree_cons;
-        // s16(*coef)[MAX_CU_DIM] = core.ctmp;
-        /*
-            EVC_BSW *bs;
-
-            u32 *map_scu;
-            int slice_type, refi0, refi1;
-            int i, j, w, h;
-            EVCE_CU_DATA *cu_data = &self.map_cu_data[core.lcu_num];
-            u32 *map_cu_mode;
-            u32 *map_affine;
-        #if TRACE_ENC_CU_DATA
-            core.trace_idx = cu_data->trace_idx[cup];
-        #endif
-        #if TRACE_ENC_CU_DATA_CHECK
-            evc_assert(core.trace_idx != 0);
-        #endif*/
         let enc_dqp = 0;
         let slice_type = self.slice_type;
 
-        // bs = &self.bs;
-
         self.cu_init(x, y, cup, cuw, cuh);
-        /*
-               EVC_TRACE_COUNTER;
-               EVC_TRACE_STR("poc: ");
-               EVC_TRACE_INT(self.poc.poc_val);
-               EVC_TRACE_STR("x pos ");
-               EVC_TRACE_INT(core.x_pel + ((cup % (self.max_cuwh >> MIN_CU_LOG2)) << MIN_CU_LOG2));
-               EVC_TRACE_STR("y pos ");
-               EVC_TRACE_INT(core.y_pel + ((cup / (self.max_cuwh >> MIN_CU_LOG2)) << MIN_CU_LOG2));
-               EVC_TRACE_STR("width ");
-               EVC_TRACE_INT(cuw);
-               EVC_TRACE_STR("height ");
-               EVC_TRACE_INT(cuh);
 
-           #if ENC_DEC_TRACE
-               if (self.sh.slice_type != SLICE_I && self.sps.sps_btt_flag)
-               {
-                   EVC_TRACE_STR("tree status ");
-                   EVC_TRACE_INT(core.tree_cons.tree_type);
-                   EVC_TRACE_STR("mode status ");
-                   EVC_TRACE_INT(core.tree_cons.mode_cons);
-               }
-           #endif
+        EVC_TRACE_COUNTER(&mut self.bs.tracer);
+        EVC_TRACE(&mut self.bs.tracer, "poc: ");
+        EVC_TRACE(&mut self.bs.tracer, self.poc.poc_val);
+        EVC_TRACE(&mut self.bs.tracer, " x pos ");
+        EVC_TRACE(
+            &mut self.bs.tracer,
+            x + ((cup as u16 % (self.max_cuwh >> MIN_CU_LOG2)) << MIN_CU_LOG2),
+        );
+        EVC_TRACE(&mut self.bs.tracer, " y pos ");
+        EVC_TRACE(
+            &mut self.bs.tracer,
+            y + ((cup as u16 / (self.max_cuwh as u16 >> MIN_CU_LOG2)) << MIN_CU_LOG2),
+        );
+        EVC_TRACE(&mut self.bs.tracer, " width ");
+        EVC_TRACE(&mut self.bs.tracer, cuw);
+        EVC_TRACE(&mut self.bs.tracer, " height ");
+        EVC_TRACE(&mut self.bs.tracer, cuh);
+        EVC_TRACE(&mut self.bs.tracer, " \n");
 
-               EVC_TRACE_STR("\n");
-        */
         {
             let core = &mut self.core;
             let cu_data = &mut self.map_cu_data[core.lcu_num as usize];

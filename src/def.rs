@@ -595,7 +595,7 @@ pub(crate) struct EvcSh {
 
     /*QP of previous cu in decoding order (used for dqp)*/
     pub(crate) qp_prev_eco: u8,
-    pub(crate) dqp: u8,
+    pub(crate) dqp: i8,
     pub(crate) qp_prev_mode: u8,
 
     pub(crate) num_ctb: u16,

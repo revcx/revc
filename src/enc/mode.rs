@@ -4,6 +4,7 @@ use super::*;
 use crate::api::*;
 use crate::def::*;
 use crate::plane::*;
+use crate::tracer::*;
 
 #[derive(Default)]
 pub(crate) struct EvceCUData {
@@ -15,11 +16,11 @@ pub(crate) struct EvceCUData {
     pub(crate) pred_mode_chroma: Vec<PredMode>,
     pub(crate) ipm: Vec<Vec<IntraPredDir>>,
     pub(crate) skip_flag: Vec<bool>,
-    pub(crate) refi: Vec<Vec<i8>>,
+    pub(crate) refi: Vec<[i8; REFP_NUM]>,
     pub(crate) mvp_idx: Vec<Vec<u8>>,
-    pub(crate) mv: Vec<Vec<Vec<i16>>>, //[MAX_CU_CNT_IN_LCU][REFP_NUM][MV_D];
-    pub(crate) mvd: Vec<Vec<Vec<i16>>>, //[MAX_CU_CNT_IN_LCU][REFP_NUM][MV_D];
-    pub(crate) nnz: Vec<Vec<u16>>,     //[N_C];
+    pub(crate) mv: Vec<[[i16; MV_D]; REFP_NUM]>, //[MAX_CU_CNT_IN_LCU][REFP_NUM][MV_D];
+    pub(crate) mvd: Vec<Vec<Vec<i16>>>,          //[MAX_CU_CNT_IN_LCU][REFP_NUM][MV_D];
+    pub(crate) nnz: Vec<Vec<u16>>,               //[N_C];
     pub(crate) map_scu: Vec<MCU>,
     pub(crate) map_cu_mode: Vec<MCU>,
     pub(crate) depth: Vec<i8>,
@@ -32,8 +33,8 @@ pub(crate) struct EvceCUData {
 
 impl EvceCUData {
     pub(crate) fn new(log2_cuw: u8, log2_cuh: u8) -> Self {
-        let cuw_scu = 1 << log2_cuw as usize;
-        let cuh_scu = 1 << log2_cuh as usize;
+        let cuw_scu = 1 << log2_cuw;
+        let cuh_scu = 1 << log2_cuh;
 
         let cu_cnt = cuw_scu * cuh_scu;
         let pixel_cnt = cu_cnt << 4;
@@ -55,9 +56,9 @@ impl EvceCUData {
             pred_mode_chroma: vec![PredMode::MODE_INTRA; cu_cnt],
             ipm: vec![vec![IntraPredDir::IPD_DC_B; cu_cnt]; 2],
             skip_flag: vec![false; cu_cnt],
-            refi: vec![vec![0; REFP_NUM]; cu_cnt],
+            refi: vec![[0; REFP_NUM]; cu_cnt],
             mvp_idx: vec![vec![0; REFP_NUM]; cu_cnt],
-            mv: vec![vec![vec![0; MV_D]; REFP_NUM]; cu_cnt],
+            mv: vec![[[0; MV_D]; REFP_NUM]; cu_cnt],
             mvd: vec![vec![vec![0; MV_D]; REFP_NUM]; cu_cnt],
             nnz: vec![vec![0; cu_cnt]; N_C],
             map_scu: vec![MCU::default(); cu_cnt],
@@ -68,8 +69,8 @@ impl EvceCUData {
         }
     }
     pub(crate) fn init(&mut self, log2_cuw: u8, log2_cuh: u8, qp_y: u8, qp_u: u8, qp_v: u8) {
-        let cuw_scu = 1 << (log2_cuw as usize - MIN_CU_LOG2);
-        let cuh_scu = 1 << (log2_cuh as usize - MIN_CU_LOG2);
+        let cuw_scu = 1 << (log2_cuw - MIN_CU_LOG2 as u8);
+        let cuh_scu = 1 << (log2_cuh - MIN_CU_LOG2 as u8);
 
         let cu_cnt = cuw_scu * cuh_scu;
         let pixel_cnt = cu_cnt << 4;
@@ -534,14 +535,10 @@ impl EvceCtx {
             self.core.x_pel,
             self.core.y_pel,
             0,
-            self.log2_max_cuwh,
-            self.log2_max_cuwh,
+            self.log2_max_cuwh as usize,
+            self.log2_max_cuwh as usize,
             0,
             true,
-            SplitMode::NO_SPLIT,
-            &mut split_mode_child,
-            0,
-            &mut parent_split_allow,
             0,
             self.qp,
             evc_get_default_tree_cons(),
@@ -568,18 +565,14 @@ impl EvceCtx {
         x0: u16,
         y0: u16,
         cup: u16,
-        log2_cuw: u8,
-        log2_cuh: u8,
+        log2_cuw: usize,
+        log2_cuh: usize,
         cud: u16,
-        next_split: bool,
-        parent_split: SplitMode,
-        same_layer_split: &mut [bool],
-        node_idx: usize,
-        parent_split_allow: &mut [bool],
+        mut next_split: bool,
         qt_depth: u8,
         qp: u8,
         tree_cons: TREE_CONS,
-    ) {
+    ) -> f64 {
         // x0 = CU's left up corner horizontal index in entrie frame
         // y0 = CU's left up corner vertical index in entire frame
         // cuw = CU width, log2_cuw = CU width in log2
@@ -604,17 +597,12 @@ impl EvceCtx {
         let mut split_mode = SplitMode::NO_SPLIT;
         let mut do_split = false;
         let mut do_curr = false;
-        let best_split_cost = MAX_COST;
+        let mut best_split_cost = MAX_COST;
         let best_curr_cost = MAX_COST;
-        let split_mode_child = [
-            SplitMode::NO_SPLIT,
-            SplitMode::NO_SPLIT,
-            SplitMode::NO_SPLIT,
-            SplitMode::NO_SPLIT,
-        ];
+        let mut split_mode_child = vec![false; 4];
         let mut curr_split_allow = vec![false; MAX_SPLIT_NUM];
         let remaining_split = 0;
-        let num_split_tried = 0;
+        let mut num_split_tried = 0;
         let mut num_split_to_try = 0;
         let mut nev_max_depth = 0;
         let eval_parent_node_first = 1;
@@ -635,8 +623,8 @@ impl EvceCtx {
         self.core.tree_cons = tree_cons;
         self.core.avail_lr = avail_lr;
 
-        self.core.s_curr_before_split[log2_cuw as usize - 2][log2_cuh as usize - 2] =
-            self.core.s_curr_best[log2_cuw as usize - 2][log2_cuh as usize - 2];
+        self.core.s_curr_before_split[log2_cuw - 2][log2_cuh - 2] =
+            self.core.s_curr_best[log2_cuw - 2][log2_cuh - 2];
 
         //decide allowed split modes for the current node
         //based on CU size located at boundary
@@ -659,8 +647,8 @@ impl EvceCtx {
                 nev_max_depth = self.check_nev_block(
                     x0,
                     y0,
-                    log2_cuw,
-                    log2_cuh,
+                    log2_cuw as u8,
+                    log2_cuh as u8,
                     &mut do_curr,
                     &mut do_split,
                     cud,
@@ -691,11 +679,15 @@ impl EvceCtx {
         if !boundary {
             cost_temp = 0.0;
 
-            self.core.cu_data_temp[log2_cuw as usize - 2][log2_cuh as usize - 2]
-                .init(log2_cuw, log2_cuh, self.qp, self.qp, self.qp);
+            self.core.cu_data_temp[log2_cuw - 2][log2_cuh - 2].init(
+                log2_cuw as u8,
+                log2_cuh as u8,
+                self.qp,
+                self.qp,
+                self.qp,
+            );
 
-            self.sh.qp_prev_mode =
-                self.core.dqp_data[log2_cuw as usize - 2][log2_cuh as usize - 2].prev_QP as u8;
+            self.sh.qp_prev_mode = self.core.dqp_data[log2_cuw - 2][log2_cuh - 2].prev_QP as u8;
             best_dqp = self.sh.qp_prev_mode;
 
             split_mode = SplitMode::NO_SPLIT;
@@ -704,12 +696,10 @@ impl EvceCtx {
                     && evc_check_luma(&self.core.tree_cons)
                 {
                     /* consider CU split mode */
-                    self.core.s_temp_run =
-                        self.core.s_curr_best[log2_cuw as usize - 2][log2_cuh as usize - 2];
+                    self.core.s_temp_run = self.core.s_curr_best[log2_cuw - 2][log2_cuh - 2];
                     self.core.s_temp_run.bit_reset();
                     evc_set_split_mode(
-                        &mut self.core.cu_data_temp[log2_cuw as usize - 2][log2_cuh as usize - 2]
-                            .split_mode,
+                        &mut self.core.cu_data_temp[log2_cuw - 2][log2_cuh - 2].split_mode,
                         SplitMode::NO_SPLIT,
                         cud,
                         0,
@@ -728,6 +718,8 @@ impl EvceCtx {
                         &mut self.core.bs_temp,
                         &mut self.core.s_temp_run,
                         &mut self.core.c_temp_run,
+                        x0,
+                        y0,
                         cud,
                         0,
                         cuw,
@@ -738,8 +730,7 @@ impl EvceCtx {
 
                     bit_cnt = self.core.s_temp_run.get_bit_number();
                     cost_temp += self.lambda[0] * bit_cnt as f64;
-                    self.core.s_curr_best[log2_cuw as usize - 2][log2_cuh as usize - 2] =
-                        self.core.s_temp_run;
+                    self.core.s_curr_best[log2_cuw - 2][log2_cuh - 2] = self.core.s_temp_run;
                 }
 
                 self.core.cup = cup as u32;
@@ -757,17 +748,21 @@ impl EvceCtx {
                 );
                 for dqp in min_qp..=max_qp {
                     self.core.qp = GET_QP(qp as i8, dqp as i8 - qp as i8) as u8;
-                    self.core.dqp_curr_best[log2_cuw as usize - 2][log2_cuh as usize - 2].curr_QP =
-                        self.core.qp;
+                    self.core.dqp_curr_best[log2_cuw - 2][log2_cuh - 2].curr_QP = self.core.qp;
                     if self.core.cu_qp_delta_code_mode != 2 || is_dqp_set {
-                        self.core.dqp_curr_best[log2_cuw as usize - 2][log2_cuh as usize - 2]
-                            .cu_qp_delta_code = 1 + if is_dqp_set { 1 } else { 0 };
-                        self.core.dqp_curr_best[log2_cuw as usize - 2][log2_cuh as usize - 2]
-                            .cu_qp_delta_is_coded = false;
+                        self.core.dqp_curr_best[log2_cuw - 2][log2_cuh - 2].cu_qp_delta_code =
+                            1 + if is_dqp_set { 1 } else { 0 };
+                        self.core.dqp_curr_best[log2_cuw - 2][log2_cuh - 2].cu_qp_delta_is_coded =
+                            false;
                     }
                     cost_temp_dqp = cost_temp;
-                    self.core.cu_data_temp[log2_cuw as usize - 2][log2_cuh as usize - 2]
-                        .init(log2_cuw, log2_cuh, self.qp, self.qp, self.qp);
+                    self.core.cu_data_temp[log2_cuw - 2][log2_cuh - 2].init(
+                        log2_cuw as u8,
+                        log2_cuh as u8,
+                        self.qp,
+                        self.qp,
+                        self.qp,
+                    );
 
                     self.clear_map_scu(x0, y0, cuw, cuh);
                     cost_temp_dqp += self.mode_coding_unit(x0, y0, log2_cuw, log2_cuh, cud);
@@ -776,26 +771,24 @@ impl EvceCtx {
                         cu_mode_dqp = self.core.cu_mode;
                         dist_cu_best_dqp = self.core.dist_cu_best;
                         /* backup the current best data */
-                        self.core.cu_data_best[log2_cuw as usize - 2][log2_cuh as usize - 2].copy(
-                            &self.core.cu_data_temp[log2_cuw as usize - 2][log2_cuh as usize - 2],
+                        self.core.cu_data_best[log2_cuw - 2][log2_cuh - 2].copy(
+                            &self.core.cu_data_temp[log2_cuw - 2][log2_cuh - 2],
                             0,
                             0,
-                            log2_cuw,
-                            log2_cuh,
-                            log2_cuw,
+                            log2_cuw as u8,
+                            log2_cuh as u8,
+                            log2_cuw as u8,
                             cud,
                             &self.core.tree_cons,
                         );
                         cost_best = cost_temp_dqp;
                         best_split_mode = SplitMode::NO_SPLIT;
-                        s_temp_depth =
-                            self.core.s_next_best[log2_cuw as usize - 2][log2_cuh as usize - 2];
-                        dqp_temp_depth =
-                            self.core.dqp_next_best[log2_cuw as usize - 2][log2_cuh as usize - 2];
+                        s_temp_depth = self.core.s_next_best[log2_cuw - 2][log2_cuh - 2];
+                        dqp_temp_depth = self.core.dqp_next_best[log2_cuw - 2][log2_cuh - 2];
 
                         if let Some(pic) = &self.pic[PIC_IDX_MODE] {
-                            let cu_data_best = &mut self.core.cu_data_best[log2_cuw as usize - 2]
-                                [log2_cuh as usize - 2];
+                            let cu_data_best =
+                                &mut self.core.cu_data_best[log2_cuw - 2][log2_cuh - 2];
                             cu_data_best.mode_cpy_rec_to_ref(
                                 x0 as usize,
                                 y0 as usize,
@@ -811,13 +804,12 @@ impl EvceCtx {
                             // in mode_coding_unit, self.fn_pinter_analyze_cu will store the best MV in mi
                             // if the cost_temp has been update above, the best MV is in mi
                             self.mode.get_cu_pred_data(
-                                &self.core.cu_data_best[log2_cuw as usize - 2]
-                                    [log2_cuh as usize - 2],
+                                &self.core.cu_data_best[log2_cuw - 2][log2_cuh - 2],
                                 0,
                                 0,
-                                log2_cuw,
-                                log2_cuh,
-                                log2_cuw,
+                                log2_cuw as u8,
+                                log2_cuh as u8,
+                                log2_cuw as u8,
                                 cud,
                             );
                         }
@@ -830,25 +822,300 @@ impl EvceCtx {
                 self.core.cu_mode = cu_mode_dqp;
                 self.core.dist_cu_best = dist_cu_best_dqp;
 
-            /*#if TRACE_COSTS
-                        EVC_TRACE_COUNTER;
-                        EVC_TRACE_STR("Block [");
-                        EVC_TRACE_INT(x0);
-                        EVC_TRACE_STR(", ");
-                        EVC_TRACE_INT(y0);
-                        EVC_TRACE_STR("]x(");
-                        EVC_TRACE_INT(cuw);
-                        EVC_TRACE_STR("x");
-                        EVC_TRACE_INT(cuh);
-                        EVC_TRACE_STR(") split_type ");
-                        EVC_TRACE_INT(NO_SPLIT);
-                        EVC_TRACE_STR(" cost is ");
-                        EVC_TRACE_DOUBLE(cost_temp);
-                        EVC_TRACE_STR("\n");
-            #endif*/
+                EVC_TRACE_COUNTER(&mut self.bs_temp.tracer);
+                EVC_TRACE(&mut self.bs_temp.tracer, "Block [");
+                EVC_TRACE(&mut self.bs_temp.tracer, x0);
+                EVC_TRACE(&mut self.bs_temp.tracer, " , ");
+                EVC_TRACE(&mut self.bs_temp.tracer, y0);
+                EVC_TRACE(&mut self.bs_temp.tracer, " ]x(");
+                EVC_TRACE(&mut self.bs_temp.tracer, cuw);
+                EVC_TRACE(&mut self.bs_temp.tracer, " x");
+                EVC_TRACE(&mut self.bs_temp.tracer, cuh);
+                EVC_TRACE(&mut self.bs_temp.tracer, " ) split_type ");
+                EVC_TRACE(&mut self.bs_temp.tracer, SplitMode::NO_SPLIT as u32);
+                EVC_TRACE(&mut self.bs_temp.tracer, "  cost is ");
+                EVC_TRACE(&mut self.bs_temp.tracer, cost_temp);
+                EVC_TRACE(&mut self.bs_temp.tracer, " \n");
             } else {
                 cost_temp = MAX_COST;
             }
+        }
+
+        if cost_best != MAX_COST
+            && cud
+                >= if self.poc.poc_val % 2 != 0 {
+                    ENC_ECU_DEPTH_B - 2
+                } else {
+                    ENC_ECU_DEPTH_B
+                }
+            && self.core.cu_mode == PredMode::MODE_SKIP
+        {
+            next_split = false;
+        }
+
+        if cost_best != MAX_COST && self.sh.slice_type == SliceType::EVC_ST_I {
+            let dist_cu = self.core.dist_cu_best;
+            let dist_cu_th = 1 << (log2_cuw + log2_cuh + 7);
+
+            if dist_cu < dist_cu_th {
+                let mut bits_inc_by_split = 0;
+                bits_inc_by_split += if log2_cuw + log2_cuh >= 6 { 2 } else { 0 }; //two split flags
+                bits_inc_by_split += 8; //one more (intra dir + cbf + edi_flag + mtr info) + 1-bit penalty, approximately 8 bits
+
+                if (dist_cu as f64) < self.lambda[0] * bits_inc_by_split as f64 {
+                    next_split = false;
+                }
+            }
+        }
+
+        if (cuw > MIN_CU_SIZE as u16 || cuh > MIN_CU_SIZE as u16) && next_split {
+            split_mode = SplitMode::SPLIT_QUAD;
+            if split_allow[split_mode as usize] {
+                let split_struct = evc_split_get_part_structure(
+                    split_mode,
+                    x0,
+                    y0,
+                    cuw,
+                    cuh,
+                    cup,
+                    cud,
+                    self.log2_culine,
+                );
+
+                let mut prev_log2_sub_cuw = split_struct.log_cuw[0] as usize;
+                let mut prev_log2_sub_cuh = split_struct.log_cuh[0] as usize;
+
+                self.core.cu_data_temp[log2_cuw - 2][log2_cuh - 2].init(
+                    log2_cuw as u8,
+                    log2_cuh as u8,
+                    self.qp,
+                    self.qp,
+                    self.qp,
+                );
+                self.clear_map_scu(x0, y0, cuw, cuh);
+
+                let mut cost_temp = 0.0;
+
+                if x0 + cuw <= self.w && y0 + cuh <= self.h {
+                    /* consider CU split flag */
+                    self.core.s_temp_run =
+                        self.core.s_curr_before_split[log2_cuw - 2][log2_cuh - 2];
+                    self.core.s_temp_run.bit_reset();
+                    evc_set_split_mode(
+                        &mut self.core.cu_data_temp[log2_cuw - 2][log2_cuh - 2].split_mode,
+                        split_mode,
+                        cud,
+                        0,
+                        cuw,
+                        cuh,
+                        cuw,
+                    );
+                    evce_eco_split_mode(
+                        &mut self.core.bs_temp,
+                        &mut self.core.s_temp_run,
+                        &mut self.core.c_temp_run,
+                        x0,
+                        y0,
+                        cud,
+                        0,
+                        cuw,
+                        cuh,
+                        self.max_cuwh,
+                        &self.map_cu_data[self.core.lcu_num as usize].split_mode,
+                    );
+
+                    bit_cnt = self.core.s_temp_run.get_bit_number();
+                    cost_temp += (self.lambda[0] * bit_cnt as f64);
+                    self.core.s_curr_best[log2_cuw - 2][log2_cuh - 2] = self.core.s_temp_run;
+                }
+
+                let mut min_qp = 0i8;
+                let mut max_qp = 0i8;
+                let mut is_dqp_set = false;
+                self.get_min_max_qp(
+                    &mut min_qp,
+                    &mut max_qp,
+                    &mut is_dqp_set,
+                    split_mode,
+                    cuw,
+                    cuh,
+                    qp,
+                    x0,
+                    y0,
+                );
+
+                let mut loop_counter = 0;
+                if is_dqp_set {
+                    loop_counter = (max_qp - min_qp).abs();
+                }
+                cost_best_dqp = MAX_COST;
+                for dqp_loop in 0..=loop_counter {
+                    let dqp = min_qp + dqp_loop;
+                    self.core.qp = GET_QP(qp as i8, dqp - qp as i8) as u8;
+                    if is_dqp_set {
+                        self.core.dqp_curr_best[log2_cuw - 2][log2_cuh - 2].cu_qp_delta_code = 2;
+                        self.core.dqp_curr_best[log2_cuw - 2][log2_cuh - 2].cu_qp_delta_is_coded =
+                            false;
+                        self.core.dqp_curr_best[log2_cuw - 2][log2_cuh - 2].curr_QP = self.core.qp;
+                    }
+
+                    cost_temp_dqp = cost_temp;
+                    self.core.cu_data_temp[log2_cuw - 2][log2_cuh - 2].init(
+                        log2_cuw as u8,
+                        log2_cuh as u8,
+                        self.qp,
+                        self.qp,
+                        self.qp,
+                    );
+                    self.clear_map_scu(x0, y0, cuw, cuh);
+
+                    //#if TRACE_ENC_CU_DATA_CHECK
+                    //                  static int counter_in[MAX_CU_LOG2 - MIN_CU_LOG2][MAX_CU_LOG2 - MIN_CU_LOG2] = { 0, };
+                    //                  counter_in[log2_cuw - MIN_CU_LOG2][log2_cuh - MIN_CU_LOG2]++;
+                    // #endif
+
+                    for part_num in 0..split_struct.part_count {
+                        let cur_part_num = part_num;
+                        let log2_sub_cuw = split_struct.log_cuw[cur_part_num] as usize;
+                        let log2_sub_cuh = split_struct.log_cuh[cur_part_num] as usize;
+                        let x_pos = split_struct.x_pos[cur_part_num];
+                        let y_pos = split_struct.y_pos[cur_part_num];
+                        let cur_cuw = split_struct.width[cur_part_num];
+                        let cur_cuh = split_struct.height[cur_part_num];
+
+                        if (x_pos < self.w) && (y_pos < self.h) {
+                            if part_num == 0 {
+                                self.core.s_curr_best[log2_sub_cuw - 2][log2_sub_cuh - 2] =
+                                    self.core.s_curr_best[log2_cuw - 2][log2_cuh - 2];
+                                self.core.dqp_curr_best[log2_sub_cuw - 2][log2_sub_cuh - 2] =
+                                    self.core.dqp_curr_best[log2_cuw - 2][log2_cuh - 2];
+                            } else {
+                                self.core.s_curr_best[log2_sub_cuw - 2][log2_sub_cuh - 2] = self
+                                    .core
+                                    .s_next_best[prev_log2_sub_cuw - 2][prev_log2_sub_cuh - 2];
+                                self.core.dqp_curr_best[log2_sub_cuw - 2][log2_sub_cuh - 2] = self
+                                    .core
+                                    .dqp_next_best[prev_log2_sub_cuw - 2][prev_log2_sub_cuh - 2];
+                            }
+                            cost_temp_dqp += self.mode_coding_tree(
+                                x_pos,
+                                y_pos,
+                                split_struct.cup[cur_part_num],
+                                log2_sub_cuw as usize,
+                                log2_sub_cuh as usize,
+                                split_struct.cud[cur_part_num],
+                                true,
+                                split_mode.inc_qt_depth(qt_depth),
+                                self.core.qp,
+                                split_struct.tree_cons,
+                            );
+
+                            self.core.qp = GET_QP(qp as i8, dqp - qp as i8) as u8;
+
+                            self.core.cu_data_temp[log2_cuw - 2][log2_cuh - 2].copy(
+                                &self.core.cu_data_best[log2_sub_cuw - 2][log2_sub_cuh - 2],
+                                x_pos - split_struct.x_pos[0],
+                                y_pos - split_struct.y_pos[0],
+                                log2_sub_cuw as u8,
+                                log2_sub_cuh as u8,
+                                log2_cuw as u8,
+                                cud,
+                                &split_struct.tree_cons,
+                            );
+
+                            self.update_map_scu(x_pos, y_pos, cur_cuw, cur_cuh);
+                            prev_log2_sub_cuw = log2_sub_cuw;
+                            prev_log2_sub_cuh = log2_sub_cuh;
+                        }
+                        self.core.tree_cons = tree_cons;
+                    }
+
+                    EVC_TRACE_COUNTER(&mut self.bs_temp.tracer);
+                    EVC_TRACE(&mut self.bs_temp.tracer, "Block [");
+                    EVC_TRACE(&mut self.bs_temp.tracer, x0);
+                    EVC_TRACE(&mut self.bs_temp.tracer, " , ");
+                    EVC_TRACE(&mut self.bs_temp.tracer, y0);
+                    EVC_TRACE(&mut self.bs_temp.tracer, " ]x(");
+                    EVC_TRACE(&mut self.bs_temp.tracer, cuw);
+                    EVC_TRACE(&mut self.bs_temp.tracer, " x");
+                    EVC_TRACE(&mut self.bs_temp.tracer, cuh);
+                    EVC_TRACE(&mut self.bs_temp.tracer, " ) split_type ");
+                    EVC_TRACE(&mut self.bs_temp.tracer, split_mode as u32);
+                    EVC_TRACE(&mut self.bs_temp.tracer, "  cost is ");
+                    EVC_TRACE(&mut self.bs_temp.tracer, cost_temp);
+                    EVC_TRACE(&mut self.bs_temp.tracer, " \n");
+
+                    if cost_best_dqp > cost_temp_dqp {
+                        cost_best_dqp = cost_temp_dqp;
+                    }
+
+                    if cost_best - 0.0001 > cost_temp_dqp {
+                        /* backup the current best data */
+                        self.core.cu_data_best[log2_cuw - 2][log2_cuh - 2].copy(
+                            &self.core.cu_data_temp[log2_cuw - 2][log2_cuh - 2],
+                            0,
+                            0,
+                            log2_cuw as u8,
+                            log2_cuh as u8,
+                            log2_cuw as u8,
+                            cud,
+                            &self.core.tree_cons,
+                        );
+                        cost_best = cost_temp_dqp;
+                        best_dqp = self.core.dqp_data[prev_log2_sub_cuw - 2][prev_log2_sub_cuh - 2]
+                            .prev_QP;
+                        dqp_temp_depth =
+                            self.core.dqp_next_best[prev_log2_sub_cuw - 2][prev_log2_sub_cuh - 2];
+                        s_temp_depth =
+                            self.core.s_next_best[prev_log2_sub_cuw - 2][prev_log2_sub_cuh - 2];
+                        best_split_mode = split_mode;
+                    }
+
+                    cost_temp = cost_best_dqp;
+
+                    if is_dqp_set {
+                        self.core.cu_qp_delta_code_mode = 0;
+                    }
+
+                    if split_mode != SplitMode::NO_SPLIT && cost_temp < best_split_cost {
+                        best_split_cost = cost_temp;
+                    }
+                }
+            }
+        }
+
+        if let Some(pic) = &self.pic[PIC_IDX_MODE] {
+            let cu_data_best = &mut self.core.cu_data_best[log2_cuw - 2][log2_cuh - 2];
+            cu_data_best.mode_cpy_rec_to_ref(
+                x0 as usize,
+                y0 as usize,
+                cuw as usize,
+                cuh as usize,
+                &mut pic.borrow().frame.borrow_mut().planes,
+                &self.core.tree_cons,
+            );
+        }
+
+        /* restore best data */
+        evc_set_split_mode(
+            &mut self.core.cu_data_best[log2_cuw - 2][log2_cuh - 2].split_mode,
+            best_split_mode,
+            cud,
+            0,
+            cuw,
+            cuh,
+            cuw,
+        );
+
+        self.core.s_next_best[log2_cuw - 2][log2_cuh - 2] = s_temp_depth;
+        self.core.dqp_next_best[log2_cuw - 2][log2_cuh - 2] = dqp_temp_depth;
+
+        assert_ne!(cost_best, MAX_COST);
+
+        if cost_best > MAX_COST {
+            MAX_COST
+        } else {
+            cost_best
         }
     }
 
@@ -1004,8 +1271,8 @@ impl EvceCtx {
 
     fn check_run_split(
         &mut self,
-        log2_cuw: u8,
-        log2_cuh: u8,
+        log2_cuw: usize,
+        log2_cuh: usize,
         cup: u16,
         next_split: bool,
         do_curr: bool,
@@ -1052,8 +1319,8 @@ impl EvceCtx {
 
     fn get_min_max_qp(
         &mut self,
-        min_qp: &mut u8,
-        max_qp: &mut u8,
+        min_qp: &mut i8,
+        max_qp: &mut i8,
         is_dqp_set: &mut bool,
         split_mode: SplitMode,
         cuw: u16,
@@ -1064,28 +1331,28 @@ impl EvceCtx {
     ) {
         *is_dqp_set = false;
         if !self.pps.cu_qp_delta_enabled_flag {
-            *min_qp = self.qp; // Clip?
-            *max_qp = self.qp;
+            *min_qp = self.qp as i8; // Clip?
+            *max_qp = self.qp as i8;
         } else {
             if !self.sps.dquant_flag {
                 if split_mode != SplitMode::NO_SPLIT {
-                    *min_qp = qp; // Clip?
-                    *max_qp = qp;
+                    *min_qp = qp as i8; // Clip?
+                    *max_qp = qp as i8;
                 } else {
-                    *min_qp = self.qp;
-                    *max_qp = self.qp + self.sh.dqp;
+                    *min_qp = self.qp as i8;
+                    *max_qp = self.qp as i8 + self.sh.dqp;
                 }
             } else {
-                *min_qp = qp; // Clip?
-                *max_qp = qp;
+                *min_qp = qp as i8; // Clip?
+                *max_qp = qp as i8;
                 if split_mode == SplitMode::NO_SPLIT
                     && CONV_LOG2(cuw as usize) + CONV_LOG2(cuh as usize)
                         >= self.pps.cu_qp_delta_area
                     && self.core.cu_qp_delta_code_mode != 2
                 {
                     self.core.cu_qp_delta_code_mode = 1;
-                    *min_qp = self.qp;
-                    *max_qp = self.qp + self.sh.dqp;
+                    *min_qp = self.qp as i8;
+                    *max_qp = self.qp as i8 + self.sh.dqp;
 
                     if CONV_LOG2(cuw as usize) == 7 || CONV_LOG2(cuh as usize) == 7 {
                         *is_dqp_set = true;
@@ -1101,9 +1368,82 @@ impl EvceCtx {
                 {
                     self.core.cu_qp_delta_code_mode = 2;
                     *is_dqp_set = true;
-                    *min_qp = self.qp;
-                    *max_qp = self.qp + self.sh.dqp;
+                    *min_qp = self.qp as i8;
+                    *max_qp = self.qp as i8 + self.sh.dqp;
                 }
+            }
+        }
+    }
+
+    fn update_map_scu(&mut self, x: u16, y: u16, src_cuw: u16, src_cuh: u16) {
+        let scu_x = x as usize >> MIN_CU_LOG2;
+        let scu_y = y as usize >> MIN_CU_LOG2;
+        let log2_src_cuw = CONV_LOG2(src_cuw as usize) as usize;
+        let log2_src_cuh = CONV_LOG2(src_cuh as usize) as usize;
+        let pos = scu_y * self.w_scu as usize + scu_x;
+
+        let mut map_scu = &mut self.map_scu[pos..];
+        let mut src_map_scu =
+            &self.core.cu_data_best[log2_src_cuw - 2][log2_src_cuh - 2].map_scu[..];
+
+        let mut map_ipm = &mut self.map_ipm[pos..];
+        let mut src_map_ipm =
+            &self.core.cu_data_best[log2_src_cuw - 2][log2_src_cuh - 2].ipm[0][..];
+
+        let mut map_depth = &mut self.map_depth[pos..];
+        let mut src_depth = &self.core.cu_data_best[log2_src_cuw - 2][log2_src_cuh - 2].depth[..];
+
+        let mut map_cu_mode = &mut self.map_cu_mode[pos..];
+        let mut src_map_cu_mode =
+            &self.core.cu_data_best[log2_src_cuw - 2][log2_src_cuh - 2].map_cu_mode[..];
+
+        let w = if x + src_cuw > self.w {
+            (self.w - x) >> MIN_CU_LOG2
+        } else {
+            (src_cuw >> MIN_CU_LOG2)
+        } as usize;
+
+        let h = if y + src_cuh > self.h {
+            (self.h - y) >> MIN_CU_LOG2
+        } else {
+            (src_cuh >> MIN_CU_LOG2)
+        } as usize;
+
+        if let (Some(map_refi), Some(map_mv)) = (&mut self.map_refi, &mut self.map_mv) {
+            let (mut map_refi, mut map_mv) = (map_refi.borrow_mut(), map_mv.borrow_mut());
+
+            let mut map_refi = &mut map_refi[pos..];
+            let mut src_map_refi =
+                &self.core.cu_data_best[log2_src_cuw - 2][log2_src_cuh - 2].refi[..];
+
+            let mut map_mv = &mut map_mv[pos..];
+            let mut src_map_mv = &self.core.cu_data_best[log2_src_cuw - 2][log2_src_cuh - 2].mv[..];
+
+            for i in 0..h {
+                map_scu.copy_from_slice(&src_map_scu[..w]);
+                map_ipm.copy_from_slice(&src_map_ipm[..w]);
+                map_depth.copy_from_slice(&src_depth[..w]);
+                map_cu_mode.copy_from_slice(&src_map_cu_mode[..w]);
+                map_refi.copy_from_slice(&src_map_refi[..w]);
+                map_mv.copy_from_slice(&src_map_mv[..w]);
+
+                map_depth = &mut map_depth[self.w_scu as usize..];
+                src_depth = &src_depth[(src_cuw >> MIN_CU_LOG2) as usize..];
+
+                map_scu = &mut map_scu[self.w_scu as usize..];
+                src_map_scu = &src_map_scu[(src_cuw >> MIN_CU_LOG2) as usize..];
+
+                map_ipm = &mut map_ipm[self.w_scu as usize..];
+                src_map_ipm = &src_map_ipm[(src_cuw >> MIN_CU_LOG2) as usize..];
+
+                map_mv = &mut map_mv[self.w_scu as usize..];
+                src_map_mv = &src_map_mv[(src_cuw >> MIN_CU_LOG2) as usize..];
+
+                map_refi = &mut map_refi[self.w_scu as usize..];
+                src_map_refi = &src_map_refi[(src_cuw >> MIN_CU_LOG2) as usize..];
+
+                map_cu_mode = &mut map_cu_mode[self.w_scu as usize..];
+                src_map_cu_mode = &src_map_cu_mode[(src_cuw >> MIN_CU_LOG2) as usize..];
             }
         }
     }
@@ -1133,7 +1473,14 @@ impl EvceCtx {
         }
     }
 
-    fn mode_coding_unit(&mut self, x: u16, y: u16, log2_cuw: u8, log2_cuh: u8, cud: u16) -> f64 {
+    fn mode_coding_unit(
+        &mut self,
+        x: u16,
+        y: u16,
+        log2_cuw: usize,
+        log2_cuh: usize,
+        cud: u16,
+    ) -> f64 {
         let start_comp = if evc_check_luma(&self.core.tree_cons) {
             Y_C
         } else {
@@ -1146,7 +1493,7 @@ impl EvceCtx {
         };
 
         assert!((log2_cuw as i8 - log2_cuh as i8).abs() <= 2);
-        self.mode_cu_init(x, y, log2_cuw, log2_cuh, cud);
+        self.mode_cu_init(x, y, log2_cuw as u8, log2_cuh as u8, cud);
 
         self.core.avail_lr = evc_check_nev_avail(
             self.core.x_scu,
@@ -1264,8 +1611,8 @@ impl EvceCtx {
                 self.core.inter_satd = evce_satd_16b(
                     x as usize,
                     y as usize,
-                    log2_cuw as usize,
-                    log2_cuh as usize,
+                    log2_cuw,
+                    log2_cuh,
                     &planes[Y_C].as_region(),
                     &self.mode.pred_y_best.data,
                 );
@@ -1274,10 +1621,7 @@ impl EvceCtx {
                 self.core.inter_satd = u32::MAX;
             }
             if self.pps.cu_qp_delta_enabled_flag {
-                self.evce_set_qp(
-                    self.core.dqp_curr_best[log2_cuw as usize - 2][log2_cuh as usize - 2].curr_QP
-                        as u8,
-                );
+                self.evce_set_qp(self.core.dqp_curr_best[log2_cuw - 2][log2_cuh - 2].curr_QP as u8);
             }
 
             self.core.avail_cu = evc_get_avail_intra(
@@ -1286,8 +1630,8 @@ impl EvceCtx {
                 self.w_scu as usize,
                 self.h_scu as usize,
                 self.core.scup as usize,
-                log2_cuw,
-                log2_cuh,
+                log2_cuw as u8,
+                log2_cuh as u8,
                 &self.map_scu,
             );
             cost = self.pintra_analyze_cu(
@@ -1306,10 +1650,8 @@ impl EvceCtx {
                             evc_assert(self.core.trace_idx != 0);
                 #endif*/
                 self.core.cu_mode = PredMode::MODE_INTRA;
-                self.core.s_next_best[log2_cuw as usize - 2][log2_cuh as usize - 2] =
-                    self.core.s_temp_best;
-                self.core.dqp_next_best[log2_cuw as usize - 2][log2_cuh as usize - 2] =
-                    self.core.dqp_temp_best;
+                self.core.s_next_best[log2_cuw - 2][log2_cuh - 2] = self.core.s_temp_best;
+                self.core.dqp_next_best[log2_cuw - 2][log2_cuh - 2] = self.core.dqp_temp_best;
                 self.core.dist_cu_best = self.core.dist_cu;
 
                 //for i in start_comp..end_comp {
@@ -1317,8 +1659,7 @@ impl EvceCtx {
                 //self.mode.s_rec[i] = s_rec[i];
                 //}
 
-                let cu_data =
-                    &mut self.core.cu_data_temp[log2_cuw as usize - 2][log2_cuh as usize - 2];
+                let cu_data = &mut self.core.cu_data_temp[log2_cuw - 2][log2_cuh - 2];
                 cu_data.copy_to_cu_data(
                     self.core.cu_mode,
                     self.core.cuw,
@@ -1389,11 +1730,11 @@ impl EvceCtx {
         self.pinter.qp_u = self.core.qp_u;
         self.pinter.qp_v = self.core.qp_v;
 
-        self.evce_rdoq_bit_est(log2_cuw, log2_cuh);
+        self.evce_rdoq_bit_est(log2_cuw as usize, log2_cuh as usize);
     }
 
-    fn evce_rdoq_bit_est(&mut self, log2_cuw: u8, log2_cuh: u8) {
-        let sbac_ctx = &self.core.c_curr_best[log2_cuw as usize - 2][log2_cuh as usize - 2];
+    fn evce_rdoq_bit_est(&mut self, log2_cuw: usize, log2_cuh: usize) {
+        let sbac_ctx = &self.core.c_curr_best[log2_cuw - 2][log2_cuh - 2];
         for bin in 0..2 {
             self.core.rdoq_est.cbf_luma[bin] = biari_no_bits(bin, sbac_ctx.cbf_luma[0]) as i64;
             self.core.rdoq_est.cbf_cb[bin] = biari_no_bits(bin, sbac_ctx.cbf_cb[0]) as i64;
