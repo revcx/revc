@@ -18,6 +18,10 @@ The fastest and safest EVC encoder and decoder
 
 # Usage
 
+* run encoder without trace
+  * cargo run --bin revce -- -i tools/foreman_mb8.yuv -w 16 -h 16 -z 30 -f 1 -q 27 -r tools/tmp/rec.yuv --ref_pic_gap_length 8 -o tools/tmp/test.evc -v
+* run encoder with trace
+  * cargo run --bin revce --features "trace" -- -i tools/foreman_mb8.yuv -w 16 -h 16 -z 30 -f 1 -q 27 -r tools/tmp/rec.yuv --ref_pic_gap_length 8 -o tools/tmp/test.evc -v
 * run decoder without trace
   * cargo run --bin revcd -- -i test_ld_p.evc -o test.yuv -v
 * run decoder with trace
