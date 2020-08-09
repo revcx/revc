@@ -12,6 +12,6 @@ Cargo.lock
 **/*.rs.bk
 
 #debug files
-dec_trace.txt
+trace.txt
 
 

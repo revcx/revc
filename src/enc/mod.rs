@@ -925,7 +925,8 @@ impl EvceCtx {
          */
 
         /* initialize bitstream container */
-        self.bs.init(&mut self.tracer);
+        self.bs.init();
+        self.bs.tracer = self.tracer.take();
 
         /* clear map */
         /*
@@ -1053,9 +1054,12 @@ impl EvceCtx {
                     .is_bitcount = true;
 
                 /* analyzer lcu */
+                self.core.bs_temp.tracer = self.bs.tracer.take();
                 self.mode_analyze_lcu();
 
                 /* entropy coding ************************************************/
+                self.bs.tracer = self.core.bs_temp.tracer.take();
+
                 self.evce_eco_tree(
                     self.core.x_pel,
                     self.core.y_pel,
@@ -2038,7 +2042,8 @@ impl EvceCtx {
 
     fn evce_encode_sps(&mut self) {
         /* bitsteam initialize for sequence */
-        self.bs.init(&mut self.tracer);
+        self.bs.init();
+        self.bs.tracer = self.tracer.take();
 
         /* nalu header */
         self.nalu.set_nalu(NaluType::EVC_SPS_NUT, 0);
@@ -2050,7 +2055,8 @@ impl EvceCtx {
         evce_eco_sps(&mut self.bs, &self.sps);
 
         /* de-init BSW */
-        self.tracer = self.bs.deinit();
+        self.bs.deinit();
+        self.tracer = self.bs.tracer.take();
 
         /* write the bitstream size */
         self.bs.write_nalu_size();
@@ -2068,7 +2074,8 @@ impl EvceCtx {
 
     fn evce_encode_pps(&mut self) {
         /* bitsteam initialize for sequence */
-        self.bs.init(&mut self.tracer);
+        self.bs.init();
+        self.bs.tracer = self.tracer.take();
 
         /* nalu header */
         self.nalu
@@ -2081,7 +2088,8 @@ impl EvceCtx {
         evce_eco_pps(&mut self.bs, &self.sps, &self.pps);
 
         /* de-init BSW */
-        self.tracer = self.bs.deinit();
+        self.bs.deinit();
+        self.tracer = self.bs.tracer.take();
 
         /* write the bitstream size */
         self.bs.write_nalu_size();

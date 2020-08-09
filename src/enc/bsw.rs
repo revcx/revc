@@ -51,19 +51,18 @@ impl EvceBsw {
         self.leftbits = 32;
     }
 
-    pub(crate) fn init(&mut self, tracer: &mut Option<Tracer>) {
+    pub(crate) fn init(&mut self) {
         self.code = 0;
         self.leftbits = 32;
         self.pkt = Some(Packet {
             data: Vec::with_capacity(1024), // 1K?
             pts: 0,
         });
-        self.tracer = tracer.take();
+        self.tracer = None;
     }
 
-    pub(crate) fn deinit(&mut self) -> Option<Tracer> {
+    pub(crate) fn deinit(&mut self) {
         self.flush();
-        self.tracer.take()
     }
 
     pub(crate) fn write_nalu_size(&mut self) {
