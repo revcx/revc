@@ -489,7 +489,7 @@ impl EvceCtx {
                 self.core.nnz[V_C] != 0,
             ];
             evc_sub_block_itdq(
-                &mut self.bs_temp.tracer,
+                &mut self.core.bs_temp.tracer,
                 &mut self.pintra.coef_tmp.data,
                 log2_cuw as u8,
                 log2_cuh as u8,
@@ -600,7 +600,7 @@ impl EvceCtx {
                 self.core.nnz[V_C] != 0,
             ];
             evc_sub_block_itdq(
-                &mut self.bs_temp.tracer,
+                &mut self.core.bs_temp.tracer,
                 &mut self.pintra.coef_tmp.data,
                 log2_cuw as u8,
                 log2_cuh as u8,

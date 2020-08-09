@@ -822,20 +822,20 @@ impl EvceCtx {
                 self.core.cu_mode = cu_mode_dqp;
                 self.core.dist_cu_best = dist_cu_best_dqp;
 
-                EVC_TRACE_COUNTER(&mut self.bs_temp.tracer);
-                EVC_TRACE(&mut self.bs_temp.tracer, "Block [");
-                EVC_TRACE(&mut self.bs_temp.tracer, x0);
-                EVC_TRACE(&mut self.bs_temp.tracer, " , ");
-                EVC_TRACE(&mut self.bs_temp.tracer, y0);
-                EVC_TRACE(&mut self.bs_temp.tracer, " ]x(");
-                EVC_TRACE(&mut self.bs_temp.tracer, cuw);
-                EVC_TRACE(&mut self.bs_temp.tracer, " x");
-                EVC_TRACE(&mut self.bs_temp.tracer, cuh);
-                EVC_TRACE(&mut self.bs_temp.tracer, " ) split_type ");
-                EVC_TRACE(&mut self.bs_temp.tracer, SplitMode::NO_SPLIT as u32);
-                EVC_TRACE(&mut self.bs_temp.tracer, "  cost is ");
-                EVC_TRACE(&mut self.bs_temp.tracer, cost_temp);
-                EVC_TRACE(&mut self.bs_temp.tracer, " \n");
+                EVC_TRACE_COUNTER(&mut self.core.bs_temp.tracer);
+                EVC_TRACE(&mut self.core.bs_temp.tracer, "Block [");
+                EVC_TRACE(&mut self.core.bs_temp.tracer, x0);
+                EVC_TRACE(&mut self.core.bs_temp.tracer, " , ");
+                EVC_TRACE(&mut self.core.bs_temp.tracer, y0);
+                EVC_TRACE(&mut self.core.bs_temp.tracer, " ]x(");
+                EVC_TRACE(&mut self.core.bs_temp.tracer, cuw);
+                EVC_TRACE(&mut self.core.bs_temp.tracer, " x");
+                EVC_TRACE(&mut self.core.bs_temp.tracer, cuh);
+                EVC_TRACE(&mut self.core.bs_temp.tracer, " ) split_type ");
+                EVC_TRACE(&mut self.core.bs_temp.tracer, SplitMode::NO_SPLIT as u32);
+                EVC_TRACE(&mut self.core.bs_temp.tracer, "  cost is ");
+                EVC_TRACE(&mut self.core.bs_temp.tracer, cost_temp);
+                EVC_TRACE(&mut self.core.bs_temp.tracer, " \n");
             } else {
                 cost_temp = MAX_COST;
             }
@@ -1030,20 +1030,20 @@ impl EvceCtx {
                         self.core.tree_cons = tree_cons;
                     }
 
-                    EVC_TRACE_COUNTER(&mut self.bs_temp.tracer);
-                    EVC_TRACE(&mut self.bs_temp.tracer, "Block [");
-                    EVC_TRACE(&mut self.bs_temp.tracer, x0);
-                    EVC_TRACE(&mut self.bs_temp.tracer, " , ");
-                    EVC_TRACE(&mut self.bs_temp.tracer, y0);
-                    EVC_TRACE(&mut self.bs_temp.tracer, " ]x(");
-                    EVC_TRACE(&mut self.bs_temp.tracer, cuw);
-                    EVC_TRACE(&mut self.bs_temp.tracer, " x");
-                    EVC_TRACE(&mut self.bs_temp.tracer, cuh);
-                    EVC_TRACE(&mut self.bs_temp.tracer, " ) split_type ");
-                    EVC_TRACE(&mut self.bs_temp.tracer, split_mode as u32);
-                    EVC_TRACE(&mut self.bs_temp.tracer, "  cost is ");
-                    EVC_TRACE(&mut self.bs_temp.tracer, cost_temp);
-                    EVC_TRACE(&mut self.bs_temp.tracer, " \n");
+                    EVC_TRACE_COUNTER(&mut self.core.bs_temp.tracer);
+                    EVC_TRACE(&mut self.core.bs_temp.tracer, "Block [");
+                    EVC_TRACE(&mut self.core.bs_temp.tracer, x0);
+                    EVC_TRACE(&mut self.core.bs_temp.tracer, " , ");
+                    EVC_TRACE(&mut self.core.bs_temp.tracer, y0);
+                    EVC_TRACE(&mut self.core.bs_temp.tracer, " ]x(");
+                    EVC_TRACE(&mut self.core.bs_temp.tracer, cuw);
+                    EVC_TRACE(&mut self.core.bs_temp.tracer, " x");
+                    EVC_TRACE(&mut self.core.bs_temp.tracer, cuh);
+                    EVC_TRACE(&mut self.core.bs_temp.tracer, " ) split_type ");
+                    EVC_TRACE(&mut self.core.bs_temp.tracer, split_mode as u32);
+                    EVC_TRACE(&mut self.core.bs_temp.tracer, "  cost is ");
+                    EVC_TRACE(&mut self.core.bs_temp.tracer, cost_temp);
+                    EVC_TRACE(&mut self.core.bs_temp.tracer, " \n");
 
                     if cost_best_dqp > cost_temp_dqp {
                         cost_best_dqp = cost_temp_dqp;
@@ -1331,16 +1331,16 @@ impl EvceCtx {
     ) {
         *is_dqp_set = false;
         if !self.pps.cu_qp_delta_enabled_flag {
-            *min_qp = self.qp as i8; // Clip?
-            *max_qp = self.qp as i8;
+            *min_qp = self.sh.qp as i8; // Clip?
+            *max_qp = self.sh.qp as i8;
         } else {
             if !self.sps.dquant_flag {
                 if split_mode != SplitMode::NO_SPLIT {
                     *min_qp = qp as i8; // Clip?
                     *max_qp = qp as i8;
                 } else {
-                    *min_qp = self.qp as i8;
-                    *max_qp = self.qp as i8 + self.sh.dqp;
+                    *min_qp = self.sh.qp as i8;
+                    *max_qp = self.sh.qp as i8 + self.sh.dqp;
                 }
             } else {
                 *min_qp = qp as i8; // Clip?
@@ -1351,8 +1351,8 @@ impl EvceCtx {
                     && self.core.cu_qp_delta_code_mode != 2
                 {
                     self.core.cu_qp_delta_code_mode = 1;
-                    *min_qp = self.qp as i8;
-                    *max_qp = self.qp as i8 + self.sh.dqp;
+                    *min_qp = self.sh.qp as i8;
+                    *max_qp = self.sh.qp as i8 + self.sh.dqp;
 
                     if CONV_LOG2(cuw as usize) == 7 || CONV_LOG2(cuh as usize) == 7 {
                         *is_dqp_set = true;
@@ -1368,8 +1368,8 @@ impl EvceCtx {
                 {
                     self.core.cu_qp_delta_code_mode = 2;
                     *is_dqp_set = true;
-                    *min_qp = self.qp as i8;
-                    *max_qp = self.qp as i8 + self.sh.dqp;
+                    *min_qp = self.sh.qp as i8;
+                    *max_qp = self.sh.qp as i8 + self.sh.dqp;
                 }
             }
         }

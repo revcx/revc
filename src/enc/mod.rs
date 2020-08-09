@@ -213,6 +213,7 @@ pub(crate) struct EvceCore {
     nnz: [u16; N_C],
     /* platform specific data, if needed */
     //void          *pf;
+
     /* bitstream structure for RDO */
     bs_temp: EvceBsw,
     s_temp_run: EvceSbac,
@@ -227,6 +228,7 @@ pub(crate) struct EvceCore {
     s_temp_prev_comp_run: EvceSbac,
     s_curr_before_split: [[EvceSbac; MAX_CU_DEPTH]; MAX_CU_DEPTH],
 
+    /* SBAC_CTX structures for full RDO */
     c_curr_best: [[EvcSbacCtx; MAX_CU_DEPTH]; MAX_CU_DEPTH],
     c_next_best: [[EvcSbacCtx; MAX_CU_DEPTH]; MAX_CU_DEPTH],
     c_temp_best: EvcSbacCtx,
@@ -234,6 +236,7 @@ pub(crate) struct EvceCore {
     c_temp_prev_comp_best: EvcSbacCtx,
     c_temp_prev_comp_run: EvcSbacCtx,
     c_curr_before_split: [[EvcSbacCtx; MAX_CU_DEPTH]; MAX_CU_DEPTH],
+
     //EVCE_BEF_DATA  bef_data[MAX_CU_DEPTH][MAX_CU_DEPTH][MAX_CU_CNT_IN_LCU][MAX_BEF_DATA_NUM];
     cost_best: f64,
     inter_satd: u32,
@@ -462,8 +465,6 @@ pub(crate) struct EvceCtx {
     tracer: Option<Tracer>,
     /* bitstream structure */
     bs: EvceBsw,
-    /* bitstream structure for RDO */
-    bs_temp: EvceBsw,
     /* sequnce parameter set */
     sps: EvcSps,
     /* picture parameter set */
@@ -680,8 +681,6 @@ impl EvceCtx {
             tracer: OPEN_TRACE(),
             /* bitstream structure */
             bs: EvceBsw::default(),
-            /* bitstream structure for RDO */
-            bs_temp: EvceBsw::default(),
             /* sequnce parameter set */
             sps: EvcSps::default(),
             /* picture parameter set */

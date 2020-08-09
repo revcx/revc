@@ -98,9 +98,8 @@ impl EvceSbac {
         self.bitcounter
             + 8 * (self.stacked_zero + self.stacked_ff)
             + 8 * (if self.is_pending_byte != 0 { 1 } else { 0 })
-            + 8
+            + 11
             - self.code_bits
-            + 3
     }
 
     pub(crate) fn finish(&mut self, bs: &mut EvceBsw) {
