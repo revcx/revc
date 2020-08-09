@@ -1,5 +1,5 @@
 use std::fmt::Display;
-use std::fs::OpenOptions;
+use std::fs::{File, OpenOptions};
 use std::io::Write;
 
 use super::def::*;
@@ -9,11 +9,15 @@ pub(crate) type Tracer = (Box<dyn Write>, isize);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 #[cfg(feature = "trace")]
-pub(crate) fn OPEN_TRACE() -> Option<Tracer> {
-    let fp_trace = OpenOptions::new()
-        .append(true)
-        .create(true)
-        .open("trace.txt");
+pub(crate) fn OPEN_TRACE(encoder: bool) -> Option<Tracer> {
+    let fp_trace = if encoder {
+        File::create("enc_trace.txt")
+    } else {
+        OpenOptions::new()
+            .append(true)
+            .create(true)
+            .open("dec_trace.txt")
+    };
     if let Ok(fp) = fp_trace {
         Some((Box::new(fp), 0))
     } else {
@@ -192,7 +196,7 @@ pub(crate) fn TRACE_DBF(
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[cfg(not(feature = "trace"))]
-pub(crate) fn OPEN_TRACE() -> Option<Tracer> {
+pub(crate) fn OPEN_TRACE(encoder: bool) -> Option<Tracer> {
     None
 }
 #[cfg(not(feature = "trace"))]

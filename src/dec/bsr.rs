@@ -57,7 +57,7 @@ impl EvcdBsr {
             leftbits: 0,
             cur: 0,
             pkt,
-            tracer: OPEN_TRACE(),
+            tracer: OPEN_TRACE(false),
         }
     }
 

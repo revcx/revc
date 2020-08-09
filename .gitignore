@@ -12,7 +12,7 @@ Cargo.lock
 **/*.rs.bk
 
 #debug files
-trace.txt
+*_trace.txt
 rec.yuv
 
 

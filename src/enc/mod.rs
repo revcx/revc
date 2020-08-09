@@ -678,7 +678,7 @@ impl EvceCtx {
             /* SBAC */
             sbac_enc: EvceSbac::default(),
             sbac_ctx: EvcSbacCtx::default(),
-            tracer: OPEN_TRACE(),
+            tracer: OPEN_TRACE(true),
             /* bitstream structure */
             bs: EvceBsw::default(),
             /* sequnce parameter set */
