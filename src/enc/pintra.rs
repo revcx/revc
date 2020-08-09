@@ -229,6 +229,7 @@ impl EvceCtx {
 
                     self.pintra.nnz_best[Y_C] = self.core.nnz[Y_C];
                     self.core.s_temp_prev_comp_best = self.core.s_temp_run;
+                    self.core.c_temp_prev_comp_best = self.core.c_temp_run;
                 }
             }
         } else {
@@ -301,6 +302,8 @@ impl EvceCtx {
 
         /* cost calculation */
         self.core.s_temp_run = self.core.s_curr_best[log2_cuw - 2][log2_cuh - 2];
+        self.core.c_temp_run = self.core.c_curr_best[log2_cuw - 2][log2_cuh - 2];
+
         self.core.dqp_temp_run = self.core.dqp_curr_best[log2_cuw - 2][log2_cuh - 2];
 
         self.core.s_temp_run.bit_reset();
@@ -320,6 +323,8 @@ impl EvceCtx {
         }
 
         self.core.s_temp_best = self.core.s_temp_run;
+        self.core.c_temp_best = self.core.c_temp_run;
+
         self.core.dqp_temp_best = self.core.dqp_temp_run;
 
         cost
@@ -361,7 +366,7 @@ impl EvceCtx {
             evc_ipred_b(
                 &core.nb.data[Y_C][0][2..],
                 &core.nb.data[Y_C][1][cuh..],
-                core.nb.data[Y_C][2][cuh - 1],
+                core.nb.data[Y_C][1][cuh - 1],
                 pred_buf,
                 i.into(),
                 cuw,
@@ -375,6 +380,8 @@ impl EvceCtx {
                 cost = cost_satd as f64;
             }
             core.s_temp_run = core.s_curr_best[log2_cuw - 2][log2_cuh - 2];
+            core.c_temp_run = core.c_curr_best[log2_cuw - 2][log2_cuh - 2];
+
             core.s_temp_run.bit_reset();
 
             evce_eco_intra_dir_b(
@@ -478,6 +485,8 @@ impl EvceCtx {
                 .copy_from_slice(&self.pintra.coef_tmp.data[Y_C][0..cuw * cuh]);
 
             self.core.s_temp_run = self.core.s_curr_best[log2_cuw - 2][log2_cuh - 2];
+            self.core.c_temp_run = self.core.c_curr_best[log2_cuw - 2][log2_cuh - 2];
+
             self.core.dqp_temp_run = self.core.dqp_curr_best[log2_cuw - 2][log2_cuh - 2];
             self.core.s_temp_run.bit_reset();
             self.evce_rdo_bit_cnt_cu_intra_luma(self.sh.slice_type);

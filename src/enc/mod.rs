@@ -1049,6 +1049,7 @@ impl EvceCtx {
                     [self.log2_max_cuwh as usize - 2] = self.sbac_enc;
                 self.core.c_curr_best[self.log2_max_cuwh as usize - 2]
                     [self.log2_max_cuwh as usize - 2] = self.sbac_ctx;
+
                 self.core.s_curr_best[self.log2_max_cuwh as usize - 2]
                     [self.log2_max_cuwh as usize - 2]
                     .is_bitcount = true;

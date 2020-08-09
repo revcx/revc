@@ -585,6 +585,7 @@ impl EvceCtx {
         let mut cost_best = MAX_COST;
         let mut cost_temp = MAX_COST;
         let mut s_temp_depth = EvceSbac::default();
+        let mut c_temp_depth = EvcSbacCtx::default();
         let boundary = !(x0 + cuw <= self.w && y0 + cuh <= self.h);
         let mut split_allow = vec![false; MAX_SPLIT_NUM];
         let avail_lr = evc_check_nev_avail(
@@ -625,6 +626,8 @@ impl EvceCtx {
 
         self.core.s_curr_before_split[log2_cuw - 2][log2_cuh - 2] =
             self.core.s_curr_best[log2_cuw - 2][log2_cuh - 2];
+        self.core.c_curr_before_split[log2_cuw - 2][log2_cuh - 2] =
+            self.core.c_curr_best[log2_cuw - 2][log2_cuh - 2];
 
         //decide allowed split modes for the current node
         //based on CU size located at boundary
@@ -697,6 +700,8 @@ impl EvceCtx {
                 {
                     /* consider CU split mode */
                     self.core.s_temp_run = self.core.s_curr_best[log2_cuw - 2][log2_cuh - 2];
+                    self.core.c_temp_run = self.core.c_curr_best[log2_cuw - 2][log2_cuh - 2];
+
                     self.core.s_temp_run.bit_reset();
                     evc_set_split_mode(
                         &mut self.core.cu_data_temp[log2_cuw - 2][log2_cuh - 2].split_mode,
@@ -730,7 +735,9 @@ impl EvceCtx {
 
                     bit_cnt = self.core.s_temp_run.get_bit_number();
                     cost_temp += self.lambda[0] * bit_cnt as f64;
+
                     self.core.s_curr_best[log2_cuw - 2][log2_cuh - 2] = self.core.s_temp_run;
+                    self.core.c_curr_best[log2_cuw - 2][log2_cuh - 2] = self.core.c_temp_run;
                 }
 
                 self.core.cup = cup as u32;
@@ -783,7 +790,10 @@ impl EvceCtx {
                         );
                         cost_best = cost_temp_dqp;
                         best_split_mode = SplitMode::NO_SPLIT;
+
                         s_temp_depth = self.core.s_next_best[log2_cuw - 2][log2_cuh - 2];
+                        c_temp_depth = self.core.c_next_best[log2_cuw - 2][log2_cuh - 2];
+
                         dqp_temp_depth = self.core.dqp_next_best[log2_cuw - 2][log2_cuh - 2];
 
                         if let Some(pic) = &self.pic[PIC_IDX_MODE] {
@@ -900,6 +910,9 @@ impl EvceCtx {
                     /* consider CU split flag */
                     self.core.s_temp_run =
                         self.core.s_curr_before_split[log2_cuw - 2][log2_cuh - 2];
+                    self.core.c_temp_run =
+                        self.core.c_curr_before_split[log2_cuw - 2][log2_cuh - 2];
+
                     self.core.s_temp_run.bit_reset();
                     evc_set_split_mode(
                         &mut self.core.cu_data_temp[log2_cuw - 2][log2_cuh - 2].split_mode,
@@ -926,7 +939,9 @@ impl EvceCtx {
 
                     bit_cnt = self.core.s_temp_run.get_bit_number();
                     cost_temp += (self.lambda[0] * bit_cnt as f64);
+
                     self.core.s_curr_best[log2_cuw - 2][log2_cuh - 2] = self.core.s_temp_run;
+                    self.core.c_curr_best[log2_cuw - 2][log2_cuh - 2] = self.core.c_temp_run;
                 }
 
                 let mut min_qp = 0i8;
@@ -987,12 +1002,19 @@ impl EvceCtx {
                             if part_num == 0 {
                                 self.core.s_curr_best[log2_sub_cuw - 2][log2_sub_cuh - 2] =
                                     self.core.s_curr_best[log2_cuw - 2][log2_cuh - 2];
+                                self.core.c_curr_best[log2_sub_cuw - 2][log2_sub_cuh - 2] =
+                                    self.core.c_curr_best[log2_cuw - 2][log2_cuh - 2];
+
                                 self.core.dqp_curr_best[log2_sub_cuw - 2][log2_sub_cuh - 2] =
                                     self.core.dqp_curr_best[log2_cuw - 2][log2_cuh - 2];
                             } else {
                                 self.core.s_curr_best[log2_sub_cuw - 2][log2_sub_cuh - 2] = self
                                     .core
                                     .s_next_best[prev_log2_sub_cuw - 2][prev_log2_sub_cuh - 2];
+                                self.core.c_curr_best[log2_sub_cuw - 2][log2_sub_cuh - 2] = self
+                                    .core
+                                    .c_next_best[prev_log2_sub_cuw - 2][prev_log2_sub_cuh - 2];
+
                                 self.core.dqp_curr_best[log2_sub_cuw - 2][log2_sub_cuh - 2] = self
                                     .core
                                     .dqp_next_best[prev_log2_sub_cuw - 2][prev_log2_sub_cuh - 2];
@@ -1066,8 +1088,12 @@ impl EvceCtx {
                             .prev_QP;
                         dqp_temp_depth =
                             self.core.dqp_next_best[prev_log2_sub_cuw - 2][prev_log2_sub_cuh - 2];
+
                         s_temp_depth =
                             self.core.s_next_best[prev_log2_sub_cuw - 2][prev_log2_sub_cuh - 2];
+                        c_temp_depth =
+                            self.core.c_next_best[prev_log2_sub_cuw - 2][prev_log2_sub_cuh - 2];
+
                         best_split_mode = split_mode;
                     }
 
@@ -1108,6 +1134,8 @@ impl EvceCtx {
         );
 
         self.core.s_next_best[log2_cuw - 2][log2_cuh - 2] = s_temp_depth;
+        self.core.c_next_best[log2_cuw - 2][log2_cuh - 2] = c_temp_depth;
+
         self.core.dqp_next_best[log2_cuw - 2][log2_cuh - 2] = dqp_temp_depth;
 
         assert_ne!(cost_best, MAX_COST);
@@ -1650,7 +1678,10 @@ impl EvceCtx {
                             evc_assert(self.core.trace_idx != 0);
                 #endif*/
                 self.core.cu_mode = PredMode::MODE_INTRA;
+
                 self.core.s_next_best[log2_cuw - 2][log2_cuh - 2] = self.core.s_temp_best;
+                self.core.c_next_best[log2_cuw - 2][log2_cuh - 2] = self.core.c_temp_best;
+
                 self.core.dqp_next_best[log2_cuw - 2][log2_cuh - 2] = self.core.dqp_temp_best;
                 self.core.dist_cu_best = self.core.dist_cu;
 
