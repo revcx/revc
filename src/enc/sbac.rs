@@ -213,11 +213,11 @@ impl EvceSbac {
         }
 
         while sym != 0 {
+            sym -= 1;
             if icounter < max_val {
                 self.encode_bin_ep(bs, if sym != 0 { 1 } else { 0 });
                 icounter += 1;
             }
-            sym -= 1;
         }
     }
 
@@ -237,6 +237,7 @@ impl EvceSbac {
         }
 
         while sym != 0 {
+            sym -= 1;
             if ctx_idx < num_ctx - 1 {
                 ctx_idx += 1;
             }
@@ -245,7 +246,6 @@ impl EvceSbac {
                 &mut models[ctx_idx as usize],
                 if sym != 0 { 1 } else { 0 },
             );
-            sym -= 1;
         }
     }
 
