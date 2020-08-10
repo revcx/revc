@@ -267,15 +267,15 @@ pub(crate) fn evce_satd_16b(
 pub(crate) fn evce_diff_16b(
     x: usize,
     y: usize,
-    w: usize,
-    h: usize,
+    cuw: usize,
+    cuh: usize,
     src1: &PlaneRegion<'_, pel>,
     src2: &[pel],
     diff: &mut [i16],
 ) {
-    for j in 0..h {
-        for i in 0..w {
-            diff[j * w + i] = src1[y + j][x + i] as i16 - src2[j * w + i] as i16;
+    for j in 0..cuh {
+        for i in 0..cuw {
+            diff[j * cuw + i] = src1[y + j][x + i] as i16 - src2[j * cuw + i] as i16;
         }
     }
 }
@@ -284,17 +284,19 @@ pub(crate) fn evce_diff_16b(
 pub(crate) fn evce_ssd_16b(
     x: usize,
     y: usize,
-    w: usize,
-    h: usize,
+    log_cuw: usize,
+    log_cuh: usize,
     src1: &PlaneRegion<'_, pel>,
     src2: &[pel],
 ) -> i64 {
     let shift = (BIT_DEPTH - 8) << 1;
     let mut ssd = 0;
+    let cuw = 1 << log_cuw;
+    let cuh = 1 << log_cuh;
 
-    for j in 0..h {
-        for i in 0..w {
-            let diff = src1[y + j][x + i] as i64 - src2[j * w + i] as i64;
+    for j in 0..cuh {
+        for i in 0..cuw {
+            let diff = src2[j * cuw + i] as i64 - src1[y + j][x + i] as i64;
             ssd += (diff * diff) >> shift;
         }
     }

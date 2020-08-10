@@ -217,7 +217,7 @@ impl EvceCtx {
                 EVC_TRACE(&mut self.core.bs_temp.tracer, "Luma mode ");
                 EVC_TRACE(&mut self.core.bs_temp.tracer, i as u8);
                 EVC_TRACE(&mut self.core.bs_temp.tracer, "  cost is ");
-                EVC_TRACE(&mut self.core.bs_temp.tracer, cost_t);
+                EVC_TRACE(&mut self.core.bs_temp.tracer, cost_t as i64);
                 EVC_TRACE(&mut self.core.bs_temp.tracer, " \n");
 
                 if cost_t < cost {
