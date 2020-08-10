@@ -1466,7 +1466,7 @@ impl EvceCtx {
         let sbac_ctx = &mut self.core.c_temp_run;
         let tree_cons = &self.core.tree_cons;
         let nnz = &self.core.nnz;
-        let coef = &self.pintra.coef_tmp;
+        let coef = &self.core.ctmp;
 
         let run_stats = evc_get_run(run_stats, tree_cons);
         let run = [
