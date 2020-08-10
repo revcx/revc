@@ -267,12 +267,14 @@ pub(crate) fn evce_satd_16b(
 pub(crate) fn evce_diff_16b(
     x: usize,
     y: usize,
-    cuw: usize,
-    cuh: usize,
+    log_cuw: usize,
+    log_cuh: usize,
     src1: &PlaneRegion<'_, pel>,
     src2: &[pel],
     diff: &mut [i16],
 ) {
+    let cuw = 1 << log_cuw;
+    let cuh = 1 << log_cuh;
     for j in 0..cuh {
         for i in 0..cuw {
             diff[j * cuw + i] = src1[y + j][x + i] as i16 - src2[j * cuw + i] as i16;

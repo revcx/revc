@@ -458,8 +458,8 @@ impl EvceCtx {
                 evce_diff_16b(
                     x,
                     y,
-                    cuw,
-                    cuh,
+                    log2_cuw,
+                    log2_cuh,
                     &planes[Y_C].as_region(),
                     &self.pintra.pred_cache[self.core.ipm[0] as usize],
                     &mut self.pintra.coef_tmp.data[Y_C],
@@ -551,22 +551,23 @@ impl EvceCtx {
                 &self.core.nb.data[U_C][0][2..],
                 &self.core.nb.data[U_C][1][(cuh >> 1) as usize..],
                 self.core.nb.data[U_C][1][(cuh >> 1) as usize - 1],
-                &mut self.core.pred[0].data[U_C],
-                self.core.ipm[1],
-                cuw as usize >> 1,
-                cuh as usize >> 1,
-            );
-            evc_ipred_b(
-                &self.core.nb.data[V_C][0][2..],
-                &self.core.nb.data[V_C][1][(cuh >> 1) as usize..],
-                self.core.nb.data[V_C][1][(cuh >> 1) as usize - 1],
-                &mut self.core.pred[0].data[V_C],
+                &mut self.pintra.pred.data[U_C],
                 self.core.ipm[1],
                 cuw as usize >> 1,
                 cuh as usize >> 1,
             );
 
-            if let Some(pic) = &self.pintra.pic_m {
+            evc_ipred_b(
+                &self.core.nb.data[V_C][0][2..],
+                &self.core.nb.data[V_C][1][(cuh >> 1) as usize..],
+                self.core.nb.data[V_C][1][(cuh >> 1) as usize - 1],
+                &mut self.pintra.pred.data[V_C],
+                self.core.ipm[1],
+                cuw as usize >> 1,
+                cuh as usize >> 1,
+            );
+
+            if let Some(pic) = &self.pintra.pic_o {
                 let frame = &pic.borrow().frame;
                 let planes = &frame.borrow().planes;
                 evce_diff_16b(

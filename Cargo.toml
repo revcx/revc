@@ -38,3 +38,6 @@ required-features = ["binaries"]
 name = "revce"
 path = "src/bin/revce.rs"
 required-features = ["binaries"]
+
+[profile.dev]
+opt-level = 0
