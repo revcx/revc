@@ -43,6 +43,11 @@ impl Demuxer for Y4mDemuxer {
                 f.planes[0].copy_from_raw_u8(frame.get_y_plane(), width * bytes, bytes);
                 f.planes[1].copy_from_raw_u8(frame.get_u_plane(), chroma_width * bytes, bytes);
                 f.planes[2].copy_from_raw_u8(frame.get_v_plane(), chroma_width * bytes, bytes);
+
+                f.planes[0].conv_8b_to_16b(2);
+                f.planes[1].conv_8b_to_16b(2);
+                f.planes[2].conv_8b_to_16b(2);
+
                 f
             })
             .map_err(|e| map_y4m_error(e))?;

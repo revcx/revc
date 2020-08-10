@@ -452,7 +452,7 @@ impl EvceCtx {
         if !chroma {
             assert!(evc_check_luma(&self.core.tree_cons));
 
-            if let Some(pic) = &self.pintra.pic_m {
+            if let Some(pic) = &self.pintra.pic_o {
                 let frame = &pic.borrow().frame;
                 let planes = &frame.borrow().planes;
                 evce_diff_16b(

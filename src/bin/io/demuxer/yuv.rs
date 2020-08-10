@@ -51,6 +51,10 @@ impl Demuxer for YuvDemuxer {
             frame.planes[1].copy_from_raw_u8(&rec_u, pitch_uv, bytes_per_sample);
             frame.planes[2].copy_from_raw_u8(&rec_v, pitch_uv, bytes_per_sample);
 
+            frame.planes[0].conv_8b_to_16b(2);
+            frame.planes[1].conv_8b_to_16b(2);
+            frame.planes[2].conv_8b_to_16b(2);
+
             Ok(Data::Frame(Some(frame)))
         } else {
             Err(io::Error::new(

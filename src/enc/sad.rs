@@ -275,7 +275,7 @@ pub(crate) fn evce_diff_16b(
 ) {
     for j in 0..h {
         for i in 0..w {
-            diff[j * w + h] = src1[y + j][x + i] as i16 - src2[j * w + i] as i16;
+            diff[j * w + i] = src1[y + j][x + i] as i16 - src2[j * w + i] as i16;
         }
     }
 }

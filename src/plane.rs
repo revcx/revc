@@ -376,6 +376,23 @@ impl<T: Pixel> Plane<T> {
         }
     }
 
+    pub fn conv_8b_to_16b(&mut self, shift: usize) {
+        let width = self.cfg.width;
+        let height = self.cfg.height;
+        let xorigin = self.cfg.xorigin;
+        let yorigin = self.cfg.yorigin;
+        let stride = self.cfg.stride;
+
+        for row in 0..height {
+            let base = (yorigin + row) * stride + xorigin;
+            let dst = &mut self.data[base..base + width];
+
+            for col in 0..width {
+                dst[col] = dst[col] << shift;
+            }
+        }
+    }
+
     pub fn downsample_from(&mut self, src: &Plane<T>) {
         let width = self.cfg.width;
         let height = self.cfg.height;
