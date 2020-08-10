@@ -517,12 +517,14 @@ impl EvceCtx {
             );
 
             evc_recon(
+                &mut self.core.bs_temp.tracer,
                 &self.pintra.coef_tmp.data[Y_C],
                 &self.pintra.pred_cache[self.core.ipm[0] as usize],
                 self.core.nnz[Y_C] != 0,
                 cuw,
                 cuh,
                 &mut self.pintra.rec.data[Y_C],
+                Y_C,
             );
 
             if let Some(pic) = &self.pintra.pic_o {
@@ -628,20 +630,24 @@ impl EvceCtx {
             );
 
             evc_recon(
+                &mut self.core.bs_temp.tracer,
                 &self.pintra.coef_tmp.data[U_C],
                 &self.pintra.pred.data[U_C],
                 self.core.nnz[U_C] != 0,
                 cuw >> 1,
                 cuh >> 1,
                 &mut self.pintra.rec.data[U_C],
+                U_C,
             );
             evc_recon(
+                &mut self.core.bs_temp.tracer,
                 &self.pintra.coef_tmp.data[V_C],
                 &self.pintra.pred.data[V_C],
                 self.core.nnz[V_C] != 0,
                 cuw >> 1,
                 cuh >> 1,
                 &mut self.pintra.rec.data[V_C],
+                V_C,
             );
 
             self.core.s_temp_run.bit_reset();

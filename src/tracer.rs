@@ -123,7 +123,7 @@ pub(crate) fn TRACE_PRED(
 }
 
 #[cfg(feature = "trace_reco")]
-pub(crate) fn TRACE_RECO(
+pub(crate) fn TRACE_RECO_PLANE_REGION(
     tracer: &mut Option<Tracer>,
     ch_type: usize,
     x: usize,
@@ -136,12 +136,35 @@ pub(crate) fn TRACE_RECO(
     EVC_TRACE(tracer, "Reco for ");
     EVC_TRACE(tracer, ch_type);
     EVC_TRACE(tracer, " : ");
-    for i in 0..cuh {
-        for j in 0..cuw {
+    for j in 0..cuh {
+        for i in 0..cuw {
             if !(i == 0 && j == 0) {
                 EVC_TRACE(tracer, " , ");
             }
-            EVC_TRACE(tracer, reco[y + i][x + j]);
+            EVC_TRACE(tracer, reco[y + j][x + i]);
+        }
+    }
+    EVC_TRACE(tracer, " \n");
+}
+
+#[cfg(feature = "trace_reco")]
+pub(crate) fn TRACE_RECO(
+    tracer: &mut Option<Tracer>,
+    ch_type: usize,
+    cuw: usize,
+    cuh: usize,
+    rec: &mut [pel],
+) {
+    EVC_TRACE_COUNTER(tracer);
+    EVC_TRACE(tracer, "Reco for ");
+    EVC_TRACE(tracer, ch_type);
+    EVC_TRACE(tracer, " : ");
+    for j in 0..cuh {
+        for i in 0..cuw {
+            if !(i == 0 && j == 0) {
+                EVC_TRACE(tracer, " , ");
+            }
+            EVC_TRACE(tracer, rec[j * cuw + i]);
         }
     }
     EVC_TRACE(tracer, " \n");
@@ -242,7 +265,7 @@ pub(crate) fn TRACE_PRED(
 }
 
 #[cfg(not(feature = "trace_reco"))]
-pub(crate) fn TRACE_RECO(
+pub(crate) fn TRACE_RECO_PLANE_REGION(
     tracer: &mut Option<Tracer>,
     ch_type: usize,
     x: usize,
@@ -250,6 +273,16 @@ pub(crate) fn TRACE_RECO(
     cuw: usize,
     cuh: usize,
     reco: &PlaneRegionMut<'_, pel>,
+) {
+}
+
+#[cfg(not(feature = "trace_reco"))]
+pub(crate) fn TRACE_RECO(
+    tracer: &mut Option<Tracer>,
+    ch_type: usize,
+    cuw: usize,
+    cuh: usize,
+    rec: &mut [pel],
 ) {
 }
 
