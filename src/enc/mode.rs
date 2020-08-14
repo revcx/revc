@@ -558,6 +558,43 @@ impl EvceCtx {
                     }
                 }
         #endif*/
+
+        self.update_to_ctx_map();
+        self.map_cu_data[self.core.lcu_num as usize].copy(
+            &self.core.cu_data_best[self.log2_max_cuwh as usize - 2]
+                [self.log2_max_cuwh as usize - 2],
+            0,
+            0,
+            self.log2_max_cuwh,
+            self.log2_max_cuwh,
+            self.log2_max_cuwh,
+            0,
+            &evc_get_default_tree_cons(),
+        );
+
+        /* Reset all coded flag for the current lcu */
+        self.core.x_scu = PEL2SCU(self.core.x_pel as usize) as u16;
+        self.core.y_scu = PEL2SCU(self.core.y_pel as usize) as u16;
+
+        let mut map_scu =
+            &mut self.map_scu[(self.core.y_scu * self.w_scu + self.core.x_scu) as usize..];
+        let w = std::cmp::min(
+            1 << (self.log2_max_cuwh - MIN_CU_LOG2 as u8),
+            self.w_scu - self.core.x_scu,
+        );
+        let h = std::cmp::min(
+            1 << (self.log2_max_cuwh - MIN_CU_LOG2 as u8),
+            self.h_scu - self.core.y_scu,
+        );
+
+        for i in 0..h {
+            for j in 0..w {
+                map_scu[j as usize].CLR_COD();
+            }
+            if i + 1 < h {
+                map_scu = &mut map_scu[self.w_scu as usize..];
+            }
+        }
     }
 
     fn mode_coding_tree(
@@ -1412,6 +1449,63 @@ impl EvceCtx {
                 }
             }
         }
+    }
+
+    fn update_to_ctx_map(&mut self) {
+        let cu_data = &self.core.cu_data_best[self.log2_max_cuwh as usize - 2]
+            [self.log2_max_cuwh as usize - 2];
+        let mut cuw = self.max_cuwh;
+        let mut cuh = self.max_cuwh;
+        let x = self.core.x_pel;
+        let y = self.core.y_pel;
+
+        if x + cuw > self.w {
+            cuw = self.w - x;
+        }
+
+        if y + cuh > self.h {
+            cuh = self.h - y;
+        }
+
+        let w = (cuw as usize) >> MIN_CU_LOG2;
+        let h = (cuh as usize) >> MIN_CU_LOG2;
+
+        /* copy mode info */
+        let mut core_idx = 0usize;
+        let mut ctx_idx = ((y >> MIN_CU_LOG2) * self.w_scu + (x >> MIN_CU_LOG2)) as usize;
+
+        if let (Some(map_refi), Some(map_mv)) = (&mut self.map_refi, &mut self.map_mv) {
+            let (mut map_refi, mut map_mv) = (map_refi.borrow_mut(), map_mv.borrow_mut());
+            let mut map_ipm = &mut self.map_ipm;
+
+            for i in 0..h {
+                for j in 0..w {
+                    if cu_data.pred_mode[core_idx + j] == PredMode::MODE_INTRA {
+                        map_ipm[ctx_idx + j] = cu_data.ipm[0][core_idx + j];
+                        map_mv[ctx_idx + j][REFP_0][MV_X] = 0;
+                        map_mv[ctx_idx + j][REFP_0][MV_Y] = 0;
+                        map_mv[ctx_idx + j][REFP_1][MV_X] = 0;
+                        map_mv[ctx_idx + j][REFP_1][MV_Y] = 0;
+                    } else {
+                        map_refi[ctx_idx + j][REFP_0] = cu_data.refi[core_idx + j][REFP_0];
+                        map_refi[ctx_idx + j][REFP_1] = cu_data.refi[core_idx + j][REFP_1];
+                        map_mv[ctx_idx + j][REFP_0][MV_X] = cu_data.mv[core_idx + j][REFP_0][MV_X];
+                        map_mv[ctx_idx + j][REFP_0][MV_Y] = cu_data.mv[core_idx + j][REFP_0][MV_Y];
+                        map_mv[ctx_idx + j][REFP_1][MV_X] = cu_data.mv[core_idx + j][REFP_1][MV_X];
+                        map_mv[ctx_idx + j][REFP_1][MV_Y] = cu_data.mv[core_idx + j][REFP_1][MV_Y];
+                    }
+                }
+                ctx_idx += self.w_scu as usize;
+                core_idx += (self.max_cuwh >> MIN_CU_LOG2) as usize;
+            }
+        }
+
+        self.update_map_scu(
+            self.core.x_pel,
+            self.core.y_pel,
+            self.max_cuwh,
+            self.max_cuwh,
+        );
     }
 
     fn update_map_scu(&mut self, x: u16, y: u16, src_cuw: u16, src_cuh: u16) {
