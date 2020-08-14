@@ -1066,7 +1066,14 @@ impl EvceCtx {
                     EVC_TRACE(&mut self.core.bs_temp.tracer, " x");
                     EVC_TRACE(&mut self.core.bs_temp.tracer, cuh);
                     EVC_TRACE(&mut self.core.bs_temp.tracer, " ) split_type ");
-                    EVC_TRACE(&mut self.core.bs_temp.tracer, split_mode as u32);
+                    EVC_TRACE(
+                        &mut self.core.bs_temp.tracer,
+                        if split_mode == SplitMode::NO_SPLIT {
+                            0
+                        } else {
+                            5
+                        },
+                    );
                     EVC_TRACE(&mut self.core.bs_temp.tracer, "  cost is ");
                     EVC_TRACE(&mut self.core.bs_temp.tracer, cost_temp as i64);
                     EVC_TRACE(&mut self.core.bs_temp.tracer, " \n");
@@ -1452,30 +1459,32 @@ impl EvceCtx {
             let mut src_map_mv = &self.core.cu_data_best[log2_src_cuw - 2][log2_src_cuh - 2].mv[..];
 
             for i in 0..h {
-                map_scu.copy_from_slice(&src_map_scu[..w]);
-                map_ipm.copy_from_slice(&src_map_ipm[..w]);
-                map_depth.copy_from_slice(&src_depth[..w]);
-                map_cu_mode.copy_from_slice(&src_map_cu_mode[..w]);
-                map_refi.copy_from_slice(&src_map_refi[..w]);
-                map_mv.copy_from_slice(&src_map_mv[..w]);
+                map_scu[..w].copy_from_slice(&src_map_scu[..w]);
+                map_ipm[..w].copy_from_slice(&src_map_ipm[..w]);
+                map_depth[..w].copy_from_slice(&src_depth[..w]);
+                map_cu_mode[..w].copy_from_slice(&src_map_cu_mode[..w]);
+                map_refi[..w].copy_from_slice(&src_map_refi[..w]);
+                map_mv[..w].copy_from_slice(&src_map_mv[..w]);
 
-                map_depth = &mut map_depth[self.w_scu as usize..];
-                src_depth = &src_depth[(src_cuw >> MIN_CU_LOG2) as usize..];
+                if i + 1 < h {
+                    map_depth = &mut map_depth[self.w_scu as usize..];
+                    src_depth = &src_depth[(src_cuw >> MIN_CU_LOG2) as usize..];
 
-                map_scu = &mut map_scu[self.w_scu as usize..];
-                src_map_scu = &src_map_scu[(src_cuw >> MIN_CU_LOG2) as usize..];
+                    map_scu = &mut map_scu[self.w_scu as usize..];
+                    src_map_scu = &src_map_scu[(src_cuw >> MIN_CU_LOG2) as usize..];
 
-                map_ipm = &mut map_ipm[self.w_scu as usize..];
-                src_map_ipm = &src_map_ipm[(src_cuw >> MIN_CU_LOG2) as usize..];
+                    map_ipm = &mut map_ipm[self.w_scu as usize..];
+                    src_map_ipm = &src_map_ipm[(src_cuw >> MIN_CU_LOG2) as usize..];
 
-                map_mv = &mut map_mv[self.w_scu as usize..];
-                src_map_mv = &src_map_mv[(src_cuw >> MIN_CU_LOG2) as usize..];
+                    map_mv = &mut map_mv[self.w_scu as usize..];
+                    src_map_mv = &src_map_mv[(src_cuw >> MIN_CU_LOG2) as usize..];
 
-                map_refi = &mut map_refi[self.w_scu as usize..];
-                src_map_refi = &src_map_refi[(src_cuw >> MIN_CU_LOG2) as usize..];
+                    map_refi = &mut map_refi[self.w_scu as usize..];
+                    src_map_refi = &src_map_refi[(src_cuw >> MIN_CU_LOG2) as usize..];
 
-                map_cu_mode = &mut map_cu_mode[self.w_scu as usize..];
-                src_map_cu_mode = &src_map_cu_mode[(src_cuw >> MIN_CU_LOG2) as usize..];
+                    map_cu_mode = &mut map_cu_mode[self.w_scu as usize..];
+                    src_map_cu_mode = &src_map_cu_mode[(src_cuw >> MIN_CU_LOG2) as usize..];
+                }
             }
         }
     }
