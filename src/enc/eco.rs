@@ -259,21 +259,15 @@ pub(crate) fn evce_eco_split_mode(
     cup: u16,
     cuw: u16,
     cuh: u16,
-    max_cuwh: u16,
+    lcu_s: u16,
     split_mode_buf: &LcuSplitMode,
 ) {
-    let mut split_mode = SplitMode::NO_SPLIT;
-    let mut ctx = 0;
-    let order_idx = if cuw >= cuh { 0 } else { 1 };
-
-    let mut split_allow = vec![false; MAX_SPLIT_NUM];
-
     if cuw < 8 && cuh < 8 {
         return;
     }
 
     //evc_assert(evce_check_luma(c, core));
-    split_mode = evc_get_split_mode(cud, cup, cuw, cuh, max_cuwh, split_mode_buf);
+    let split_mode = evc_get_split_mode(cud, cup, cuw, cuh, lcu_s, split_mode_buf);
 
     sbac.encode_bin(
         bs,
@@ -289,12 +283,12 @@ pub(crate) fn evce_eco_split_mode(
     EVC_TRACE(&mut bs.tracer, "x pos ");
     EVC_TRACE(
         &mut bs.tracer,
-        x_pel + ((cup % (max_cuwh >> MIN_CU_LOG2)) << MIN_CU_LOG2),
+        x_pel + ((cup % (lcu_s >> MIN_CU_LOG2)) << MIN_CU_LOG2),
     );
     EVC_TRACE(&mut bs.tracer, " y pos ");
     EVC_TRACE(
         &mut bs.tracer,
-        y_pel + ((cup / (max_cuwh >> MIN_CU_LOG2)) << MIN_CU_LOG2),
+        y_pel + ((cup / (lcu_s >> MIN_CU_LOG2)) << MIN_CU_LOG2),
     );
     EVC_TRACE(&mut bs.tracer, " width ");
     EVC_TRACE(&mut bs.tracer, cuw);
@@ -303,7 +297,14 @@ pub(crate) fn evce_eco_split_mode(
     EVC_TRACE(&mut bs.tracer, " depth ");
     EVC_TRACE(&mut bs.tracer, cud);
     EVC_TRACE(&mut bs.tracer, " split mode ");
-    EVC_TRACE(&mut bs.tracer, split_mode as u32);
+    EVC_TRACE(
+        &mut bs.tracer,
+        if split_mode == SplitMode::NO_SPLIT {
+            0
+        } else {
+            5
+        },
+    );
     EVC_TRACE(&mut bs.tracer, " \n");
 }
 

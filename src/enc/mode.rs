@@ -109,9 +109,9 @@ impl EvceCUData {
         let cuw = (1 << log2_cuw) as usize; //current CU width
         let cuh = (1 << log2_cuh) as usize; //current CU height
         let cus = (1 << log2_cus) as usize; //current CU buffer stride (= current CU width)
-        let cuw_scu = (1 << log2_cuw) as usize - MIN_CU_LOG2; //4x4 CU number in width
-        let cuh_scu = (1 << log2_cuh) as usize - MIN_CU_LOG2; //4x4 CU number in height
-        let cus_scu = (1 << log2_cus) as usize - MIN_CU_LOG2; //4x4 CU number in stride
+        let cuw_scu = 1 << (log2_cuw as usize - MIN_CU_LOG2); //4x4 CU number in width
+        let cuh_scu = 1 << (log2_cuh as usize - MIN_CU_LOG2); //4x4 CU number in height
+        let cus_scu = 1 << (log2_cus as usize - MIN_CU_LOG2); //4x4 CU number in stride
 
         // only copy src's first row of 4x4 CUs to dis's all 4x4 CUs
         if evc_check_luma(tree_cons) {
@@ -713,9 +713,7 @@ impl EvceCtx {
                         cuw,
                     );
                     let split_mode_buf = if self.core.s_temp_run.is_bitcount {
-                        &self.core.cu_data_temp[CONV_LOG2(cuw as usize) as usize - 2]
-                            [CONV_LOG2(cuh as usize) as usize - 2]
-                            .split_mode
+                        &self.core.cu_data_temp[log2_cuw - 2][log2_cuh - 2].split_mode
                     } else {
                         &self.map_cu_data[self.core.lcu_num as usize].split_mode
                     };
@@ -844,7 +842,7 @@ impl EvceCtx {
                 EVC_TRACE(&mut self.core.bs_temp.tracer, " ) split_type ");
                 EVC_TRACE(&mut self.core.bs_temp.tracer, SplitMode::NO_SPLIT as u32);
                 EVC_TRACE(&mut self.core.bs_temp.tracer, "  cost is ");
-                EVC_TRACE(&mut self.core.bs_temp.tracer, cost_temp);
+                EVC_TRACE(&mut self.core.bs_temp.tracer, cost_temp as i64);
                 EVC_TRACE(&mut self.core.bs_temp.tracer, " \n");
             } else {
                 cost_temp = MAX_COST;
@@ -923,6 +921,12 @@ impl EvceCtx {
                         cuh,
                         cuw,
                     );
+
+                    let split_mode_buf = if self.core.s_temp_run.is_bitcount {
+                        &self.core.cu_data_temp[log2_cuw - 2][log2_cuh - 2].split_mode
+                    } else {
+                        &self.map_cu_data[self.core.lcu_num as usize].split_mode
+                    };
                     evce_eco_split_mode(
                         &mut self.core.bs_temp,
                         &mut self.core.s_temp_run,
@@ -933,8 +937,8 @@ impl EvceCtx {
                         0,
                         cuw,
                         cuh,
-                        self.max_cuwh,
-                        &self.map_cu_data[self.core.lcu_num as usize].split_mode,
+                        cuw,
+                        split_mode_buf,
                     );
 
                     bit_cnt = self.core.s_temp_run.get_bit_number();
@@ -1064,7 +1068,7 @@ impl EvceCtx {
                     EVC_TRACE(&mut self.core.bs_temp.tracer, " ) split_type ");
                     EVC_TRACE(&mut self.core.bs_temp.tracer, split_mode as u32);
                     EVC_TRACE(&mut self.core.bs_temp.tracer, "  cost is ");
-                    EVC_TRACE(&mut self.core.bs_temp.tracer, cost_temp);
+                    EVC_TRACE(&mut self.core.bs_temp.tracer, cost_temp as i64);
                     EVC_TRACE(&mut self.core.bs_temp.tracer, " \n");
 
                     if cost_best_dqp > cost_temp_dqp {

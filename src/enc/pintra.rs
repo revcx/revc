@@ -678,6 +678,21 @@ impl EvceCtx {
                         &planes[V_C].as_region(),
                         &self.pintra.rec.data[V_C],
                     ) as f64;
+            }
+
+            self.calc_delta_dist_filter_boundary(); //ctx, PIC_MODE(ctx), PIC_ORIG(ctx), cuw, cuh, pi -> rec, cuw, x, y, core -> avail_lr, 1,
+                                                    // !evce_check_luma(ctx, core)?
+                                                    // core -> cu_data_temp[log2_cuw - 2][log2_cuh - 2].nnz[Y_C] != 0:
+                                                    // core -> nnz[Y_C] != 0, NULL, NULL, 0, core -> ats_inter_info, core);
+
+            cost += (self.core.delta_dist[U_C] as f64 * self.dist_chroma_weight[0])
+                + (self.core.delta_dist[V_C] as f64 * self.dist_chroma_weight[1]);
+
+            *dist = cost as i32;
+
+            if let Some(pic) = &self.pintra.pic_o {
+                let frame = &pic.borrow().frame;
+                let planes = &frame.borrow().planes;
                 cost += evce_ssd_16b(
                     x,
                     y,
@@ -688,14 +703,6 @@ impl EvceCtx {
                 ) as f64;
             }
 
-            self.calc_delta_dist_filter_boundary(); //ctx, PIC_MODE(ctx), PIC_ORIG(ctx), cuw, cuh, pi -> rec, cuw, x, y, core -> avail_lr, 1,
-                                                    // !evce_check_luma(ctx, core)?
-                                                    // core -> cu_data_temp[log2_cuw - 2][log2_cuh - 2].nnz[Y_C] != 0:
-                                                    // core -> nnz[Y_C] != 0, NULL, NULL, 0, core -> ats_inter_info, core);
-
-            cost += (self.core.delta_dist[U_C] as f64 * self.dist_chroma_weight[0])
-                + (self.core.delta_dist[V_C] as f64 * self.dist_chroma_weight[1]);
-            *dist = cost as i32;
             cost += (self.lambda[0] * bit_cnt as f64);
         }
 
