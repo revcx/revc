@@ -152,15 +152,15 @@ fn ipred_hor_b(src_le: &[pel], dst: &mut [pel], w: usize, h: usize) {
 }
 
 fn ipred_dc_b(src_le: &[pel], src_up: &[pel], dst: &mut [pel], w: usize, h: usize) {
-    let mut dc = 0;
+    let mut dc = 0u32;
     for i in 0..h {
-        dc += src_le[i];
+        dc += src_le[i] as u32;
     }
     for j in 0..w {
-        dc += src_up[j];
+        dc += src_up[j] as u32;
     }
-    dc = (dc + w as pel) >> (evc_tbl_log2[w] + 1) as pel;
 
+    let dc = ((dc + w as u32) >> (evc_tbl_log2[w] + 1)) as pel;
     for v in dst[..w * h].iter_mut() {
         *v = dc;
     }

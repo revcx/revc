@@ -884,7 +884,7 @@ fn get_coded_level_rl(
     run: u32,
     ctx_run: usize,
     ctx_level: usize,
-    q_bits: usize,
+    q_bits: isize,
     err_scale: i64,
     lambda: i64,
     rdoq_est: &EvceRdoqEst,
@@ -943,11 +943,11 @@ fn evce_rdoq_run_length_cc(
     };
     let q_value = (quant_scale[qp_rem] * ns_scale + ns_offset) >> ns_shift;
     let log2_size = (log2_cuw + log2_cuh) >> 1;
-    let tr_shift = MAX_TX_DYNAMIC_RANGE - BIT_DEPTH - (log2_size);
+    let tr_shift = MAX_TX_DYNAMIC_RANGE as isize - BIT_DEPTH as isize - log2_size as isize;
     let max_num_coef = 1 << (log2_cuw + log2_cuh);
     let scan = &evc_scan_tbl[log2_cuw - 1];
     let ctx_last = if ch_type == Y_C { 0 } else { 1 };
-    let q_bits = QUANT_SHIFT + tr_shift + (qp as usize / 6);
+    let q_bits = QUANT_SHIFT as isize + tr_shift + (qp as isize / 6);
     let mut nnz = 0;
     let mut sum_all = 0;
 
@@ -1101,8 +1101,9 @@ fn evce_quant_nnz(
     } else {
         1
     };
-    let tr_shift = MAX_TX_DYNAMIC_RANGE - BIT_DEPTH - log2_size + ns_shift;
-    let shift = QUANT_SHIFT + tr_shift + (qp as usize / 6);
+    let tr_shift =
+        MAX_TX_DYNAMIC_RANGE as isize - BIT_DEPTH as isize - log2_size as isize + ns_shift;
+    let shift = QUANT_SHIFT as isize + tr_shift + (qp as isize / 6);
     let cuwxh = (1usize << (log2_cuw + log2_cuh));
 
     if USE_RDOQ {
