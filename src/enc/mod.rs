@@ -444,6 +444,8 @@ pub(crate) struct EvceCtx {
     pico_max_cnt: usize,
     gop_size: usize,
 
+    sps_pps_once: bool,
+
     /* EVCE identifier */
     //EVCE                   id;
     /* address of core structure */
@@ -660,6 +662,8 @@ impl EvceCtx {
             pico_idx: 0,
             pico_max_cnt,
             gop_size: param.max_b_frames as usize + 1,
+
+            sps_pps_once: false,
 
             /* EVCE identifier */
             //EVCE                   id;
@@ -914,8 +918,13 @@ impl EvceCtx {
         self.decide_slice_type();
 
         if self.slice_type == SliceType::EVC_ST_I {
-            self.evce_encode_sps();
-            self.evce_encode_pps();
+            if !self.sps_pps_once {
+                self.evce_encode_sps();
+                self.evce_encode_pps();
+
+                //TODO:
+                self.sps_pps_once = true;
+            }
         }
 
         self.lcu_cnt = self.f_lcu;
