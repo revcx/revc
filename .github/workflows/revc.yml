@@ -26,3 +26,7 @@ jobs:
         cd tools
         cargo run --bin revcd -- -i ./data/test_ra_b_q37.evc -o ./tmp/test_ra_b_q37_revc.yuv -v
         md5sum -c                   ./data/test_ra_b_q37.txt
+    - name: Run encoder test
+      run: |
+        cargo run --bin revce -- -i ./foreman_mb8.yuv -w 16 -h 16 -z 30 -f 1 -q 27 -r ./tmp/rec.yuv --ref_pic_gap_length 8 --disable_dbf -o ./tmp/foreman_mb8_nodb.evc -v
+        md5sum -c                   ./data/foreman_mb8_nodb.txt
