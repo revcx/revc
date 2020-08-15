@@ -143,7 +143,7 @@ fn print_summary(w: usize, h: usize, bs_cnt: usize, pic_cnt: usize, clk_tot: usi
     eprint!("Processed NALUs                   = {}\n", bs_cnt);
     eprint!("Decoded frame count               = {}\n", pic_cnt);
     if pic_cnt > 0 {
-        eprint!("total decoding time               = {} msec,", clk_tot);
+        eprint!("Total decoding time               = {} msec,", clk_tot);
         eprint!(" {:.3} sec\n", clk_tot as f32 / 1000.0);
 
         eprint!(

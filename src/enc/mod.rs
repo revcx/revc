@@ -1196,7 +1196,7 @@ impl EvceCtx {
         evc_assert(imgb_c != NULL);*/
 
         /* set stat */
-        stat.bytes = 0; //TODO:self.bs.EVC_BSW_GET_WRITE_BYTE();
+        stat.bytes = self.pkt.len();
         stat.nalu_type = if self.slice_type == SliceType::EVC_ST_I {
             NaluType::EVC_IDR_NUT
         } else {

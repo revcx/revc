@@ -87,12 +87,17 @@ fn parse_config(matches: &ArgMatches<'_>) -> std::io::Result<EncoderConfig> {
 
     cfg.width = matches.value_of("WIDTH").unwrap_or("0").parse().unwrap();
     cfg.height = matches.value_of("HEIGHT").unwrap_or("0").parse().unwrap();
-    if let Some(frame_rate) = matches.value_of("FRAME_RATE") {
-        cfg.time_base = Rational::new(
-            matches.value_of("TIME_SCALE").unwrap().parse().unwrap(),
-            frame_rate.parse().unwrap(),
-        );
+    cfg.fps = matches
+        .value_of("FRAME_RATE")
+        .unwrap_or("30")
+        .parse()
+        .unwrap();
+    if let Some(time_base) = matches.value_of("TIME_SCALE") {
+        cfg.time_base = Rational::new(1, time_base.parse().unwrap())
+    } else {
+        cfg.time_base = Rational::new(1, cfg.fps);
     }
+
     cfg.bit_depth = matches
         .value_of("BIT_DEPTH")
         .unwrap_or("8")
@@ -425,6 +430,125 @@ fn parse_cli() -> std::io::Result<CLISettings> {
     })
 }
 
+fn print_config(cli: &CLISettings) {
+    //if(op_verbose < VERBOSE_ALL) return;
+
+    eprint!(
+        "---------------------------------------------------------------------------------------\n"
+    );
+    eprint!("< Configurations >\n");
+    eprint!("\twidth                    = {}\n", cli.enc.width);
+    eprint!("\theight                   = {}\n", cli.enc.height);
+    eprint!("\tFPS                      = {}\n", cli.enc.fps);
+    eprint!(
+        "\tintra picture period     = {}\n",
+        cli.enc.max_key_frame_interval
+    );
+    eprint!("\tQP                       = {}\n", cli.enc.qp);
+
+    eprint!("\tframes                   = {}\n", cli.frames);
+    eprint!(
+        "\tdeblocking filter        = {}\n",
+        if !cli.enc.disable_dbf {
+            "enabled"
+        } else {
+            "disabled"
+        }
+    );
+    eprint!(
+        "\tGOP type                 = {}\n",
+        if cli.enc.closed_gop { "closed" } else { "open" }
+    );
+
+    eprint!(
+        "\thierarchical GOP         = {}\n",
+        if !cli.enc.disable_hgop {
+            "enabled"
+        } else {
+            "disabled"
+        }
+    );
+}
+
+fn print_stat_init() {
+    //if(op_verbose < VERBOSE_FRAME) return;
+
+    /*eprint!("---------------------------------------------------------------------------------------\n");
+    eprint!("  Input YUV file          : %s \n", op_fname_inp);
+    if(op_flag[OP_FLAG_FNAME_OUT])
+    {
+        eprint!("  Output EVC bitstream    : %s \n", op_fname_out);
+    }
+    if(op_flag[OP_FLAG_FNAME_REC])
+    {
+        eprint!("  Output YUV file         : %s \n", op_fname_rec);
+    }*/
+    eprint!(
+        "---------------------------------------------------------------------------------------\n"
+    );
+    eprint!("POC   Tid   Ftype   QP   PSNR-Y    PSNR-U    PSNR-V    Bytes     EncT(ms)  ");
+    //eprint!("MS-SSIM     ");
+    eprint!("Ref. List\n");
+
+    eprint!(
+        "---------------------------------------------------------------------------------------\n"
+    );
+}
+
+fn print_stat(stat: &EvcStat, duration: usize) {
+    let stype = match stat.stype {
+        SliceType::EVC_ST_I => 'I',
+        SliceType::EVC_ST_P => 'P',
+        SliceType::EVC_ST_B => 'B',
+        _ => 'U',
+    };
+    eprint!(
+        "{:<7}{:<5}({})     {:<5}{:<10.4}{:<10.4}{:<10.4}{:<10}{:<10}",
+        stat.poc, stat.tid, stype, stat.qp, 0.0, 0.0, 0.0, stat.bytes, duration
+    );
+    for i in 0..2 {
+        eprint!("[L{} ", i);
+        for j in 0..stat.refpic_num[i] as usize {
+            eprint!("{} ", stat.refpic[i][j]);
+        }
+        eprint!("] ");
+    }
+    eprint!("\n");
+}
+
+fn print_summary(fps: u64, bit_tot: usize, pic_cnt: usize, clk_tot: usize) {
+    eprint!(
+        "=======================================================================================\n"
+    );
+    eprint!("  PSNR Y(dB)       : {:<5.4}\n", 0.0);
+    eprint!("  PSNR U(dB)       : {:<5.4}\n", 0.0);
+    eprint!("  PSNR V(dB)       : {:<5.4}\n", 0.0);
+    eprint!("  Total bits(bits) : {:<.0}\n", bit_tot);
+    if pic_cnt > 0 {
+        let bitrate = (bit_tot * fps as usize) as f32 / (pic_cnt * 1000) as f32;
+        eprint!("  bitrate(kbps)    : {:<5.4}\n", bitrate);
+        eprint!(
+            "=======================================================================================\n"
+        );
+        eprint!("Encoded frame count               = {}\n", pic_cnt);
+
+        eprint!("Total encoding time               = {} msec,", clk_tot);
+        eprint!(" {:.3} sec\n", clk_tot as f32 / 1000.0);
+
+        eprint!(
+            "Average encoding time for a frame = {} msec\n",
+            clk_tot / pic_cnt
+        );
+        eprint!(
+            "Average encoding speed            = {:.3} frames/sec\n",
+            pic_cnt as f32 * 1000.0 / (clk_tot as f32)
+        );
+    }
+    eprint!(
+        "=======================================================================================\n"
+    );
+}
+
 #[derive(PartialEq)]
 enum EvceState {
     STATE_ENCODING,
@@ -442,7 +566,10 @@ fn main() -> std::io::Result<()> {
         cli.enc.time_base = video_info.time_base;
     }
 
-    eprint!("Encoding settings: {:?}\n", cli.enc);
+    if cli.verbose {
+        print_config(&cli);
+        print_stat_init();
+    }
 
     let cfg = Config {
         threads: cli.threads,
@@ -466,6 +593,7 @@ fn main() -> std::io::Result<()> {
         };
     }
 
+    let mut bit_tot = 0;
     let mut clk_tot = 0;
     let mut pic_cnt = 0;
 
@@ -513,11 +641,20 @@ fn main() -> std::io::Result<()> {
         clk_tot += duration.as_millis() as usize;
 
         match ret {
-            Ok(_) => cli.muxer.write(
-                data,
-                cli.bitdepth,
-                Rational::new(cli.enc.time_base.den, cli.enc.time_base.num),
-            )?,
+            Ok(st) => {
+                if let Some(stat) = st {
+                    if cli.verbose {
+                        print_stat(&stat, duration.as_millis() as usize);
+                    }
+                    bit_tot += stat.bytes << 3;
+                }
+
+                cli.muxer.write(
+                    data,
+                    cli.bitdepth,
+                    Rational::new(cli.enc.time_base.den, cli.enc.time_base.num),
+                )?;
+            }
             Err(err) => {
                 if err == EvcError::EVC_OK_NO_MORE_OUTPUT {
                     if cli.verbose {
@@ -529,6 +666,10 @@ fn main() -> std::io::Result<()> {
                 break;
             }
         }
+    }
+
+    if cli.verbose {
+        print_summary(cli.enc.fps, bit_tot, pic_cnt, clk_tot);
     }
 
     Ok(())

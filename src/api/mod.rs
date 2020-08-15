@@ -412,6 +412,7 @@ pub struct EncoderConfig {
     pub height: usize,
     // Video time base.
     pub time_base: Rational,
+    pub fps: u64,
 
     // Bit depth.
     pub bit_depth: usize,
