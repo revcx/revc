@@ -1089,7 +1089,6 @@ impl EvceCtx {
                 // TRACE_RDO = 0: comment this line, otherwise, 2: uncomment it
                 //self.core.bs_temp.tracer = self.bs.tracer.take();
                 self.mode_analyze_lcu();
-                // TRACE_RDO = 0: comment this line, otherwise, 2: uncomment it
                 //self.bs.tracer = self.core.bs_temp.tracer.take();
 
                 /* entropy coding ************************************************/

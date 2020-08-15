@@ -484,10 +484,9 @@ impl EvceCtx {
                 &self.core.rdoq_est,
             );
 
-            if self.core.nnz[Y_C] == 0 {
-                //(core->ats_intra_cu != 0 &&
-                return MAX_COST;
-            }
+            //if core->ats_intra_cu != 0 &&self.core.nnz[Y_C] == 0 {
+            //   return MAX_COST;
+            //}
 
             self.core.ctmp.data[Y_C][0..cuw * cuh]
                 .copy_from_slice(&self.pintra.coef_tmp.data[Y_C][0..cuw * cuh]);
