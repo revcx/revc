@@ -23,3 +23,4 @@ done
 
 
 # md5sum -b  ./tmp/foreman_mb8_nodb.evc > ./data/foreman_mb8_nodb.txt
+# md5sum -b  ./tmp/foreman_qcif8_nodb.evc > ./data/foreman_qcif8_nodb.txt
