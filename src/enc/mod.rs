@@ -430,7 +430,7 @@ pub(crate) struct EvceCtx {
     magic: u32,
 
     /* input frame */
-    //frm: Option<Frame<pel>>,
+    frm: Option<Frame<pel>>,
     /* output packet */
     pkt: Vec<u8>,
 
@@ -648,7 +648,7 @@ impl EvceCtx {
             /* magic code */
             magic: EVCE_MAGIC_CODE,
 
-            //frm: None,
+            frm: None,
             pkt: vec![],
 
             flush: false,
@@ -799,27 +799,27 @@ impl EvceCtx {
     }
 
     pub(crate) fn push_frm(&mut self, frm: &mut Option<Frame<pel>>) -> Result<(), EvcError> {
-        if frm.is_none() {
-            self.flush = true;
-        }
-
-        let frm = frm.take();
-        if let Some(f) = frm {
-            self.pico_idx = self.pic_icnt % self.pico_max_cnt;
-            let pico = &mut self.pico_buf[self.pico_idx];
-            pico.pic_icnt = self.pic_icnt;
-            pico.is_used = true;
-            self.pic_icnt += 1;
-
-            pico.pic.borrow_mut().frame = Rc::new(RefCell::new(f));
-
-            self.pic[PIC_IDX_ORIG] = Some(Rc::clone(&pico.pic));
-        }
-
+        self.frm = frm.take();
         Ok(())
     }
 
     pub(crate) fn encode_frm(&mut self) -> Result<EvcStat, EvcError> {
+        if self.frm.is_none() {
+            self.flush = true;
+        } else {
+            if let Some(f) = self.frm.take() {
+                self.pico_idx = self.pic_icnt % self.pico_max_cnt;
+                let pico = &mut self.pico_buf[self.pico_idx];
+                pico.pic_icnt = self.pic_icnt;
+                pico.is_used = true;
+                self.pic_icnt += 1;
+
+                pico.pic.borrow_mut().frame = Rc::new(RefCell::new(f));
+
+                self.pic[PIC_IDX_ORIG] = Some(Rc::clone(&pico.pic));
+            }
+        }
+
         /* bumping - check whether input pictures are remaining or not in pico_buf[] */
         self.check_more_frames()?;
         /* store input picture and return if needed */
@@ -1134,6 +1134,13 @@ impl EvceCtx {
             self.sh.qp_prev_eco = self.sh.qp;
              */
         }
+
+        /* de-init BSW */
+        self.bs.deinit();
+        self.tracer = self.bs.tracer.take();
+
+        /* write the bitstream size */
+        self.bs.write_nalu_size();
 
         /* append bs.pkt to ctx.pkt */
         if let Some(pkt) = self.bs.pkt.take() {
