@@ -944,10 +944,12 @@ impl EvceCtx {
          */
 
         /* clear map */
-        /*
-        evc_mset_x64a(self.map_scu, 0, sizeof(u32) * self.f_scu);
-        evc_mset_x64a(self.map_cu_mode, 0, sizeof(u32) * self.f_scu);
-        */
+        for v in &mut self.map_scu {
+            *v = MCU::default();
+        }
+        for v in &mut self.map_cu_mode {
+            *v = MCU::default();
+        }
 
         //TODO: support MULTIPLE_NAL?
 
@@ -1087,9 +1089,9 @@ impl EvceCtx {
                 /* analyzer lcu */
 
                 // TRACE_RDO = 0: comment this line, otherwise, 2: uncomment it
-                //self.core.bs_temp.tracer = self.bs.tracer.take();
+                // self.core.bs_temp.tracer = self.bs.tracer.take();
                 self.mode_analyze_lcu();
-                //self.bs.tracer = self.core.bs_temp.tracer.take();
+                // self.bs.tracer = self.core.bs_temp.tracer.take();
 
                 /* entropy coding ************************************************/
                 self.evce_eco_tree(
