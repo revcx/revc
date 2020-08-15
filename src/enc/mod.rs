@@ -1748,12 +1748,12 @@ impl EvceCtx {
         EVC_TRACE(&mut self.bs.tracer, " x pos ");
         EVC_TRACE(
             &mut self.bs.tracer,
-            x + ((cup as u16 % (self.max_cuwh >> MIN_CU_LOG2)) << MIN_CU_LOG2),
+            self.core.x_pel + ((cup as u16 % (self.max_cuwh >> MIN_CU_LOG2)) << MIN_CU_LOG2),
         );
         EVC_TRACE(&mut self.bs.tracer, " y pos ");
         EVC_TRACE(
             &mut self.bs.tracer,
-            y + ((cup as u16 / (self.max_cuwh as u16 >> MIN_CU_LOG2)) << MIN_CU_LOG2),
+            self.core.y_pel + ((cup as u16 / (self.max_cuwh as u16 >> MIN_CU_LOG2)) << MIN_CU_LOG2),
         );
         EVC_TRACE(&mut self.bs.tracer, " width ");
         EVC_TRACE(&mut self.bs.tracer, cuw);
@@ -2075,22 +2075,11 @@ impl EvceCtx {
         let scup = self.core.scup as usize;
         let w_cu = (1 << self.core.log2_cuw as usize) >> MIN_CU_LOG2;
         let h_cu = (1 << self.core.log2_cuh as usize) >> MIN_CU_LOG2;
-        let flag = if self.core.cu_mode == PredMode::MODE_INTRA {
-            1
-        } else {
-            0
-        };
-
-        //if let (Some(map_refi), Some(map_mv)) = (&mut self.map_refi, &mut self.map_mv) {
-        //    let (mut refis, mut mvs) = (map_refi.borrow_mut(), map_mv.borrow_mut());
 
         if evc_check_luma(&self.core.tree_cons) {
             for i in 0..h_cu {
                 let map_scu = &mut self.map_scu[scup + i * w_scu..];
-                let map_ipm = &mut self.map_ipm[scup + i * w_scu..];
                 let map_cu_mode = &mut self.map_cu_mode[scup + i * w_scu..];
-                //let refi = &mut refis[scup + i * w_scu..];
-                //let mv = &mut mvs[scup + i * w_scu..];
 
                 for j in 0..w_cu {
                     if self.core.cu_mode == PredMode::MODE_SKIP {
@@ -2104,26 +2093,18 @@ impl EvceCtx {
                         map_scu[j].CLR_CBFL();
                     }
 
+                    map_scu[j].SET_COD();
+
                     map_cu_mode[j].SET_LOGW(self.core.log2_cuw as u32);
                     map_cu_mode[j].SET_LOGH(self.core.log2_cuh as u32);
 
                     if self.pps.cu_qp_delta_enabled_flag {
                         map_scu[j].RESET_QP();
+                        map_scu[j].SET_QP(self.core.qp_prev_eco as u32);
                     }
-                    map_scu[j].SET_IF_COD_SN_QP(flag, self.slice_num as u32, self.core.qp);
-
-                    map_ipm[j] = self.core.ipm[0];
-
-                    /*refi[j][REFP_0] = self.core.refi[REFP_0];
-                    refi[j][REFP_1] = self.core.refi[REFP_1];
-                    mv[j][REFP_0][MV_X] = self.core.mv[REFP_0][MV_X];
-                    mv[j][REFP_0][MV_Y] = self.core.mv[REFP_0][MV_Y];
-                    mv[j][REFP_1][MV_X] = self.core.mv[REFP_1][MV_X];
-                    mv[j][REFP_1][MV_Y] = self.core.mv[REFP_1][MV_Y];*/
                 }
             }
         }
-        //}
     }
 
     fn evce_encode_sps(&mut self) {

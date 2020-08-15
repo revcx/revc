@@ -20,3 +20,6 @@ md5sum -b                     ./tmp/test_ld_b_q${QP}_evca.yuv      | awk '{print
 ./evca_decoder.exe        -i ./data/test_ra_b_q${QP}.evc                          -o ./tmp/test_ra_b_q${QP}_evca.yuv      -v 0
 md5sum -b                     ./tmp/test_ra_b_q${QP}_evca.yuv      | awk '{print $1,"./tmp/test_ra_b_q'${QP}'_revc.yuv"}'      > ./data/test_ra_b_q${QP}.txt
 done
+
+
+# md5sum -b  ./tmp/foreman_mb8_nodb.evc > ./data/foreman_mb8_nodb.txt
