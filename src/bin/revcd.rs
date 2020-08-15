@@ -102,12 +102,12 @@ fn parse_cli() -> std::io::Result<CLISettings> {
 }
 
 fn print_stat(stat: &EvcStat, bs_cnt: usize) {
-    eprint!("[{:4}] NALU --> ", bs_cnt);
+    eprint!("[{:>7}] NALU --> ", bs_cnt);
     if stat.nalu_type < NaluType::EVC_SPS_NUT {
         eprint!("{}-slice", stat.stype);
 
-        eprint!(" ({} bytes", stat.bytes);
-        eprint!(", poc={}, tid={}, ", stat.poc, stat.tid);
+        eprint!(" ({:>10} bytes", stat.bytes);
+        eprint!(", poc={:>7}, tid={:>2}), ", stat.poc, stat.tid);
 
         for i in 0..2 {
             eprint!("[L{} ", i);
