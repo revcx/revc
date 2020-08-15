@@ -245,6 +245,67 @@ pub(crate) fn evce_eco_pps(bs: &mut EvceBsw, sps: &EvcSps, pps: &EvcPps) {
     EVC_TRACE(&mut bs.tracer, "***********************************\n");
 }
 
+pub(crate) fn evce_eco_sh(
+    bs: &mut EvceBsw,
+    sps: &EvcSps,
+    pps: &EvcPps,
+    sh: &EvcSh,
+    nalu_type: NaluType,
+) {
+    EVC_TRACE(&mut bs.tracer, "***********************************\n");
+    EVC_TRACE(&mut bs.tracer, "************ SH  Start ************\n");
+
+    bs.write_ue(
+        sh.slice_pic_parameter_set_id as u32,
+        Some("sh->slice_pic_parameter_set_id"),
+    );
+    bs.write_ue(sh.slice_type as u32, Some("sh->slice_type"));
+
+    if nalu_type == NaluType::EVC_IDR_NUT {
+        bs.write1(
+            sh.no_output_of_prior_pics_flag as u32,
+            Some("sh->no_output_of_prior_pics_flag"),
+        );
+    } else {
+        if sh.slice_type == SliceType::EVC_ST_P || sh.slice_type == SliceType::EVC_ST_B {
+            bs.write1(
+                sh.num_ref_idx_active_override_flag as u32,
+                Some("sh->num_ref_idx_active_override_flag"),
+            );
+            if sh.num_ref_idx_active_override_flag {
+                let num_ref_idx_active_minus1 = sh.rpl_l0.ref_pic_active_num - 1;
+                bs.write_ue(
+                    num_ref_idx_active_minus1 as u32,
+                    Some("num_ref_idx_active_minus1"),
+                );
+                if sh.slice_type == SliceType::EVC_ST_B {
+                    let num_ref_idx_active_minus1 = sh.rpl_l1.ref_pic_active_num - 1;
+                    bs.write_ue(
+                        num_ref_idx_active_minus1 as u32,
+                        Some("num_ref_idx_active_minus1"),
+                    );
+                }
+            }
+        }
+    }
+
+    bs.write1(
+        sh.deblocking_filter_on as u32,
+        Some("sh->deblocking_filter_on"),
+    );
+    bs.write(sh.qp as u32, 6, Some("sh->qp"));
+    bs.write_se(sh.qp_u_offset as i32, Some("sh->qp_u_offset"));
+    bs.write_se(sh.qp_v_offset as i32, Some("sh->qp_v_offset"));
+
+    /* byte align */
+    while !bs.IS_BYTE_ALIGN() {
+        bs.write1(0, Some("t0"));
+    }
+
+    EVC_TRACE(&mut bs.tracer, "************ SH  End   ************\n");
+    EVC_TRACE(&mut bs.tracer, "***********************************\n");
+}
+
 pub(crate) fn evce_eco_tile_end_flag(bs: &mut EvceBsw, sbac: &mut EvceSbac, flag: u32) {
     sbac.encode_bin_trm(bs, flag);
 }

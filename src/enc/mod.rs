@@ -848,7 +848,9 @@ impl EvceCtx {
     }
 
     pub(crate) fn pull_pkt(&mut self) -> Result<Rc<RefCell<Packet>>, EvcError> {
-        Err(EvcError::EVC_OK_OUTPUT_NOT_AVAILABLE)
+        let data = self.pkt.clone();
+        self.pkt.clear();
+        Ok(Rc::new(RefCell::new(Packet { data, pts: 0 })))
     }
 
     fn check_frame_delay(&self) -> Result<(), EvcError> {
@@ -932,10 +934,6 @@ impl EvceCtx {
         evc_mset_x64a(self.map_mv, 0, size);
          */
 
-        /* initialize bitstream container */
-        self.bs.init();
-        self.bs.tracer = self.tracer.take();
-
         /* clear map */
         /*
         evc_mset_x64a(self.map_scu, 0, sizeof(u32) * self.f_scu);
@@ -949,6 +947,10 @@ impl EvceCtx {
     fn evce_enc_pic(&mut self) -> Result<(), EvcError> {
         let split_allow: [bool; 6] = [false, false, false, false, false, true];
         let num_slice_in_pic = self.param.num_slices_in_pic;
+
+        /* initialize bitstream container */
+        self.bs.init();
+        self.bs.tracer = self.tracer.take();
 
         for slice_num in 0..num_slice_in_pic {
             self.slice_num = slice_num;
@@ -1003,7 +1005,18 @@ impl EvceCtx {
                 self.nalu.nuh_temporal_id,
             );
 
+            /* Encode nalu header */
+            evce_eco_nalu(&mut self.bs, &self.nalu);
+
             self.set_sh();
+            /* Encode slice header */
+            evce_eco_sh(
+                &mut self.bs,
+                &self.sps,
+                &self.pps,
+                &self.sh,
+                self.nalu.nal_unit_type,
+            );
 
             {
                 let core = &mut self.core;
@@ -1063,12 +1076,14 @@ impl EvceCtx {
                     .is_bitcount = true;
 
                 /* analyzer lcu */
-                self.core.bs_temp.tracer = self.bs.tracer.take();
+
+                // TRACE_RDO = 0: comment this line, otherwise, 2: uncomment it
+                //self.core.bs_temp.tracer = self.bs.tracer.take();
                 self.mode_analyze_lcu();
+                // TRACE_RDO = 0: comment this line, otherwise, 2: uncomment it
+                //self.bs.tracer = self.core.bs_temp.tracer.take();
 
                 /* entropy coding ************************************************/
-                self.bs.tracer = self.core.bs_temp.tracer.take();
-
                 self.evce_eco_tree(
                     self.core.x_pel,
                     self.core.y_pel,
@@ -1100,6 +1115,29 @@ impl EvceCtx {
                     break;
                 }
             } //End of LCU processing loop for a tile
+
+            /* deblocking filter */
+            if self.sh.deblocking_filter_on {
+                unimplemented!();
+            }
+
+            /*self.core.x_lcu = 0;
+            self.core.y_lcu = 0;
+            self.core.x_pel = 0;
+            self.core.y_pel = 0;
+            self.core.lcu_num = 0;
+            self.lcu_cnt = self.f_lcu;
+            for i in 0..self.f_scu as usize {
+                self.map_scu[i].CLR_COD();
+            }
+
+            self.sh.qp_prev_eco = self.sh.qp;
+             */
+        }
+
+        /* append bs.pkt to ctx.pkt */
+        if let Some(pkt) = self.bs.pkt.take() {
+            self.pkt.extend_from_slice(&pkt.data);
         }
 
         Ok(())
@@ -1453,6 +1491,7 @@ impl EvceCtx {
 
     fn evce_eco_coef(
         &mut self,
+        bsc_temp: bool,
         log2_cuw: u8,
         log2_cuh: u8,
         pred_mode: PredMode,
@@ -1461,9 +1500,21 @@ impl EvceCtx {
         enc_dqp: i8,
         cur_qp: u8,
     ) {
-        let bs = &mut self.core.bs_temp;
-        let sbac = &mut self.core.s_temp_run;
-        let sbac_ctx = &mut self.core.c_temp_run;
+        let bs = if bsc_temp {
+            &mut self.core.bs_temp
+        } else {
+            &mut self.bs
+        };
+        let sbac = if bsc_temp {
+            &mut self.core.s_temp_run
+        } else {
+            &mut self.sbac_enc
+        };
+        let sbac_ctx = if bsc_temp {
+            &mut self.core.c_temp_run
+        } else {
+            &mut self.sbac_ctx
+        };
         let tree_cons = &self.core.tree_cons;
         let nnz = &self.core.nnz;
         let coef = &self.core.ctmp;
@@ -1657,7 +1708,7 @@ impl EvceCtx {
             }
 
             core.cu_qp_delta_code = cu_qp_delta_code;
-            //evce_eco_unit(ctx, core, x0, y0, cup, cuw, cuh, tree_cons);
+            self.evce_eco_unit(x0, y0, cup as usize, cuw, cuh, tree_cons);
         }
     }
 
@@ -1846,6 +1897,7 @@ impl EvceCtx {
 
         if !self.core.skip_flag {
             self.evce_eco_coef(
+                false,
                 self.core.log2_cuw,
                 self.core.log2_cuh,
                 self.core.cu_mode,

@@ -1934,6 +1934,7 @@ impl EvceCtx {
         }
 
         self.evce_eco_coef(
+            true,
             log2_cuw,
             log2_cuh,
             PredMode::MODE_INTRA,
@@ -1956,6 +1957,7 @@ impl EvceCtx {
         let log2_cuh = self.core.log2_cuh;
 
         self.evce_eco_coef(
+            true,
             log2_cuw,
             log2_cuh,
             PredMode::MODE_INTRA,
@@ -2003,6 +2005,7 @@ impl EvceCtx {
         }
 
         self.evce_eco_coef(
+            true,
             log2_cuw,
             log2_cuh,
             PredMode::MODE_INTRA,
