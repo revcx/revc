@@ -1262,7 +1262,7 @@ impl EvceCtx {
                     self.poc.poc_val = 0;
                     self.slice_ref_flag = true;
                 } else {
-                    self.slice_type = SliceType::from(self.param.inter_slice_type);
+                    self.slice_type = self.param.inter_slice_type;
 
                     if !self.param.disable_hgop {
                         self.slice_depth = tbl_slice_depth_P
@@ -1338,14 +1338,14 @@ impl EvceCtx {
             self.poc.prev_poc_val = self.poc.poc_val as u32;
             self.slice_ref_flag = true;
         } else if pic_imcnt % gop_size == 0 {
-            self.slice_type = SliceType::from(self.param.inter_slice_type);
+            self.slice_type = self.param.inter_slice_type;
             self.slice_depth = FRM_DEPTH_1;
             self.poc.poc_val = pic_imcnt as i32;
             self.poc.prev_doc_offset = 0;
             self.poc.prev_poc_val = self.poc.poc_val as u32;
             self.slice_ref_flag = true;
         } else {
-            self.slice_type = SliceType::from(self.param.inter_slice_type);
+            self.slice_type = self.param.inter_slice_type;
             if !self.param.disable_hgop {
                 let pos = (pic_imcnt % gop_size) - 1;
 

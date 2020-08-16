@@ -147,11 +147,17 @@ fn parse_config(matches: &ArgMatches<'_>) -> std::io::Result<EncoderConfig> {
         .unwrap_or("1")
         .parse()
         .unwrap();
-    cfg.inter_slice_type = matches
+    cfg.inter_slice_type = if matches
         .value_of("INTER_SLICE_TYPE")
         .unwrap_or("0")
-        .parse()
-        .unwrap();
+        .parse::<u8>()
+        .unwrap()
+        == 0
+    {
+        SliceType::EVC_ST_B
+    } else {
+        SliceType::EVC_ST_P
+    };
 
     Ok(cfg)
 }

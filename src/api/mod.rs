@@ -445,7 +445,7 @@ pub struct EncoderConfig {
     pub enable_cip: bool,
     pub disable_dbf: bool,
     pub num_slices_in_pic: usize,
-    pub inter_slice_type: u8,
+    pub inter_slice_type: SliceType,
 
     // Number of frames to read ahead for the RDO lookahead computation.
     pub rdo_lookahead_frames: usize,
