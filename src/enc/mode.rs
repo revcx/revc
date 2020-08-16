@@ -2071,5 +2071,7 @@ impl EvceCtx {
             self.core.delta_dist[V_C] = 0;
             return; //if no filter is applied, just return delta_dist as 0
         }
+
+        unimplemented!();
     }
 }

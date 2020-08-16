@@ -1,9 +1,12 @@
 use super::sad::*;
+use super::tq::*;
 use super::*;
 use crate::api::*;
 use crate::def::*;
+use crate::itdq::*;
 use crate::mc::*;
 use crate::picman::*;
+use crate::util::*;
 
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -26,22 +29,22 @@ pub(crate) struct EvcePInter {
     refi_pred: [[i8; MAX_NUM_MVP]; REFP_NUM],
     mvp_idx: [[u8; REFP_NUM]; InterPredDir::PRED_NUM as usize],
     /*s16  mvp_scale[REFP_NUM][MAX_NUM_ACTIVE_REF_FRAME][MAX_NUM_MVP][MV_D];
-        s16  mv_scale[REFP_NUM][MAX_NUM_ACTIVE_REF_FRAME][MV_D];
-        u8   mvp_idx_temp_for_bi[PRED_NUM][REFP_NUM][MAX_NUM_ACTIVE_REF_FRAME];
-        int  best_index[PRED_NUM][4];
+    s16  mv_scale[REFP_NUM][MAX_NUM_ACTIVE_REF_FRAME][MV_D];
+    u8   mvp_idx_temp_for_bi[PRED_NUM][REFP_NUM][MAX_NUM_ACTIVE_REF_FRAME];
+    int  best_index[PRED_NUM][4];
 
-        s8   first_refi[PRED_NUM][REFP_NUM];
-        u8   bi_idx[PRED_NUM];
-        u8   curr_bi;
-        int max_search_range;
-         u8   mvp_idx_scale[REFP_NUM][MAX_NUM_ACTIVE_REF_FRAME];
+    s8   first_refi[PRED_NUM][REFP_NUM];
+    u8   bi_idx[PRED_NUM];
+    u8   curr_bi;
+    int max_search_range;
+     u8   mvp_idx_scale[REFP_NUM][MAX_NUM_ACTIVE_REF_FRAME];
 
-        pel  p_error[MAX_CU_DIM];
-        int  i_gradient[2][MAX_CU_DIM];
-        s16  resi[N_C][MAX_CU_DIM];
-        s16  coff_save[N_C][MAX_CU_DIM];
-    */
-        /* MV predictor */
+    pel  p_error[MAX_CU_DIM];
+    int  i_gradient[2][MAX_CU_DIM];*/
+    resi: CUBuffer<i16>,
+    coff_save: CUBuffer<i16>,
+
+    /* MV predictor */
     mvp: [[[i16; MV_D]; MAX_NUM_MVP]; REFP_NUM],
 
     mv: [[[i16; MV_D]; REFP_NUM]; InterPredDir::PRED_NUM as usize],
@@ -420,10 +423,126 @@ impl EvceCtx {
         pidx: usize,
         mvp_idx: &[u8],
     ) -> f64 {
-        let pred = &self.pinter.pred[pidx];
-        let coef = &self.pinter.coef[pidx];
+        //let pred = &self.pinter.pred[pidx];
+        //let coef = &self.pinter.coef[pidx];
 
-        //TODO:
+        let mut coef_t: CUBuffer<i16> = CUBuffer::default();
+        let mut cbf_idx = [0; N_C];
+        let mut nnz_store = [0; N_C];
+
+        let mut dist = [[0i64; N_C]; 2];
+        let mut dist_no_resi = [0i64; N_C];
+
+        let cuw = 1 << log2_cuw;
+        let cuh = 1 << log2_cuh;
+        let x0 = [x, x >> 1, x >> 1];
+        let y0 = [y, y >> 1, y >> 1];
+        let w = [1 << log2_cuw, 1 << (log2_cuw - 1), 1 << (log2_cuw - 1)];
+        let h = [1 << log2_cuh, 1 << (log2_cuh - 1), 1 << (log2_cuh - 1)];
+        let log2_w = [log2_cuw, log2_cuw - 1, log2_cuw - 1];
+        let log2_h = [log2_cuh, log2_cuh - 1, log2_cuh - 1];
+
+        /* prediction */
+        evc_mc(
+            x as i16,
+            y as i16,
+            self.w as i16,
+            self.h as i16,
+            w[0] as i16,
+            h[0] as i16,
+            &self.pinter.refi[pidx],
+            &self.pinter.mv[pidx],
+            &self.refp,
+            &mut self.pinter.pred[pidx],
+            self.poc.poc_val,
+        );
+
+        /* get residual */
+
+        if let Some(pic) = &self.pintra.pic_o {
+            let frame = &pic.borrow().frame;
+            let planes = &frame.borrow().planes;
+
+            evce_diff_pred(
+                x,
+                y,
+                log2_cuw,
+                log2_cuh,
+                planes,
+                &self.pinter.pred[pidx][0],
+                &mut self.pinter.resi,
+            );
+
+            for i in 0..N_C {
+                dist[0][i] = evce_ssd_16b(
+                    x0[i],
+                    y0[i],
+                    log2_w[i],
+                    log2_h[i],
+                    &planes[i].as_region(),
+                    &self.pinter.pred[pidx][0].data[i],
+                );
+                dist_no_resi[i] = dist[0][i];
+            }
+        }
+
+        //prepare tu residual
+        copy_tu_from_cu(
+            &mut self.pinter.coef[pidx],
+            &self.pinter.resi,
+            log2_cuw,
+            log2_cuh,
+        );
+        if self.pps.cu_qp_delta_enabled_flag {
+            self.evce_set_qp(self.core.dqp_curr_best[log2_cuw - 2][log2_cuh - 2].curr_QP);
+        }
+
+        /* transform and quantization */
+        let tnnz = evce_sub_block_tq(
+            &mut self.pinter.coef[pidx],
+            log2_cuw,
+            log2_cuh,
+            self.core.qp_y,
+            self.core.qp_u,
+            self.core.qp_v,
+            self.pinter.slice_type,
+            &mut self.core.nnz,
+            false,
+            self.lambda[0],
+            self.lambda[1],
+            self.lambda[2],
+            TQC_RUN::RUN_L as u8 | TQC_RUN::RUN_CB as u8 | TQC_RUN::RUN_CR as u8,
+            &self.core.tree_cons,
+            &self.core.rdoq_est,
+        );
+
+        if tnnz != 0 {
+            for i in 0..N_C {
+                let size = (cuw * cuh) >> if i == 0 { 0 } else { 2 };
+                coef_t.data[i][0..size].copy_from_slice(&self.pinter.coef[pidx].data[i][0..size]);
+                cbf_idx[i] = 0;
+                nnz_store[i] = self.core.nnz[i];
+            }
+
+            let is_coef = [
+                self.core.nnz[Y_C] != 0,
+                self.core.nnz[U_C] != 0,
+                self.core.nnz[V_C] != 0,
+            ];
+            evc_sub_block_itdq(
+                &mut self.core.bs_temp.tracer,
+                &mut coef_t.data,
+                log2_cuw as u8,
+                log2_cuh as u8,
+                self.pinter.qp_y,
+                self.pinter.qp_u,
+                self.pinter.qp_v,
+                &is_coef,
+            );
+
+            self.calc_delta_dist_filter_boundary();
+        } else {
+        }
 
         0.0
     }

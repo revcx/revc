@@ -1,5 +1,7 @@
+use super::sad::*;
 use super::*;
 use crate::def::*;
+use crate::plane::*;
 
 lazy_static! {
     pub(crate) static ref entropy_bits: Box<[i32]> = {
@@ -137,4 +139,76 @@ pub(crate) fn evc_get_run(run_list: u8, tree_cons: &TREE_CONS) -> u8 {
         ans |= run_list & TQC_RUN::RUN_CR as u8;
     }
     return ans;
+}
+
+pub(crate) fn evce_diff_pred(
+    mut x: usize,
+    mut y: usize,
+    mut log2_cuw: usize,
+    mut log2_cuh: usize,
+    planes: &[Plane<pel>],
+    pred: &CUBuffer<pel>,
+    diff: &mut CUBuffer<i16>,
+) {
+    let mut cuw = 1 << log2_cuw;
+    let mut cuh = 1 << log2_cuh;
+
+    /* Y */
+    evce_diff_16b(
+        x,
+        y,
+        log2_cuw,
+        log2_cuh,
+        &planes[Y_C].as_region(),
+        &pred.data[Y_C],
+        &mut diff.data[Y_C],
+    );
+
+    cuw >>= 1;
+    cuh >>= 1;
+    x >>= 1;
+    y >>= 1;
+    log2_cuw -= 1;
+    log2_cuh -= 1;
+
+    /* U */
+    let buf = &planes[U_C].as_region();
+    evce_diff_16b(
+        x,
+        y,
+        log2_cuw,
+        log2_cuh,
+        &planes[U_C].as_region(),
+        &pred.data[U_C],
+        &mut diff.data[U_C],
+    );
+
+    /* V */
+    let buf = &planes[V_C].as_region();
+    evce_diff_16b(
+        x,
+        y,
+        log2_cuw,
+        log2_cuh,
+        &planes[V_C].as_region(),
+        &pred.data[V_C],
+        &mut diff.data[V_C],
+    );
+}
+
+pub(crate) fn copy_tu_from_cu(
+    tu_resi: &mut CUBuffer<i16>,
+    cu_resi: &CUBuffer<i16>,
+    log2_cuw: usize,
+    log2_cuh: usize,
+) {
+    let cuwh = (1 << log2_cuw) * (1 << log2_cuh);
+
+    //Y
+    tu_resi.data[Y_C][0..cuwh].copy_from_slice(&cu_resi.data[Y_C][0..cuwh]);
+
+    //UV
+    let cuwh = cuwh >> 2;
+    tu_resi.data[U_C][0..cuwh].copy_from_slice(&cu_resi.data[U_C][0..cuwh]);
+    tu_resi.data[V_C][0..cuwh].copy_from_slice(&cu_resi.data[V_C][0..cuwh]);
 }
