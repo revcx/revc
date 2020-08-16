@@ -457,7 +457,7 @@ pub(crate) struct EvceCtx {
     /* picture address for mode decision */
     //EVC_PIC * pic_m;
     /* reference picture (0: foward, 1: backward) */
-    refp: Rc<RefCell<Vec<Vec<EvcRefP>>>>, //EVC_REFP               refp[MAX_NUM_REF_PICS][REFP_NUM];
+    refp: Vec<Vec<EvcRefP>>, // Rc<RefCell<Vec<Vec<EvcRefP>>>>  refp[MAX_NUM_REF_PICS][REFP_NUM];
     /* encoding parameter */
     param: EncoderConfig,
     /* SBAC */
@@ -676,7 +676,7 @@ impl EvceCtx {
             /* picture address for mode decision */
             //EVC_PIC * pic_m;
             /* reference picture (0: foward, 1: backward) */
-            refp: Rc::new(RefCell::new(refp)),
+            refp, //: Rc::new(RefCell::new(refp)),
             /* encoding parameter */
             param,
             /* SBAC */
@@ -975,17 +975,14 @@ impl EvceCtx {
             }
 
             /* initialize reference pictures */
-            {
-                let mut refp = self.refp.borrow_mut();
-                self.rpm.evc_picman_refp_init(
-                    self.sps.max_num_ref_pics,
-                    self.slice_type,
-                    self.poc.poc_val as u32,
-                    self.nalu.nuh_temporal_id,
-                    self.last_intra_poc,
-                    &mut *refp,
-                );
-            }
+            self.rpm.evc_picman_refp_init(
+                self.sps.max_num_ref_pics,
+                self.slice_type,
+                self.poc.poc_val as u32,
+                self.nalu.nuh_temporal_id,
+                self.last_intra_poc,
+                &mut self.refp,
+            );
 
             /* initialize mode decision for frame encoding */
             self.mode_init_frame();
@@ -1173,20 +1170,18 @@ impl EvceCtx {
         }
 
         /* picture buffer management */
-        {
-            let mut refp = self.refp.borrow_mut();
 
-            self.rpm.evc_picman_put_pic(
-                pic_curr,
-                self.nalu.nal_unit_type == NaluType::EVC_IDR_NUT,
-                self.poc.poc_val as u32,
-                self.nalu.nuh_temporal_id,
-                false,
-                &mut *refp,
-                self.slice_ref_flag,
-                self.ref_pic_gap_length,
-            );
-        }
+        //let mut refp = self.refp.borrow_mut();
+        self.rpm.evc_picman_put_pic(
+            pic_curr,
+            self.nalu.nal_unit_type == NaluType::EVC_IDR_NUT,
+            self.poc.poc_val as u32,
+            self.nalu.nuh_temporal_id,
+            false,
+            &mut self.refp, // *refp,
+            self.slice_ref_flag,
+            self.ref_pic_gap_length,
+        );
 
         /*
         imgb_o = PIC_ORIG(ctx)->imgb;
@@ -1208,13 +1203,10 @@ impl EvceCtx {
         stat.poc = self.poc.poc_val as isize;
         stat.tid = self.nalu.nuh_temporal_id as isize;
 
-        {
-            let refp = self.refp.borrow();
-            for i in 0..2 {
-                stat.refpic_num[i] = self.rpm.num_refp[i];
-                for j in 0..stat.refpic_num[i] as usize {
-                    stat.refpic[i][j] = refp[j][i].poc as isize;
-                }
+        for i in 0..2 {
+            stat.refpic_num[i] = self.rpm.num_refp[i];
+            for j in 0..stat.refpic_num[i] as usize {
+                stat.refpic[i][j] = self.refp[j][i].poc as isize;
             }
         }
 
