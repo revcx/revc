@@ -1498,105 +1498,6 @@ impl EvceCtx {
         self.sqrt_lambda[2] = self.lambda[2].sqrt();
     }
 
-    fn evce_eco_coef(
-        &mut self,
-        bsc_temp: bool,
-        log2_cuw: u8,
-        log2_cuh: u8,
-        pred_mode: PredMode,
-        b_no_cbf: bool,
-        run_stats: u8,
-        enc_dqp: i8,
-        cur_qp: u8,
-    ) {
-        let bs = if bsc_temp {
-            &mut self.core.bs_temp
-        } else {
-            &mut self.bs
-        };
-        let sbac = if bsc_temp {
-            &mut self.core.s_temp_run
-        } else {
-            &mut self.sbac_enc
-        };
-        let sbac_ctx = if bsc_temp {
-            &mut self.core.c_temp_run
-        } else {
-            &mut self.sbac_ctx
-        };
-        let tree_cons = &self.core.tree_cons;
-        let nnz = &self.core.nnz;
-        let coef = &self.core.ctmp;
-
-        let run_stats = evc_get_run(run_stats, tree_cons);
-        let run = [
-            run_stats & 1 != 0,
-            (run_stats >> 1) & 1 != 0,
-            (run_stats >> 2) & 1 != 0,
-        ];
-
-        if !evc_check_luma(tree_cons) {
-            assert!(!run[0]);
-        }
-        if !evc_check_chroma(tree_cons) {
-            assert!(!run[1] && !run[2]);
-        }
-        assert!(run_stats != 0);
-
-        let mut cbf_all = 0;
-        let is_intra = pred_mode == PredMode::MODE_INTRA;
-
-        for c in 0..N_C {
-            if run[c] {
-                cbf_all += if nnz[c] != 0 { 1 } else { 0 };
-            }
-        }
-
-        evce_eco_cbf(
-            bs,
-            sbac,
-            sbac_ctx,
-            nnz[Y_C] != 0,
-            nnz[U_C] != 0,
-            nnz[V_C] != 0,
-            pred_mode,
-            b_no_cbf,
-            cbf_all,
-            &run,
-            tree_cons,
-        );
-        if self.pps.cu_qp_delta_enabled_flag {
-            if enc_dqp == 1 {
-                let cbf_for_dqp = nnz[Y_C] != 0 || nnz[U_C] != 0 || nnz[V_C] != 0;
-                if ((!(self.sps.dquant_flag)
-                    || (self.core.cu_qp_delta_code == 1 && !self.core.cu_qp_delta_is_coded))
-                    && (cbf_for_dqp))
-                    || (self.core.cu_qp_delta_code == 2 && !self.core.cu_qp_delta_is_coded)
-                {
-                    evce_eco_dqp(bs, sbac, sbac_ctx, self.core.qp_prev_eco, cur_qp);
-                    self.core.cu_qp_delta_is_coded = true;
-                    self.core.qp_prev_eco = cur_qp;
-                }
-            }
-        }
-
-        for c in 0..N_C {
-            if nnz[c] != 0 && run[c] {
-                let chroma = if c > 0 { 1 } else { 0 };
-                evce_eco_xcoef(
-                    bs,
-                    sbac,
-                    sbac_ctx,
-                    &coef.data[c],
-                    log2_cuw - chroma,
-                    log2_cuh - chroma,
-                    nnz[c],
-                    c,
-                );
-            }
-        }
-    }
-
     fn evce_eco_tree(
         &mut self,
         x0: u16,
@@ -1905,15 +1806,25 @@ impl EvceCtx {
         }
 
         if !self.core.skip_flag {
-            self.evce_eco_coef(
-                false,
+            evce_eco_coef(
+                &mut self.bs,
+                &mut self.sbac_enc,
+                &mut self.sbac_ctx,
+                &self.core.ctmp,
                 self.core.log2_cuw,
                 self.core.log2_cuh,
                 self.core.cu_mode,
+                &self.core.nnz,
                 false,
                 TQC_RUN::RUN_L as u8 | TQC_RUN::RUN_CB as u8 | TQC_RUN::RUN_CR as u8,
-                1,
+                true,
                 self.map_cu_data[self.core.lcu_num as usize].qp_y[cup] - 6 * (BIT_DEPTH as u8 - 8),
+                &self.core.tree_cons,
+                self.sps.dquant_flag,
+                self.pps.cu_qp_delta_enabled_flag,
+                self.core.cu_qp_delta_code,
+                &mut self.core.cu_qp_delta_is_coded,
+                &mut self.core.qp_prev_eco,
             );
         }
 

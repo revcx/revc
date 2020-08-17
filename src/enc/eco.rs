@@ -832,3 +832,109 @@ pub(crate) fn evce_eco_mvd(
     EVC_TRACE_INT(mvd[MV_Y]);
     EVC_TRACE_STR("\n");*/
 }
+
+pub(crate) fn evce_eco_coef(
+    bs: &mut EvceBsw,
+    sbac: &mut EvceSbac,
+    sbac_ctx: &mut EvcSbacCtx,
+    coef: &CUBuffer<i16>,
+    log2_cuw: u8,
+    log2_cuh: u8,
+    pred_mode: PredMode,
+    nnz: &[u16],
+    b_no_cbf: bool,
+    run_stats: u8,
+    enc_dqp: bool,
+    cur_qp: u8,
+    tree_cons: &TREE_CONS,
+    sps_dquant_flag: bool,
+    pps_cu_qp_delta_enabled_flag: bool,
+    core_cu_qp_delta_code: u8,
+    core_cu_qp_delta_is_coded: &mut bool,
+    core_qp_prev_eco: &mut u8,
+) {
+    /*let bs = if bsc_temp {
+        &mut self.core.bs_temp
+    } else {
+        &mut self.bs
+    };
+    let sbac = if bsc_temp {
+        &mut self.core.s_temp_run
+    } else {
+        &mut self.sbac_enc
+    };
+    let sbac_ctx = if bsc_temp {
+        &mut self.core.c_temp_run
+    } else {
+        &mut self.sbac_ctx
+    };
+    let tree_cons = &self.core.tree_cons;
+    let nnz = &self.core.nnz;
+    let coef = &self.core.ctmp;
+     */
+
+    let run_stats = evc_get_run(run_stats, tree_cons);
+    let run = [
+        run_stats & 1 != 0,
+        (run_stats >> 1) & 1 != 0,
+        (run_stats >> 2) & 1 != 0,
+    ];
+
+    if !evc_check_luma(tree_cons) {
+        assert!(!run[0]);
+    }
+    if !evc_check_chroma(tree_cons) {
+        assert!(!run[1] && !run[2]);
+    }
+    assert!(run_stats != 0);
+
+    let mut cbf_all = 0;
+    let is_intra = pred_mode == PredMode::MODE_INTRA;
+
+    for c in 0..N_C {
+        if run[c] {
+            cbf_all += if nnz[c] != 0 { 1 } else { 0 };
+        }
+    }
+
+    evce_eco_cbf(
+        bs,
+        sbac,
+        sbac_ctx,
+        nnz[Y_C] != 0,
+        nnz[U_C] != 0,
+        nnz[V_C] != 0,
+        pred_mode,
+        b_no_cbf,
+        cbf_all,
+        &run,
+        tree_cons,
+    );
+    if pps_cu_qp_delta_enabled_flag && enc_dqp {
+        let cbf_for_dqp = nnz[Y_C] != 0 || nnz[U_C] != 0 || nnz[V_C] != 0;
+        if ((!sps_dquant_flag || (core_cu_qp_delta_code == 1 && !(*core_cu_qp_delta_is_coded)))
+            && cbf_for_dqp)
+            || (core_cu_qp_delta_code == 2 && !(*core_cu_qp_delta_is_coded))
+        {
+            evce_eco_dqp(bs, sbac, sbac_ctx, *core_qp_prev_eco, cur_qp);
+            *core_cu_qp_delta_is_coded = true;
+            *core_qp_prev_eco = cur_qp;
+        }
+    }
+
+    for c in 0..N_C {
+        if nnz[c] != 0 && run[c] {
+            let chroma = if c > 0 { 1 } else { 0 };
+            evce_eco_xcoef(
+                bs,
+                sbac,
+                sbac_ctx,
+                &coef.data[c],
+                log2_cuw - chroma,
+                log2_cuh - chroma,
+                nnz[c],
+                c,
+            );
+        }
+    }
+}

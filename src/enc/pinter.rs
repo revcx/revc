@@ -6,6 +6,7 @@ use crate::def::*;
 use crate::itdq::*;
 use crate::mc::*;
 use crate::picman::*;
+use crate::recon::*;
 use crate::util::*;
 
 use std::cell::RefCell;
@@ -60,7 +61,7 @@ pub(crate) struct EvcePInter {
     /* reconstruction buffer */
     rec: [CUBuffer<pel>; InterPredDir::PRED_NUM as usize],
     /* last one buffer used for RDO */
-    coef: [CUBuffer<i16>; InterPredDir::PRED_NUM as usize + 1],
+    pub(crate) coef: [CUBuffer<i16>; InterPredDir::PRED_NUM as usize + 1],
 
     residue: CUBuffer<i16>,
 
@@ -318,7 +319,7 @@ impl EvceCtx {
                     );
                 }
 
-                self.calc_delta_dist_filter_boundary(); //ctx, PIC_MODE(ctx), PIC_ORIG(ctx), cuw, cuh, pi->pred[PRED_NUM][0], cuw, x, y, self.core.avail_lr, 0, 0
+                self.calc_delta_dist_filter_boundary(); //ctx, PIC_MODE(ctx), PIC_ORIG(ctx), cuw, cuh, self.pinter.pred[PRED_NUM][0], cuw, x, y, self.core.avail_lr, 0, 0
                                                         //, refi, mvp, 0, self.core.ats_inter_info, core);
                 cy += self.core.delta_dist[Y_C];
                 cu += self.core.delta_dist[U_C];
@@ -430,6 +431,10 @@ impl EvceCtx {
         let mut cbf_idx = [0; N_C];
         let mut nnz_store = [0; N_C];
 
+        let mut idx_y = 0;
+        let mut idx_u = 0;
+        let mut idx_v = 0;
+
         let mut dist = [[0i64; N_C]; 2];
         let mut dist_no_resi = [0i64; N_C];
 
@@ -441,6 +446,9 @@ impl EvceCtx {
         let h = [1 << log2_cuh, 1 << (log2_cuh - 1), 1 << (log2_cuh - 1)];
         let log2_w = [log2_cuw, log2_cuw - 1, log2_cuw - 1];
         let log2_h = [log2_cuh, log2_cuh - 1, log2_cuh - 1];
+
+        let mut cost = MAX_COST;
+        let mut cost_best = MAX_COST;
 
         /* prediction */
         evc_mc(
@@ -541,6 +549,130 @@ impl EvceCtx {
             );
 
             self.calc_delta_dist_filter_boundary();
+
+            if let Some(pic) = &self.pintra.pic_o {
+                let frame = &pic.borrow().frame;
+                let planes = &frame.borrow().planes;
+                for i in 0..N_C {
+                    if self.core.nnz[i] > 0 {
+                        evc_recon(
+                            &mut self.core.bs_temp.tracer,
+                            &coef_t.data[i],
+                            &self.pinter.pred[pidx][0].data[i],
+                            is_coef[i],
+                            w[i],
+                            h[i],
+                            &mut self.pinter.rec[pidx].data[i],
+                            i,
+                        );
+                        dist[1][i] = evce_ssd_16b(
+                            x0[i],
+                            y0[i],
+                            log2_w[i],
+                            log2_h[i],
+                            &planes[i].as_region(),
+                            &self.pinter.rec[pidx].data[i],
+                        );
+                    } else {
+                        dist[1][i] = dist_no_resi[i];
+                    }
+
+                    dist[0][i] += self.core.delta_dist[i];
+
+                    //complete rec
+                    if self.core.nnz[i] == 0 {
+                        evc_recon(
+                            &mut self.core.bs_temp.tracer,
+                            &coef_t.data[i],
+                            &self.pinter.pred[pidx][0].data[i],
+                            is_coef[i],
+                            w[i],
+                            h[i],
+                            &mut self.pinter.rec[pidx].data[i],
+                            i,
+                        );
+                    }
+                }
+            }
+
+            //filter rec and calculate ssd
+            self.calc_delta_dist_filter_boundary(); //ctx, PIC_MODE(ctx), PIC_ORIG(ctx), cuw, cuh, rec, cuw, x, y, self.core.avail_lr, 0
+                                                    //, nnz[Y_C] != 0, self.pinter.refi[pidx], self.pinter.mv[pidx], is_from_mv_field, self.core.ats_inter_info, core);
+            for i in 0..N_C {
+                dist[1][i] += self.core.delta_dist[i];
+            }
+
+            if pidx != InterPredDir::PRED_DIR as usize {
+                /* test all zero case */
+                idx_y = 0;
+                idx_u = 0;
+                idx_v = 0;
+                self.core.nnz[Y_C] = 0;
+                self.core.nnz[U_C] = 0;
+                self.core.nnz[V_C] = 0;
+
+                cost = dist[idx_y][Y_C] as f64
+                    + (dist[idx_u][U_C] as f64 * self.dist_chroma_weight[0])
+                    + (dist[idx_v][V_C] as f64 * self.dist_chroma_weight[1]);
+
+                self.core.s_temp_run = self.core.s_curr_best[log2_cuw - 2][log2_cuh - 2];
+                self.core.c_temp_run = self.core.c_curr_best[log2_cuw - 2][log2_cuh - 2];
+                self.core.dqp_temp_run = self.core.dqp_curr_best[log2_cuw - 2][log2_cuh - 2];
+                self.core.s_temp_run.bit_reset();
+
+                /*if self.sh.slice_type.IS_INTER_SLICE()
+                    && REFI_IS_VALID(self.pinter.refi[pidx][REFP_0])
+                {
+                    self.pinter.mvd[pidx][REFP_0][MV_X] >>= self.pinter.mvr_idx[pidx];
+                    self.pinter.mvd[pidx][REFP_0][MV_Y] >>= self.pinter.mvr_idx[pidx];
+                }
+                if self.sh.slice_type == SliceType::EVC_ST_B
+                    && REFI_IS_VALID(self.pinter.refi[pidx][REFP_1])
+                {
+                    self.pinter.mvd[pidx][REFP_1][MV_X] >>= self.pinter.mvr_idx[pidx];
+                    self.pinter.mvd[pidx][REFP_1][MV_Y] >>= self.pinter.mvr_idx[pidx];
+                }*/
+
+                self.evce_rdo_bit_cnt_cu_inter(
+                    self.sh.slice_type,
+                    self.core.scup,
+                    pidx,
+                    mvp_idx,
+                    //self.pinter.mvr_idx[pidx],
+                    //self.pinter.bi_idx[pidx],
+                );
+
+                /*if self.sh.slice_type.IS_INTER_SLICE()
+                    && REFI_IS_VALID(self.pinter.refi[pidx][REFP_0])
+                {
+                    self.pinter.mvd[pidx][REFP_0][MV_X] <<= self.pinter.mvr_idx[pidx];
+                    self.pinter.mvd[pidx][REFP_0][MV_Y] <<= self.pinter.mvr_idx[pidx];
+                }
+                if self.sh.slice_type == SliceType::EVC_ST_B
+                    && REFI_IS_VALID(self.pinter.refi[pidx][REFP_1])
+                {
+                    self.pinter.mvd[pidx][REFP_1][MV_X] <<= self.pinter.mvr_idx[pidx];
+                    self.pinter.mvd[pidx][REFP_1][MV_Y] <<= self.pinter.mvr_idx[pidx];
+                }*/
+
+                let bit_cnt = self.core.s_temp_run.get_bit_number();
+                cost += (self.lambda[0] * bit_cnt as f64);
+
+                if cost < cost_best {
+                    cost_best = cost;
+                    cbf_idx[Y_C] = idx_y;
+                    cbf_idx[U_C] = idx_u;
+                    cbf_idx[V_C] = idx_v;
+                    self.core.s_temp_best = self.core.s_temp_run;
+                    self.core.c_temp_best = self.core.c_temp_run;
+                    self.core.dqp_temp_best = self.core.dqp_temp_run;
+                    self.core.cost_best = if cost < self.core.cost_best {
+                        cost
+                    } else {
+                        self.core.cost_best
+                    };
+                }
+            } // forced zero
         } else {
         }
 
