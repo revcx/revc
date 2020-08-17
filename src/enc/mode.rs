@@ -2031,8 +2031,6 @@ impl EvceCtx {
         cup: u32,
         pidx: usize,
         mvp_idx: &[u8],
-        //mvr_idx: u8,
-        //bi_idx: u8,
     ) {
         //refi=&self.pinter.refi[pidx],
         //mvd =&self.pinter.mvd[pidx],
@@ -2045,193 +2043,81 @@ impl EvceCtx {
                     [self.core.ctx_flags[CtxNevIdx::CNID_SKIP_FLAG as usize] as usize],
                 0,
             ); /* skip_flag */
-            /*
-            if (evce_check_all_preds(ctx, core))
-            {
-                evce_eco_pred_mode(&self.core.bs_temp, MODE_INTER, self.core.ctx_flags[CNID_PRED_MODE]);
-            }
-            if (!evce_check_only_inter(ctx, core) && evce_check_luma(ctx, core) &&
-                 self.param.use_ibc_flag && self.core.log2_cuw <= self.sps.ibc_log_max_size && self.core.log2_cuh <= self.sps.ibc_log_max_size)
-            {
-                evce_eco_ibc_flag(&self.core.bs_temp, 0, self.core.ctx_flags[CNID_IBC_FLAG]);
-            }
 
-            if(self.sps.tool_amvr)
-            {
-                evce_eco_mvr_idx(&self.core.bs_temp, mvr_idx);
+            if evc_check_all_preds(&self.core.tree_cons) {
+                evce_eco_pred_mode(
+                    &mut self.core.bs_temp,
+                    &mut self.core.s_temp_run,
+                    &mut self.core.c_temp_run,
+                    PredMode::MODE_INTER,
+                    self.core.ctx_flags[CtxNevIdx::CNID_PRED_MODE as usize] as usize,
+                );
             }
 
+            let dir_flag = pidx == InterPredDir::PRED_DIR as usize;
 
-            int dir_flag = (pidx == PRED_DIR);
-            dir_flag |= (pidx == PRED_DIR_MMVD);
-            dir_flag |= (pidx == AFF_DIR);
+            evce_eco_direct_mode_flag(
+                &mut self.core.bs_temp,
+                &mut self.core.s_temp_run,
+                &mut self.core.c_temp_run,
+                dir_flag as u32,
+            );
 
-            if(self.sps.tool_admvp == 0)
-            {
-                evce_eco_direct_mode_flag(&self.core.bs_temp, dir_flag);
-            }
-            else
-            {
-                if(mvr_idx == 0)
-                {
-                    evce_eco_merge_mode_flag(&self.core.bs_temp, dir_flag);
+            if pidx != InterPredDir::PRED_DIR as usize {
+                evce_eco_inter_pred_idc(
+                    &mut self.core.bs_temp,
+                    &mut self.core.s_temp_run,
+                    &mut self.core.c_temp_run,
+                    &self.pinter.refi[pidx],
+                    slice_type,
+                );
+
+                let refi0 = self.pinter.refi[pidx][REFP_0];
+                let refi1 = self.pinter.refi[pidx][REFP_1];
+                if slice_type.IS_INTER_SLICE() && REFI_IS_VALID(refi0) {
+                    evce_eco_refi(
+                        &mut self.core.bs_temp,
+                        &mut self.core.s_temp_run,
+                        &mut self.core.c_temp_run,
+                        self.rpm.num_refp[REFP_0],
+                        refi0,
+                    );
+                    evce_eco_mvp_idx(
+                        &mut self.core.bs_temp,
+                        &mut self.core.s_temp_run,
+                        &mut self.core.c_temp_run,
+                        mvp_idx[REFP_0] as u32,
+                    );
+                    evce_eco_mvd(
+                        &mut self.core.bs_temp,
+                        &mut self.core.s_temp_run,
+                        &mut self.core.c_temp_run,
+                        &self.pinter.mvd[pidx][REFP_0],
+                    );
+                }
+
+                if slice_type == SliceType::EVC_ST_B && REFI_IS_VALID(refi1) {
+                    evce_eco_refi(
+                        &mut self.core.bs_temp,
+                        &mut self.core.s_temp_run,
+                        &mut self.core.c_temp_run,
+                        self.rpm.num_refp[REFP_1],
+                        refi1,
+                    );
+                    evce_eco_mvp_idx(
+                        &mut self.core.bs_temp,
+                        &mut self.core.s_temp_run,
+                        &mut self.core.c_temp_run,
+                        mvp_idx[REFP_1] as u32,
+                    );
+                    evce_eco_mvd(
+                        &mut self.core.bs_temp,
+                        &mut self.core.s_temp_run,
+                        &mut self.core.c_temp_run,
+                        &self.pinter.mvd[pidx][REFP_1],
+                    );
                 }
             }
-
-            if(self.sps.tool_mmvd)
-            {
-                if(dir_flag)
-                {
-                    evce_eco_mmvd_flag(&self.core.bs_temp, pidx == PRED_DIR_MMVD);
-                }
-
-                if((pidx == PRED_DIR_MMVD))
-                {
-                    evce_eco_mmvd_info(&self.core.bs_temp, pi->mmvd_idx[pidx], self.sh.mmvd_group_enable_flag && !((1 << self.core.log2_cuw)*(1 << self.core.log2_cuh) <= NUM_SAMPLES_BLOCK));
-                }
-            }
-
-            // affine direct in rdo
-            if(self.core.cuw >= 8 && self.core.cuh >= 8 && self.sps.tool_affine && ((pidx == PRED_DIR) || (pidx == AFF_DIR)))
-            {
-                evce_sbac_encode_bin(self.core.affine_flag != 0, &self.core.s_temp_run, self.core.s_temp_run.ctx.affine_flag + self.core.ctx_flags[CNID_AFFN_FLAG], &self.core.bs_temp); /* direct affine_flag */
-
-                if(self.core.affine_flag)
-                    evce_eco_affine_mrg_idx(&self.core.bs_temp, mvp_idx[REFP_0]);
-            }
-
-            if (self.sps.tool_admvp == 1 && pidx == PRED_DIR && !self.core.affine_flag && mvr_idx == 0)
-            {
-                evce_eco_merge_idx(&self.core.bs_temp, mvp_idx[0]);
-            }
-
-
-            if((((pidx % ORG_PRED_NUM) != PRED_DIR) && ((pidx % ORG_PRED_NUM) != PRED_DIR_MMVD)) || ((pidx >= AFF_L0) && (pidx <= AFF_6_BI) && (pidx != AFF_DIR)) )
-            {
-                evce_eco_inter_pred_idc(&self.core.bs_temp, refi, slice_type, 1 << self.core.log2_cuw, 1 << self.core.log2_cuh, self.sps.tool_admvp);
-
-                // affine inter in rdo
-                if (self.core.cuw >= 16 && self.core.cuh >= 16 && self.sps.tool_affine && mvr_idx == 0)
-                {
-                    evce_sbac_encode_bin(self.core.affine_flag != 0, &self.core.s_temp_run, self.core.s_temp_run.ctx.affine_flag + self.core.ctx_flags[CNID_AFFN_FLAG], &self.core.bs_temp); /* inter affine_flag */
-                }
-
-                if(self.core.affine_flag)
-                {
-                    evce_sbac_encode_bin(self.core.affine_flag - 1, &self.core.s_temp_run, self.core.s_temp_run.ctx.affine_mode, &self.core.bs_temp); /* inter affine_mode */
-                }
-
-                if(!self.core.affine_flag)
-                {
-                    if(self.sps.tool_admvp == 1 && REFI_IS_VALID(refi[REFP_0]) && REFI_IS_VALID(refi[REFP_1]))
-                    {
-                        evce_eco_bi_idx(&self.core.bs_temp, bi_idx - 1);
-                    }
-                }
-                refi0 = refi[REFP_0];
-                refi1 = refi[REFP_1];
-                if(IS_INTER_SLICE(slice_type) && REFI_IS_VALID(refi0))
-                {
-                    if(self.sps.tool_admvp == 0)
-                    {
-                        evce_eco_refi(&self.core.bs_temp, self.rpm.num_refp[REFP_0], refi0);
-                        evce_eco_mvp_idx(&self.core.bs_temp, mvp_idx[REFP_0]);
-                        evce_eco_mvd(&self.core.bs_temp, mvd[REFP_0]);
-                    }
-                    else
-                    {
-                        if(bi_idx != BI_FL0 && bi_idx != BI_FL1)
-                        {
-                            evce_eco_refi(&self.core.bs_temp, self.rpm.num_refp[REFP_0], refi0);
-                        }
-
-                        if(self.core.affine_flag)
-                        {
-                            int b_zero = 1;
-
-                            evce_eco_affine_mvp_idx(&self.core.bs_temp, mvp_idx[REFP_0]);
-
-                            for(vertex = 0; vertex < vertex_num; vertex++)
-                            {
-                                int mvd_x = affine_mvd[REFP_0][vertex][MV_X];
-                                int mvd_y = affine_mvd[REFP_0][vertex][MV_Y];
-                                if(mvd_x != 0 || mvd_y != 0)
-                                {
-                                    b_zero = 0;
-                                    break;
-                                }
-                            }
-                            evce_eco_affine_mvd_flag(&self.core.bs_temp, b_zero, REFP_0);
-
-                            if(b_zero == 0)
-                            {
-                                for(vertex = 0; vertex < vertex_num; vertex++)
-                                {
-                                    evce_eco_mvd(&self.core.bs_temp, affine_mvd[REFP_0][vertex]);
-                                }
-                            }
-                        }
-                        else
-                        {
-                            if(bi_idx != BI_FL0)
-                            {
-                                evce_eco_mvd(&self.core.bs_temp, mvd[REFP_0]);
-                            }
-                        }
-                    }
-                }
-
-                if(slice_type == SLICE_B && REFI_IS_VALID(refi1))
-                {
-                    if(self.sps.tool_admvp == 0)
-                    {
-                        evce_eco_refi(&self.core.bs_temp, self.rpm.num_refp[REFP_1], refi1);
-                        evce_eco_mvp_idx(&self.core.bs_temp, mvp_idx[REFP_1]);
-                        evce_eco_mvd(&self.core.bs_temp, mvd[REFP_1]);
-                    }
-                    else
-                    {
-                        if(bi_idx != BI_FL0 && bi_idx != BI_FL1)
-                        {
-                            evce_eco_refi(&self.core.bs_temp, self.rpm.num_refp[REFP_1], refi1);
-                        }
-
-                        if(self.core.affine_flag)
-                        {
-                            int b_zero = 1;
-
-                            evce_eco_affine_mvp_idx(&self.core.bs_temp, mvp_idx[REFP_1]);
-
-                            for(vertex = 0; vertex < vertex_num; vertex++)
-                            {
-                                int mvd_x = affine_mvd[REFP_1][vertex][MV_X];
-                                int mvd_y = affine_mvd[REFP_1][vertex][MV_Y];
-                                if(mvd_x != 0 || mvd_y != 0)
-                                {
-                                    b_zero = 0;
-                                    break;
-                                }
-                            }
-                            evce_eco_affine_mvd_flag(&self.core.bs_temp, b_zero, REFP_1);
-
-                            if(b_zero == 0)
-                            {
-                                for(vertex = 0; vertex < vertex_num; vertex++)
-                                {
-                                    evce_eco_mvd(&self.core.bs_temp, affine_mvd[REFP_1][vertex]);
-                                }
-                            }
-                        }
-                        else
-                        {
-                            if(bi_idx != BI_FL1)
-                            {
-                                evce_eco_mvd(&self.core.bs_temp, mvd[REFP_1]);
-                            }
-                        }
-                    }
-                }
-            }*/
         }
         if self.pps.cu_qp_delta_enabled_flag {
             self.core.cu_qp_delta_code = self.core.dqp_temp_run.cu_qp_delta_code;
@@ -2265,6 +2151,41 @@ impl EvceCtx {
             self.core.dqp_temp_run.prev_QP = self.core.qp_prev_eco;
             self.core.dqp_temp_run.curr_QP = self.core.qp;
         }
+    }
+
+    pub(crate) fn evce_rdo_bit_cnt_cu_inter_comp(&mut self, ch_type: usize, pidx: usize) {
+        //coef=&self.pinter.coef[pidx],
+        //int* nnz = self.core.nnz;
+        //EVCE_SBAC* sbac = &self.core.s_temp_run;
+        let log2_cuw = self.core.log2_cuw;
+        let log2_cuh = self.core.log2_cuh;
+        let run_stats = match ch_type {
+            Y_C => TQC_RUN::RUN_L as u8,
+            U_C => TQC_RUN::RUN_CB as u8,
+            V_C => TQC_RUN::RUN_CR as u8,
+            _ => 0,
+        };
+
+        evce_eco_coef(
+            &mut self.core.bs_temp,
+            &mut self.core.s_temp_run,
+            &mut self.core.c_temp_run,
+            &self.pinter.coef[pidx],
+            log2_cuw,
+            log2_cuh,
+            PredMode::MODE_INTER,
+            &self.core.nnz,
+            false,
+            run_stats,
+            false,
+            if ch_type == Y_C { self.core.qp } else { 0 },
+            &self.core.tree_cons,
+            self.sps.dquant_flag,
+            self.pps.cu_qp_delta_enabled_flag,
+            self.core.cu_qp_delta_code,
+            &mut self.core.cu_qp_delta_is_coded,
+            &mut self.core.qp_prev_eco,
+        );
     }
 
     pub(crate) fn evce_rdo_bit_cnt_cu_skip(

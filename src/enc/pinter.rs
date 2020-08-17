@@ -25,7 +25,7 @@ pub(crate) struct EvcePInter {
     //pred_buf: [pel; MAX_CU_DIM],
 
     /* temporary buffer for analyze_cu */
-    refi: [[i8; REFP_NUM]; InterPredDir::PRED_NUM as usize],
+    pub(crate) refi: [[i8; REFP_NUM]; InterPredDir::PRED_NUM as usize],
     /* Ref idx predictor */
     refi_pred: [[i8; MAX_NUM_MVP]; REFP_NUM],
     mvp_idx: [[u8; REFP_NUM]; InterPredDir::PRED_NUM as usize],
@@ -49,7 +49,7 @@ pub(crate) struct EvcePInter {
     mvp: [[[i16; MV_D]; MAX_NUM_MVP]; REFP_NUM],
 
     mv: [[[i16; MV_D]; REFP_NUM]; InterPredDir::PRED_NUM as usize],
-    mvd: [[[i16; MV_D]; REFP_NUM]; InterPredDir::PRED_NUM as usize],
+    pub(crate) mvd: [[[i16; MV_D]; REFP_NUM]; InterPredDir::PRED_NUM as usize],
     /*
       s16  org_bi[MAX_CU_DIM];
       s32  mot_bits[REFP_NUM];
@@ -437,6 +437,7 @@ impl EvceCtx {
 
         let mut dist = [[0i64; N_C]; 2];
         let mut dist_no_resi = [0i64; N_C];
+        let mut idx_best = [0; N_C];
 
         let cuw = 1 << log2_cuw;
         let cuh = 1 << log2_cuh;
@@ -449,6 +450,7 @@ impl EvceCtx {
 
         let mut cost = MAX_COST;
         let mut cost_best = MAX_COST;
+        let mut cost_comp_best = MAX_COST;
 
         /* prediction */
         evc_mc(
@@ -620,40 +622,7 @@ impl EvceCtx {
                 self.core.dqp_temp_run = self.core.dqp_curr_best[log2_cuw - 2][log2_cuh - 2];
                 self.core.s_temp_run.bit_reset();
 
-                /*if self.sh.slice_type.IS_INTER_SLICE()
-                    && REFI_IS_VALID(self.pinter.refi[pidx][REFP_0])
-                {
-                    self.pinter.mvd[pidx][REFP_0][MV_X] >>= self.pinter.mvr_idx[pidx];
-                    self.pinter.mvd[pidx][REFP_0][MV_Y] >>= self.pinter.mvr_idx[pidx];
-                }
-                if self.sh.slice_type == SliceType::EVC_ST_B
-                    && REFI_IS_VALID(self.pinter.refi[pidx][REFP_1])
-                {
-                    self.pinter.mvd[pidx][REFP_1][MV_X] >>= self.pinter.mvr_idx[pidx];
-                    self.pinter.mvd[pidx][REFP_1][MV_Y] >>= self.pinter.mvr_idx[pidx];
-                }*/
-
-                self.evce_rdo_bit_cnt_cu_inter(
-                    self.sh.slice_type,
-                    self.core.scup,
-                    pidx,
-                    mvp_idx,
-                    //self.pinter.mvr_idx[pidx],
-                    //self.pinter.bi_idx[pidx],
-                );
-
-                /*if self.sh.slice_type.IS_INTER_SLICE()
-                    && REFI_IS_VALID(self.pinter.refi[pidx][REFP_0])
-                {
-                    self.pinter.mvd[pidx][REFP_0][MV_X] <<= self.pinter.mvr_idx[pidx];
-                    self.pinter.mvd[pidx][REFP_0][MV_Y] <<= self.pinter.mvr_idx[pidx];
-                }
-                if self.sh.slice_type == SliceType::EVC_ST_B
-                    && REFI_IS_VALID(self.pinter.refi[pidx][REFP_1])
-                {
-                    self.pinter.mvd[pidx][REFP_1][MV_X] <<= self.pinter.mvr_idx[pidx];
-                    self.pinter.mvd[pidx][REFP_1][MV_Y] <<= self.pinter.mvr_idx[pidx];
-                }*/
+                self.evce_rdo_bit_cnt_cu_inter(self.sh.slice_type, self.core.scup, pidx, mvp_idx);
 
                 let bit_cnt = self.core.s_temp_run.get_bit_number();
                 cost += (self.lambda[0] * bit_cnt as f64);
@@ -673,9 +642,179 @@ impl EvceCtx {
                     };
                 }
             } // forced zero
+
+            /* test as it is */
+            idx_y = if nnz_store[Y_C] > 0 { 1 } else { 0 };
+            idx_u = if nnz_store[U_C] > 0 { 1 } else { 0 };
+            idx_v = if nnz_store[V_C] > 0 { 1 } else { 0 };
+            self.core.nnz[Y_C] = nnz_store[Y_C];
+            self.core.nnz[U_C] = nnz_store[U_C];
+            self.core.nnz[V_C] = nnz_store[V_C];
+
+            cost = dist[idx_y][Y_C] as f64
+                + (dist[idx_u][U_C] as f64 * self.dist_chroma_weight[0])
+                + (dist[idx_v][V_C] as f64 * self.dist_chroma_weight[1]);
+
+            self.core.s_temp_run = self.core.s_curr_best[log2_cuw - 2][log2_cuh - 2];
+            self.core.c_temp_run = self.core.c_curr_best[log2_cuw - 2][log2_cuh - 2];
+            self.core.dqp_temp_run = self.core.dqp_curr_best[log2_cuw - 2][log2_cuh - 2];
+
+            self.core.s_temp_run.bit_reset();
+
+            self.evce_rdo_bit_cnt_cu_inter(self.sh.slice_type, self.core.scup, pidx, mvp_idx);
+
+            let bit_cnt = self.core.s_temp_run.get_bit_number();
+            cost += (self.lambda[0] * bit_cnt as f64);
+
+            if cost < cost_best {
+                cost_best = cost;
+                cbf_idx[Y_C] = idx_y;
+                cbf_idx[U_C] = idx_u;
+                cbf_idx[V_C] = idx_v;
+                self.core.s_temp_best = self.core.s_temp_run;
+                self.core.c_temp_best = self.core.c_temp_run;
+                self.core.dqp_temp_best = self.core.dqp_temp_run;
+                self.core.cost_best = if cost < self.core.cost_best {
+                    cost
+                } else {
+                    self.core.cost_best
+                };
+            }
+
+            self.core.s_temp_prev_comp_best = self.core.s_curr_best[log2_cuw - 2][log2_cuh - 2];
+            self.core.c_temp_prev_comp_best = self.core.c_curr_best[log2_cuw - 2][log2_cuh - 2];
+            /* cbf test for each component */
+            for i in 0..N_C {
+                if nnz_store[i] > 0 {
+                    cost_comp_best = MAX_COST;
+                    self.core.s_temp_prev_comp_run = self.core.s_temp_prev_comp_best;
+                    self.core.c_temp_prev_comp_run = self.core.c_temp_prev_comp_best;
+                    for j in 0..2 {
+                        cost = dist[j][i] as f64
+                            * (if i == 0 {
+                                1.0
+                            } else {
+                                self.dist_chroma_weight[i - 1]
+                            });
+                        self.core.nnz[i] = if j != 0 { nnz_store[i] } else { 0 };
+                        self.core.s_temp_run = self.core.s_temp_prev_comp_run;
+                        self.core.c_temp_run = self.core.c_temp_prev_comp_run;
+                        self.core.s_temp_run.bit_reset();
+                        self.evce_rdo_bit_cnt_cu_inter_comp(i, pidx);
+
+                        let bit_cnt = self.core.s_temp_run.get_bit_number();
+                        cost += (self.lambda[i] * bit_cnt as f64);
+                        if cost < cost_comp_best {
+                            cost_comp_best = cost;
+                            idx_best[i] = j;
+                            self.core.s_temp_prev_comp_best = self.core.s_temp_run;
+                            self.core.c_temp_prev_comp_best = self.core.c_temp_run;
+                        }
+                    }
+                } else {
+                    idx_best[i] = 0;
+                }
+            }
+
+            if idx_best[Y_C] != 0 || idx_best[U_C] != 0 || idx_best[V_C] != 0 {
+                idx_y = idx_best[Y_C];
+                idx_u = idx_best[U_C];
+                idx_v = idx_best[V_C];
+                self.core.nnz[Y_C] = if idx_y != 0 { nnz_store[Y_C] } else { 0 };
+                self.core.nnz[U_C] = if idx_u != 0 { nnz_store[U_C] } else { 0 };
+                self.core.nnz[V_C] = if idx_v != 0 { nnz_store[V_C] } else { 0 };
+            }
+
+            if self.core.nnz[Y_C] != nnz_store[Y_C]
+                || self.core.nnz[U_C] != nnz_store[U_C]
+                || self.core.nnz[V_C] != nnz_store[V_C]
+            {
+                cost = dist[idx_y][Y_C] as f64
+                    + (dist[idx_u][U_C] as f64 * self.dist_chroma_weight[0])
+                    + (dist[idx_v][V_C] as f64 * self.dist_chroma_weight[1]);
+
+                self.core.s_temp_run = self.core.s_curr_best[log2_cuw - 2][log2_cuh - 2];
+                self.core.c_temp_run = self.core.c_curr_best[log2_cuw - 2][log2_cuh - 2];
+                self.core.dqp_temp_run = self.core.dqp_curr_best[log2_cuw - 2][log2_cuh - 2];
+                self.core.s_temp_run.bit_reset();
+
+                self.evce_rdo_bit_cnt_cu_inter(self.sh.slice_type, self.core.scup, pidx, mvp_idx);
+
+                let bit_cnt = self.core.s_temp_run.get_bit_number();
+                cost += (self.lambda[0] * bit_cnt as f64);
+
+                if cost < cost_best {
+                    cost_best = cost;
+                    cbf_idx[Y_C] = idx_y;
+                    cbf_idx[U_C] = idx_u;
+                    cbf_idx[V_C] = idx_v;
+                    self.core.s_temp_best = self.core.s_temp_run;
+                    self.core.c_temp_best = self.core.c_temp_run;
+                    self.core.dqp_temp_best = self.core.dqp_temp_run;
+
+                    self.core.cost_best = if cost < self.core.cost_best {
+                        cost
+                    } else {
+                        self.core.cost_best
+                    };
+                }
+            }
+
+            for i in 0..N_C {
+                self.core.nnz[i] = if cbf_idx[i] != 0 { nnz_store[i] } else { 0 };
+                if self.core.nnz[i] == 0 && nnz_store[i] != 0 {
+                    let size = (cuw * cuh) >> (if i == 0 { 0 } else { 2 });
+                    for v in &mut self.pinter.coef[pidx].data[i][..size] {
+                        *v = 0;
+                    }
+                }
+            }
         } else {
+            if self.pps.cu_qp_delta_enabled_flag {
+                if self.core.cu_qp_delta_code_mode != 2 {
+                    self.evce_set_qp(self.core.dqp_curr_best[log2_cuw - 2][log2_cuh - 2].prev_QP);
+                }
+            }
+
+            if cost_best != MAX_COST {
+                return cost_best;
+            }
+
+            for i in 0..N_C {
+                self.core.nnz[i] = 0;
+            }
+
+            self.calc_delta_dist_filter_boundary(); //ctx, PIC_MODE(ctx), PIC_ORIG(ctx), cuw, cuh, pred[0], cuw, x, y, self.core.avail_lr, 0, 0
+                                                    //, pi->refi[pidx], pi->mv[pidx], is_from_mv_field, self.core.ats_inter_info, core);
+            for i in 0..N_C {
+                dist[0][i] = dist_no_resi[i];
+                dist[0][i] += self.core.delta_dist[i];
+            }
+            cost_best = dist[0][Y_C] as f64
+                + (self.dist_chroma_weight[0] * dist[0][U_C] as f64)
+                + (self.dist_chroma_weight[1] * dist[0][V_C] as f64);
+
+            self.core.s_temp_run = self.core.s_curr_best[log2_cuw - 2][log2_cuh - 2];
+            self.core.c_temp_run = self.core.c_curr_best[log2_cuw - 2][log2_cuh - 2];
+            self.core.dqp_temp_run = self.core.dqp_curr_best[log2_cuw - 2][log2_cuh - 2];
+
+            self.core.s_temp_run.bit_reset();
+
+            self.evce_rdo_bit_cnt_cu_inter(self.sh.slice_type, self.core.scup, pidx, mvp_idx);
+
+            let bit_cnt = self.core.s_temp_run.get_bit_number();
+            cost_best += (self.lambda[0] * bit_cnt as f64);
+            self.core.s_temp_best = self.core.s_temp_run;
+            self.core.c_temp_best = self.core.c_temp_run;
+            self.core.dqp_temp_best = self.core.dqp_temp_run;
+
+            self.core.cost_best = if cost_best < self.core.cost_best {
+                cost_best
+            } else {
+                self.core.cost_best
+            };
         }
 
-        0.0
+        cost_best
     }
 }
