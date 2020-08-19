@@ -69,11 +69,11 @@ pub(crate) struct EvcePInter {
 
     num_refp: u8,
 
-    /*
     /* minimum clip value */
-    s16  min_clip[MV_D];
+    pub(crate) min_clip: [i16; MV_D],
     /* maximum clip value */
-    s16  max_clip[MV_D];
+    pub(crate) max_clip: [i16; MV_D],
+    /*
     /* search range for int-pel */
     s16  search_range_ipel[MV_D];
     /* search range for sub-pel */
@@ -102,9 +102,9 @@ pub(crate) struct EvcePInter {
     //refp: Option<Rc<RefCell<Vec<Vec<EvcRefP>>>>>,
     slice_type: SliceType,
     /* search level for motion estimation */
-    /*int              me_level;
-    int              complexity;
-    void            *pdata[4];
+    pub(crate) me_level: usize,
+    pub(crate) complexity: usize,
+    /*void            *pdata[4];
     int             *ndata[4];*/
     /* current picture order count */
     poc: i32,
