@@ -93,6 +93,15 @@ pub(crate) const FRM_DEPTH_MAX: u8 = 7;
 /* I-slice, P-slice, B-slice + depth + 1 (max for GOP 8 size)*/
 pub(crate) const LIST_NUM: usize = 1;
 
+pub(crate) const ORG_MAX_NUM_MVP: u8 = 4;
+
+/*****************************************************************************
+ * bi-prediction type
+ *****************************************************************************/
+pub(crate) const BI_NON: u8 = 0;
+pub(crate) const BI_NORMAL: u8 = 1;
+pub(crate) const BI_ITER: u8 = 4;
+
 /*****************************************************************************
  * original picture buffer structure
  *****************************************************************************/

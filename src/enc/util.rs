@@ -2,6 +2,7 @@ use super::sad::*;
 use super::*;
 use crate::def::*;
 use crate::plane::*;
+use crate::region::*;
 
 lazy_static! {
     pub(crate) static ref entropy_bits: Box<[i32]> = {
@@ -211,4 +212,21 @@ pub(crate) fn copy_tu_from_cu(
     let cuwh = cuwh >> 2;
     tu_resi.data[U_C][0..cuwh].copy_from_slice(&cu_resi.data[U_C][0..cuwh]);
     tu_resi.data[V_C][0..cuwh].copy_from_slice(&cu_resi.data[V_C][0..cuwh]);
+}
+
+/* Get original dummy buffer for bi prediction */
+pub(crate) fn get_org_bi(
+    org_bi: &mut [i16],
+    org: &PlaneRegion<'_, pel>,
+    pred: &[pel],
+    x: usize,
+    y: usize,
+    cuw: usize,
+    cuh: usize,
+) {
+    for j in 0..cuh {
+        for i in 0..cuw {
+            org_bi[j * cuw + i] = (org[y + j][x + i] << 1) as i16 - pred[j * cuw + i] as i16;
+        }
+    }
 }

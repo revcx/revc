@@ -1,3 +1,4 @@
+use super::eco::*;
 use super::sad::*;
 use super::util::*;
 use super::*;
@@ -419,19 +420,20 @@ pub(crate) struct EvceMode {
     /* CU count in a CU row in a LCU (== log2_max_cuwh - MIN_CU_LOG2) */
     log2_culine: u8,
     /* reference indices */
-    refi: [i8; REFP_NUM],
+    pub(crate) refi: [i8; REFP_NUM],
     /* MVP indices */
-    mvp_idx: [u8; REFP_NUM],
+    pub(crate) mvp_idx: [u8; REFP_NUM],
     /* MVR indices */
     //u8    mvr_idx;
     bi_idx: u8,
     /* mv difference */
-    mvd: [[i16; MV_D]; REFP_NUM],
+    pub(crate) mvd: [[i16; MV_D]; REFP_NUM],
 
     /* mv */
-    mv: [[i16; MV_D]; REFP_NUM],
+    pub(crate) mv: [[i16; MV_D]; REFP_NUM],
 
-    //pel  *pred_y_best;
+    pub(crate) pred_y_best_idx: usize, //pel  *pred_y_best;
+
     cu_mode: MCU,
 }
 
@@ -2215,6 +2217,50 @@ impl EvceCtx {
                     &mut self.core.s_temp_run,
                     &mut self.core.c_temp_run,
                     mvp_idx1,
+                );
+            }
+        }
+    }
+
+    pub(crate) fn evce_rdo_bit_cnt_mvp(
+        &mut self,
+        slice_type: SliceType,
+        //refi: &[i8],
+        mvd: &[[i16; MV_D]],
+        pidx: usize,
+        mvp_idx: u8,
+    ) {
+        let refi = &self.pinter.refi[pidx];
+
+        if pidx != InterPredDir::PRED_DIR as usize {
+            let refi0 = refi[REFP_0];
+            let refi1 = refi[REFP_1];
+            if slice_type.IS_INTER_SLICE() && REFI_IS_VALID(refi0) {
+                evce_eco_mvp_idx(
+                    &mut self.core.bs_temp,
+                    &mut self.core.s_temp_run,
+                    &mut self.core.c_temp_run,
+                    mvp_idx as u32,
+                );
+                evce_eco_mvd(
+                    &mut self.core.bs_temp,
+                    &mut self.core.s_temp_run,
+                    &mut self.core.c_temp_run,
+                    &mvd[REFP_0],
+                );
+            }
+            if slice_type == SliceType::EVC_ST_B && REFI_IS_VALID(refi1) {
+                evce_eco_mvp_idx(
+                    &mut self.core.bs_temp,
+                    &mut self.core.s_temp_run,
+                    &mut self.core.c_temp_run,
+                    mvp_idx as u32,
+                );
+                evce_eco_mvd(
+                    &mut self.core.bs_temp,
+                    &mut self.core.s_temp_run,
+                    &mut self.core.c_temp_run,
+                    &mvd[REFP_1],
                 );
             }
         }
