@@ -20,6 +20,74 @@ pub(crate) const MV_RANGE_MIN: usize = 0;
 pub(crate) const MV_RANGE_MAX: usize = 1;
 pub(crate) const MV_RANGE_DIM: usize = 2;
 
+/* Define the Search Range for int-pel */
+pub(crate) const SEARCH_RANGE_IPEL_RA: i16 = 384;
+pub(crate) const SEARCH_RANGE_IPEL_LD: i16 = 64;
+/* Define the Search Range for sub-pel ME */
+pub(crate) const SEARCH_RANGE_SPEL: i16 = 3;
+
+pub(crate) static tbl_search_pattern_hpel_partial: [[i8; 2]; 8] = [
+    [-2, 0],
+    [-2, 2],
+    [0, 2],
+    [2, 2],
+    [2, 0],
+    [2, -2],
+    [0, -2],
+    [-2, -2],
+];
+
+/* q-pel search pattern */
+pub(crate) static tbl_search_pattern_qpel_8point: [[i8; 2]; 8] = [
+    [-1, 0],
+    [0, 1],
+    [1, 0],
+    [0, -1],
+    [-1, 1],
+    [1, 1],
+    [-1, -1],
+    [1, -1],
+];
+
+pub(crate) static tbl_diapos_partial: [[[i8; 2]; 16]; 2] = [
+    [
+        [-2, 0],
+        [-1, 1],
+        [0, 2],
+        [1, 1],
+        [2, 0],
+        [1, -1],
+        [0, -2],
+        [-1, -1],
+        [0, 0],
+        [0, 0],
+        [0, 0],
+        [0, 0],
+        [0, 0],
+        [0, 0],
+        [0, 0],
+        [0, 0],
+    ],
+    [
+        [-4, 0],
+        [-3, 1],
+        [-2, 2],
+        [-1, 3],
+        [0, 4],
+        [1, 3],
+        [2, 2],
+        [3, 1],
+        [4, 0],
+        [3, -1],
+        [2, -2],
+        [1, -3],
+        [0, -4],
+        [-1, -3],
+        [-2, -2],
+        [-3, -1],
+    ],
+];
+
 #[derive(Default)]
 pub(crate) struct EvcePInter {
     /* temporary prediction buffer (only used for ME)*/
@@ -38,11 +106,12 @@ pub(crate) struct EvcePInter {
     s8   first_refi[PRED_NUM][REFP_NUM];
     u8   bi_idx[PRED_NUM];
     u8   curr_bi;
-    int max_search_range;
+
      u8   mvp_idx_scale[REFP_NUM][MAX_NUM_ACTIVE_REF_FRAME];
 
     pel  p_error[MAX_CU_DIM];
     int  i_gradient[2][MAX_CU_DIM];*/
+    pub(crate) max_search_range: i16,
     resi: CUBuffer<i16>,
     coff_save: CUBuffer<i16>,
 
@@ -53,7 +122,7 @@ pub(crate) struct EvcePInter {
     pub(crate) mvd: [[[i16; MV_D]; REFP_NUM]; InterPredDir::PRED_NUM as usize],
 
     org_bi: CUBuffer<i16>,
-    mot_bits: [i32; REFP_NUM],
+    pub(crate) mot_bits: [u32; REFP_NUM],
 
     /* temporary prediction buffer (only used for ME)*/
     pred: [[CUBuffer<pel>; 2]; InterPredDir::PRED_NUM as usize + 1],
@@ -67,24 +136,23 @@ pub(crate) struct EvcePInter {
 
     nnz_best: [[u16; N_C]; InterPredDir::PRED_NUM as usize],
 
-    num_refp: u8,
+    pub(crate) num_refp: u8,
 
     /* minimum clip value */
     pub(crate) min_clip: [i16; MV_D],
     /* maximum clip value */
     pub(crate) max_clip: [i16; MV_D],
-    /*
-    /* search range for int-pel */
-    s16  search_range_ipel[MV_D];
-    /* search range for sub-pel */
-    s16  search_range_spel[MV_D];
-    s8  (*search_pattern_hpel)[2];
-    u8   search_pattern_hpel_cnt;
-    s8  (*search_pattern_qpel)[2];
-    u8   search_pattern_qpel_cnt;
 
-    */
-     /* original (input) picture buffer */
+    /* search range for int-pel */
+    pub(crate) search_range_ipel: [i16; MV_D],
+    /* search range for sub-pel */
+    pub(crate) search_range_spel: [i16; MV_D],
+    //search_pattern_hpel: &'static [[i8; 2]; 8],
+    pub(crate) search_pattern_hpel_cnt: u8,
+    //search_pattern_qpel: &'static [[i8; 2]; 8],
+    pub(crate) search_pattern_qpel_cnt: u8,
+
+    /* original (input) picture buffer */
     pic_o: Option<Rc<RefCell<EvcPic>>>,
     /* mode picture buffer */
     pic_m: Option<Rc<RefCell<EvcPic>>>,
@@ -97,7 +165,7 @@ pub(crate) struct EvcePInter {
     /* QP for chroma of current encoding CU */
     pub(crate) qp_u: u8,
     pub(crate) qp_v: u8,
-    lambda_mv: u32,
+    pub(crate) lambda_mv: u32,
     /* reference pictures */
     //refp: Option<Rc<RefCell<Vec<Vec<EvcRefP>>>>>,
     slice_type: SliceType,
@@ -107,9 +175,43 @@ pub(crate) struct EvcePInter {
     /*void            *pdata[4];
     int             *ndata[4];*/
     /* current picture order count */
-    poc: i32,
+    pub(crate) poc: i32,
     /* gop size */
-    gop_size: usize,
+    pub(crate) gop_size: usize,
+}
+impl EvcePInter {
+    pub(crate) fn new(w: u16, h: u16, max_b_frames: u8) -> Self {
+        let mut pinter = EvcePInter::default();
+
+        /* set maximum/minimum value of search range */
+        pinter.min_clip[MV_X] = 1 - (MAX_CU_SIZE as i16);
+        pinter.min_clip[MV_Y] = 1 - (MAX_CU_SIZE as i16);
+        pinter.max_clip[MV_X] = w as i16 - 1;
+        pinter.max_clip[MV_Y] = h as i16 - 1;
+
+        /* default values *************************************************/
+        pinter.max_search_range = if max_b_frames == 0 {
+            SEARCH_RANGE_IPEL_LD
+        } else {
+            SEARCH_RANGE_IPEL_RA
+        };
+        pinter.search_range_ipel[MV_X] = pinter.max_search_range;
+        pinter.search_range_ipel[MV_Y] = pinter.max_search_range;
+
+        pinter.search_range_spel[MV_X] = SEARCH_RANGE_SPEL;
+        pinter.search_range_spel[MV_Y] = SEARCH_RANGE_SPEL;
+
+        //pinter.search_pattern_hpel = tbl_search_pattern_hpel_partial;
+        pinter.search_pattern_hpel_cnt = 8;
+
+        //pinter.search_pattern_qpel = tbl_search_pattern_qpel_8point;
+        pinter.search_pattern_qpel_cnt = 8;
+
+        pinter.me_level = ME_LEV_QPEL;
+        pinter.complexity = 0;
+
+        pinter
+    }
 }
 
 impl EvceCtx {

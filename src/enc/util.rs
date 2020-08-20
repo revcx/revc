@@ -230,3 +230,47 @@ pub(crate) fn get_org_bi(
         }
     }
 }
+
+#[inline]
+pub(crate) fn get_exp_golomb_bits(abs_mvd: u32) -> u32 {
+    let mut bits = 0;
+
+    /* abs(mvd) */
+    let mut nn = ((abs_mvd + 1) >> 1);
+    let mut len_i = 0;
+    while len_i < 16 && nn != 0 {
+        nn >>= 1;
+        len_i += 1;
+    }
+    let len_c = (len_i << 1) + 1;
+
+    bits += len_c;
+
+    /* sign */
+    if abs_mvd != 0 {
+        bits += 1;
+    }
+
+    return bits;
+}
+
+pub(crate) fn get_mv_bits(mvd_x: i16, mvd_y: i16, num_refp: usize, refi: usize) -> u32 {
+    let mut bits = if mvd_x > 2048 || mvd_x <= -2048 {
+        get_exp_golomb_bits(mvd_x.abs() as u32)
+    } else {
+        evce_tbl_mv_bits_data[(MV_BITS_BASE as i16 + mvd_x) as usize] as u32
+    };
+    bits += if mvd_y > 2048 || mvd_y <= -2048 {
+        get_exp_golomb_bits(mvd_y.abs() as u32)
+    } else {
+        evce_tbl_mv_bits_data[(MV_BITS_BASE as i16 + mvd_y) as usize] as u32
+    };
+    bits += evce_tbl_refi_bits[num_refp][refi] as u32;
+
+    bits
+}
+
+#[inline]
+pub(crate) fn MV_COST(lambda_mv: u32, mv_bits: u32) -> u32 {
+    (lambda_mv * mv_bits + (1 << 15)) >> 16
+}

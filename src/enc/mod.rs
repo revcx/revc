@@ -791,7 +791,7 @@ impl EvceCtx {
             /* intra prediction analysis */
             pintra: EvcePIntra::default(),
             /* inter prediction analysis */
-            pinter: EvcePInter::default(),
+            pinter: EvcePInter::new(w, h, param.max_b_frames),
             /* MAPS *******************************************************************/
             /* CU map (width in SCU x height in SCU) of raster scan order in a frame */
             map_scu,
