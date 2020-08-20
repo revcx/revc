@@ -612,7 +612,6 @@ impl EvceCtx {
             self.core.ctmp.data[V_C][0..(cuw * cuh) >> 2]
                 .copy_from_slice(&self.pintra.coef_tmp.data[V_C][0..(cuw * cuh) >> 2]);
 
-            //TODO: how to only do U/V?
             let is_coef = [
                 self.core.nnz[Y_C] != 0,
                 self.core.nnz[U_C] != 0,

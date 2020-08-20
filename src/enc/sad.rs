@@ -334,8 +334,6 @@ pub(crate) fn evce_sad_16b(
 pub(crate) fn evce_sad_bi_16b(
     x: i16,
     y: i16,
-    mv_x: i16,
-    mv_y: i16,
     cuw: usize,
     cuh: usize,
     src1: &[i16],
@@ -347,6 +345,38 @@ pub(crate) fn evce_sad_bi_16b(
         for i in 0..cuw {
             sad += (src1[j * cuw + i] as i16 - src2[y as usize + j][x as usize + i] as i16).abs()
                 as u32;
+        }
+    }
+
+    sad >> (BIT_DEPTH - 8)
+}
+
+pub(crate) fn evce_sad_16i(
+    x: i16,
+    y: i16,
+    cuw: usize,
+    cuh: usize,
+    src1: &PlaneRegion<'_, pel>,
+    src2: &[pel],
+) -> u32 {
+    let mut sad = 0;
+
+    for j in 0..cuh {
+        for i in 0..cuw {
+            sad += (src1[y as usize + j][x as usize + i] as i16 - src2[j * cuw + i] as i16).abs()
+                as u32;
+        }
+    }
+
+    sad >> (BIT_DEPTH - 8)
+}
+
+pub(crate) fn evce_sad_bi_16i(cuw: usize, cuh: usize, src1: &[i16], src2: &[pel]) -> u32 {
+    let mut sad = 0;
+
+    for j in 0..cuh {
+        for i in 0..cuw {
+            sad += (src1[j * cuw + i] as i16 - src2[j * cuw + i] as i16).abs() as u32;
         }
     }
 

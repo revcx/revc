@@ -91,7 +91,7 @@ pub(crate) static tbl_diapos_partial: [[[i8; 2]; 16]; 2] = [
 #[derive(Default)]
 pub(crate) struct EvcePInter {
     /* temporary prediction buffer (only used for ME)*/
-    //pred_buf: [pel; MAX_CU_DIM],
+    pub(crate) pred_buf: CUBuffer<pel>,
 
     /* temporary buffer for analyze_cu */
     pub(crate) refi: [[i8; REFP_NUM]; InterPredDir::PRED_NUM as usize],
@@ -305,16 +305,12 @@ impl EvceCtx {
             InterPredDir::PRED_L1 as usize
         } {
             pidx = lidx;
-            let refi = &mut self.pinter.refi[pidx];
-            let mv = &mut self.pinter.mv[pidx][lidx];
-            let mvd = &mut self.pinter.mvd[pidx][lidx];
 
             self.pinter.num_refp = self.rpm.num_refp[lidx];
 
             best_mecost = std::u32::MAX;
             refi_cur = 0;
             while refi_cur < self.pinter.num_refp as usize {
-                let mvp = &mut self.pinter.mvp_scale[lidx][refi_cur as usize];
                 let map_mv = self.map_mv.as_ref().unwrap().borrow();
                 evc_get_motion(
                     self.core.scup as usize,
@@ -326,23 +322,29 @@ impl EvceCtx {
                     self.w_scu as usize,
                     self.core.avail_cu,
                     &mut self.pinter.refi_pred[lidx],
-                    mvp,
+                    &mut self.pinter.mvp_scale[lidx][refi_cur],
                 );
                 mvp_idx[lidx] = self.pinter.mvp_idx[InterPredDir::PRED_SKIP as usize][lidx];
 
                 /* motion search ********************/
-                /*mecost = self.pinter.fn_me(
-                    pi,
-                    x,
-                    y,
+
+                //copy to temp mvp and mv
+                let mvp = self.pinter.mvp_scale[lidx][refi_cur][mvp_idx[lidx] as usize];
+                let mut mv = self.pinter.mv[pidx][lidx];
+                mecost = self.pinter.pinter_me_epzs(
+                    x as i16,
+                    y as i16,
                     log2_cuw,
                     log2_cuh,
-                    &refi_cur,
+                    refi_cur as i8,
                     lidx,
-                    mvp[mvp_idx[lidx]],
-                    mv,
+                    &mvp,
+                    &mut mv,
                     0,
-                );*/
+                    &self.refp,
+                );
+                // load mv back
+                self.pinter.mv[pidx][lidx] = mv;
 
                 self.pinter.mv_scale[lidx][refi_cur as usize][MV_X] = mv[MV_X];
                 self.pinter.mv_scale[lidx][refi_cur as usize][MV_Y] = mv[MV_Y];
@@ -355,9 +357,10 @@ impl EvceCtx {
             }
 
             refi_cur = refi_temp;
+
+            let mv = &mut self.pinter.mv[pidx][lidx];
             mv[MV_X] = self.pinter.mv_scale[lidx][refi_cur][MV_X];
             mv[MV_Y] = self.pinter.mv_scale[lidx][refi_cur][MV_Y];
-            let mvp = &self.pinter.mvp_scale[lidx][refi_cur];
 
             let t0 = if lidx == 0 {
                 refi_cur as i8
@@ -370,9 +373,12 @@ impl EvceCtx {
                 REFI_INVALID
             };
 
+            let refi = &mut self.pinter.refi[pidx];
             refi[REFP_0] = t0;
             refi[REFP_1] = t1;
 
+            let mvd = &mut self.pinter.mvd[pidx][lidx];
+            let mvp = &self.pinter.mvp_scale[lidx][refi_cur];
             mvd[MV_X] = mv[MV_X] - mvp[mvp_idx[lidx] as usize][MV_X];
             mvd[MV_Y] = mv[MV_Y] - mvp[mvp_idx[lidx] as usize][MV_Y];
 
@@ -849,18 +855,25 @@ impl EvceCtx {
 
             for refi_cur in bi_start..bi_end {
                 refi[lidx_ref] = refi_cur as i8;
-                /*mecost = self.pinter.fn_me(
-                    pi,
-                    x,
-                    y,
+
+                // save to temp mvp and mv
+                let mvp = self.pinter.mvp[lidx_ref][mvp_idx as usize];
+                let mut mv = self.pinter.mv_scale[lidx_ref][refi_cur];
+                mecost = self.pinter.pinter_me_epzs(
+                    x as i16,
+                    y as i16,
                     log2_cuw,
                     log2_cuh,
-                    &refi[lidx_ref],
+                    refi[lidx_ref],
                     lidx_ref,
-                    self.pinter.mvp[lidx_ref][mvp_idx],
-                    self.pinter.mv_scale[lidx_ref][refi_cur],
+                    &mvp,
+                    &mut mv,
                     1,
-                );*/
+                    &self.refp,
+                );
+                // load mv back
+                self.pinter.mv_scale[lidx_ref][refi_cur] = mv;
+
                 if mecost < best_mecost {
                     refi_best = refi_cur;
                     best_mecost = mecost;

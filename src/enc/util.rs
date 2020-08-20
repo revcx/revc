@@ -254,7 +254,7 @@ pub(crate) fn get_exp_golomb_bits(abs_mvd: u32) -> u32 {
     return bits;
 }
 
-pub(crate) fn get_mv_bits(mvd_x: i16, mvd_y: i16, num_refp: usize, refi: usize) -> u32 {
+pub(crate) fn get_mv_bits(mvd_x: i16, mvd_y: i16, num_refp: u8, refi: i8) -> u32 {
     let mut bits = if mvd_x > 2048 || mvd_x <= -2048 {
         get_exp_golomb_bits(mvd_x.abs() as u32)
     } else {
@@ -265,7 +265,7 @@ pub(crate) fn get_mv_bits(mvd_x: i16, mvd_y: i16, num_refp: usize, refi: usize) 
     } else {
         evce_tbl_mv_bits_data[(MV_BITS_BASE as i16 + mvd_y) as usize] as u32
     };
-    bits += evce_tbl_refi_bits[num_refp][refi] as u32;
+    bits += evce_tbl_refi_bits[num_refp as usize][refi as usize] as u32;
 
     bits
 }

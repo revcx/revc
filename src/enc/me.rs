@@ -2,6 +2,7 @@ use super::pinter::*;
 use super::sad::*;
 use super::*;
 use crate::def::*;
+use crate::mc::*;
 
 const MAX_FIRST_SEARCH_STEP: i16 = 3;
 const MAX_REFINE_SEARCH_STEP: i16 = 2;
@@ -9,6 +10,18 @@ const RASTER_SEARCH_STEP: i16 = 5;
 const RASTER_SEARCH_THD: i16 = 5;
 const REFINE_SEARCH_THD: i16 = 0;
 const BI_STEP: i16 = 5;
+
+static test_pos: [[i16; 2]; 9] = [
+    [0, 0],
+    [-1, -1],
+    [-1, 0],
+    [-1, 1],
+    [0, -1],
+    [0, 1],
+    [1, -1],
+    [1, 0],
+    [1, 1],
+];
 
 impl EvcePInter {
     pub(crate) fn pinter_me_epzs(
@@ -136,7 +149,9 @@ impl EvcePInter {
 
         if self.me_level > ME_LEV_IPEL {
             /* sub-pel ME */
-            //TODO:  cost = me_spel_pattern(pi, x, y, log2_cuw, log2_cuh, refi, lidx, gmvp, mv, mvt, bi);
+            cost = self.me_spel_pattern(
+                x, y, log2_cuw, log2_cuh, refi, lidx, &gmvp, &mv, &mut mvt, bi, refp,
+            );
 
             if cost < cost_best {
                 cost_best = cost;
@@ -152,7 +167,22 @@ impl EvcePInter {
 
             mvi[MV_X] = mv[MV_X] + (x << 2);
             mvi[MV_Y] = mv[MV_Y] + (y << 2);
-            //TODO:  cost = me_ipel_refinement(pi, x, y, log2_cuw, log2_cuh, refi, lidx, range, gmvp, mvi, mvt, bi, &tmpstep, MAX_REFINE_SEARCH_STEP);
+            cost = self.me_ipel_refinement(
+                x,
+                y,
+                log2_cuw,
+                log2_cuh,
+                refi,
+                lidx,
+                &range,
+                &gmvp,
+                &mvi,
+                &mut mvt,
+                bi,
+                &mut tmpstep,
+                MAX_REFINE_SEARCH_STEP,
+                refp,
+            );
             if cost < cost_best {
                 cost_best = cost;
 
@@ -293,8 +323,8 @@ impl EvcePInter {
                             mv_bits = get_mv_bits(
                                 (mv_x << 2) - gmvp[MV_X],
                                 (mv_y << 2) - gmvp[MV_Y],
-                                self.num_refp as usize,
-                                refi as usize,
+                                self.num_refp,
+                                refi,
                             );
 
                             if bi != 0 {
@@ -312,8 +342,6 @@ impl EvcePInter {
                                     cost += evce_sad_bi_16b(
                                         x,
                                         y,
-                                        mv_x,
-                                        mv_y,
                                         cuw,
                                         cuh,
                                         &self.org_bi.data[Y_C],
@@ -391,8 +419,8 @@ impl EvcePInter {
                         mv_bits = get_mv_bits(
                             (mv_x << 2) - gmvp[MV_X],
                             (mv_y << 2) - gmvp[MV_Y],
-                            self.num_refp as usize,
-                            refi as usize,
+                            self.num_refp,
+                            refi,
                         );
 
                         if bi != 0 {
@@ -410,8 +438,6 @@ impl EvcePInter {
                                 cost += evce_sad_bi_16b(
                                     x,
                                     y,
-                                    mv_x,
-                                    mv_y,
                                     cuw,
                                     cuh,
                                     &self.org_bi.data[Y_C],
@@ -463,7 +489,7 @@ impl EvcePInter {
 
             step <<= 1;
 
-            if step > self.max_search_range || (step << (-2)) > self.max_search_range {
+            if step > self.max_search_range {
                 break;
             }
         }
@@ -508,8 +534,8 @@ impl EvcePInter {
                 let mv_bits = get_mv_bits(
                     (mv_x << 2) - gmvp[MV_X],
                     (mv_y << 2) - gmvp[MV_Y],
-                    self.num_refp as usize,
-                    refi as usize,
+                    self.num_refp,
+                    refi,
                 );
 
                 /* get MVD cost_best */
@@ -565,8 +591,8 @@ impl EvcePInter {
                     let mv_bits = get_mv_bits(
                         (mv_x << 2) - gmvp[MV_X],
                         (mv_y << 2) - gmvp[MV_Y],
-                        self.num_refp as usize,
-                        refi as usize,
+                        self.num_refp,
+                        refi,
                     );
 
                     /* get MVD cost_best */
@@ -606,6 +632,285 @@ impl EvcePInter {
         }
 
         if best_mv_bits > 0 {
+            self.mot_bits[lidx] = best_mv_bits;
+        }
+
+        cost_best
+    }
+
+    fn me_spel_pattern(
+        &mut self,
+        x: i16,
+        y: i16,
+        log2_cuw: usize,
+        log2_cuh: usize,
+        refi: i8,
+        lidx: usize,
+        gmvp: &[i16],
+        mvi: &[i16],
+        mv: &mut [i16],
+        bi: u8,
+        refp: &Vec<Vec<EvcRefP>>,
+    ) -> u32 {
+        let mut cost_best = std::u32::MAX;
+        let lidx_r = if lidx == REFP_0 { REFP_1 } else { REFP_0 };
+
+        let cuw = 1usize << log2_cuw;
+        let cuh = 1usize << log2_cuh;
+        let mut best_mv_bits = 0;
+
+        /* make MV to be global coordinate */
+        let mut cx = mvi[MV_X] + (x << 2);
+        let mut cy = mvi[MV_Y] + (y << 2);
+
+        /* intial value */
+        mv[MV_X] = mvi[MV_X];
+        mv[MV_Y] = mvi[MV_Y];
+
+        /* search upto hpel-level from here */
+        /* search of large diamond pattern */
+        for i in 0..self.search_pattern_hpel_cnt {
+            let mv_x = cx + tbl_search_pattern_hpel_partial[i as usize][0] as i16;
+            let mv_y = cy + tbl_search_pattern_hpel_partial[i as usize][1] as i16;
+
+            /* get MVD bits */
+            let mut mv_bits =
+                get_mv_bits(mv_x - gmvp[MV_X], mv_y - gmvp[MV_Y], self.num_refp, refi);
+
+            if bi != 9 {
+                mv_bits += self.mot_bits[lidx_r];
+            }
+
+            /* get MVD cost_best */
+            let mut cost = MV_COST(self.lambda_mv, mv_bits);
+
+            /* get the interpolated(predicted) image */
+            if let Some(pic_r) = &refp[refi as usize][lidx].pic {
+                let frame_r = &pic_r.borrow().frame;
+                let plane_r = &frame_r.borrow().planes[Y_C];
+                evc_mc_l(
+                    (mv_x << 2),
+                    (mv_y << 2),
+                    &plane_r.as_region(),
+                    (mv_x << 2),
+                    (mv_y << 2),
+                    &mut self.pred_buf.data[Y_C],
+                    cuw as i16,
+                    cuh as i16,
+                );
+            }
+
+            if bi != 0 {
+                /* get sad */
+                cost += evce_sad_bi_16i(cuw, cuh, &self.org_bi.data[Y_C], &self.pred_buf.data[Y_C])
+                    >> 1;
+            } else {
+                /* get sad */
+                if let Some(pic_o) = &self.pic_o {
+                    let frame_o = &pic_o.borrow().frame;
+                    let plane_o = &frame_o.borrow().planes[Y_C];
+                    cost += evce_sad_16i(
+                        x,
+                        y,
+                        cuw,
+                        cuh,
+                        &plane_o.as_region(),
+                        &self.pred_buf.data[Y_C],
+                    );
+                }
+            }
+
+            /* check if motion cost_best is less than minimum cost_best */
+            if cost < cost_best {
+                mv[MV_X] = mv_x - (x << 2);
+                mv[MV_Y] = mv_y - (y << 2);
+                cost_best = cost;
+            }
+        }
+
+        /* search upto qpel-level from here*/
+        /* search of small diamond pattern */
+        if self.me_level > ME_LEV_HPEL {
+            /* make MV to be absolute coordinate */
+            cx = mv[MV_X] + (x << 2);
+            cy = mv[MV_Y] + (y << 2);
+
+            for i in 0..self.search_pattern_qpel_cnt {
+                let mv_x = cx + tbl_search_pattern_qpel_8point[i as usize][0] as i16;
+                let mv_y = cy + tbl_search_pattern_qpel_8point[i as usize][1] as i16;
+
+                /* get MVD bits */
+                let mut mv_bits =
+                    get_mv_bits(mv_x - gmvp[MV_X], mv_y - gmvp[MV_Y], self.num_refp, refi);
+
+                if bi != 0 {
+                    mv_bits += self.mot_bits[lidx_r];
+                }
+
+                /* get MVD cost_best */
+                let mut cost = MV_COST(self.lambda_mv, mv_bits);
+
+                /* get the interpolated(predicted) image */
+                if let Some(pic_r) = &refp[refi as usize][lidx].pic {
+                    let frame_r = &pic_r.borrow().frame;
+                    let plane_r = &frame_r.borrow().planes[Y_C];
+                    evc_mc_l(
+                        (mv_x << 2),
+                        (mv_y << 2),
+                        &plane_r.as_region(),
+                        (mv_x << 2),
+                        (mv_y << 2),
+                        &mut self.pred_buf.data[Y_C],
+                        cuw as i16,
+                        cuh as i16,
+                    );
+                }
+
+                if bi != 0 {
+                    /* get sad */
+                    cost +=
+                        evce_sad_bi_16i(cuw, cuh, &self.org_bi.data[Y_C], &self.pred_buf.data[Y_C])
+                            >> 1;
+                } else {
+                    /* get sad */
+                    if let Some(pic_o) = &self.pic_o {
+                        let frame_o = &pic_o.borrow().frame;
+                        let plane_o = &frame_o.borrow().planes[Y_C];
+                        cost += evce_sad_16i(
+                            x,
+                            y,
+                            cuw,
+                            cuh,
+                            &plane_o.as_region(),
+                            &self.pred_buf.data[Y_C],
+                        );
+                    }
+                }
+
+                /* check if motion cost_best is less than minimum cost_best */
+                if cost < cost_best {
+                    mv[MV_X] = mv_x - (x << 2);
+                    mv[MV_Y] = mv_y - (y << 2);
+                    cost_best = cost;
+                    best_mv_bits = mv_bits;
+                }
+            }
+        }
+
+        if bi == 0 && best_mv_bits > 0 {
+            self.mot_bits[lidx] = best_mv_bits;
+        }
+
+        cost_best
+    }
+
+    fn me_ipel_refinement(
+        &mut self,
+        x: i16,
+        y: i16,
+        log2_cuw: usize,
+        log2_cuh: usize,
+        refi: i8,
+        lidx: usize,
+        range: &[[i16; MV_D]],
+        gmvp: &[i16],
+        mvi: &[i16],
+        mv: &mut [i16],
+        bi: u8,
+        beststep: &mut i16,
+        faststep: i16,
+        refp: &Vec<Vec<EvcRefP>>,
+    ) -> u32 {
+        let mut cost = std::u32::MAX;
+        let mut cost_best = std::u32::MAX;
+        let lidx_r = if lidx == REFP_0 { REFP_1 } else { REFP_0 };
+        let cuw = 1 << log2_cuw;
+        let cuh = 1 << log2_cuh;
+
+        let mut best_mv_bits = 0;
+        let step = 1;
+        let mut mv_best_x = EVC_CLIP3(self.min_clip[MV_X], self.max_clip[MV_X], (mvi[MV_X] >> 2));
+        let mut mv_best_y = EVC_CLIP3(self.min_clip[MV_Y], self.max_clip[MV_Y], (mvi[MV_Y] >> 2));
+
+        let imv_x = mv_best_x;
+        let imv_y = mv_best_y;
+
+        for i in 0..=8 {
+            let mv_x = imv_x + (step * test_pos[i][MV_X]);
+            let mv_y = imv_y + (step * test_pos[i][MV_Y]);
+
+            if mv_x > range[MV_RANGE_MAX][MV_X]
+                || mv_x < range[MV_RANGE_MIN][MV_X]
+                || mv_y > range[MV_RANGE_MAX][MV_Y]
+                || mv_y < range[MV_RANGE_MIN][MV_Y]
+            {
+                cost = std::u32::MAX;
+            } else {
+                /* get MVD bits */
+                let mut mv_bits = get_mv_bits(
+                    (mv_x << 2) - gmvp[MV_X],
+                    (mv_y << 2) - gmvp[MV_Y],
+                    self.num_refp,
+                    refi,
+                );
+
+                if bi != 0 {
+                    mv_bits += self.mot_bits[lidx_r];
+                }
+
+                /* get MVD cost_best */
+                cost = MV_COST(self.lambda_mv, mv_bits);
+
+                if bi != 0 {
+                    /* get sad */
+                    if let Some(pic_r) = &refp[refi as usize][lidx].pic {
+                        let frame_r = &pic_r.borrow().frame;
+                        let plane_r = &frame_r.borrow().planes[Y_C];
+                        cost += evce_sad_bi_16b(
+                            x,
+                            y,
+                            cuw,
+                            cuh,
+                            &self.org_bi.data[Y_C],
+                            &plane_r.as_region(),
+                        ) >> 1;
+                    }
+                } else {
+                    /* get sad */
+                    if let (Some(pic_o), Some(pic_r)) =
+                        (&self.pic_o, &refp[refi as usize][lidx].pic)
+                    {
+                        let (frame_o, frame_r) = (&pic_o.borrow().frame, &pic_r.borrow().frame);
+                        let (plane_o, plane_r) =
+                            (&frame_o.borrow().planes[Y_C], &frame_r.borrow().planes[Y_C]);
+                        cost += evce_sad_16b(
+                            x,
+                            y,
+                            mv_x,
+                            mv_y,
+                            cuw,
+                            cuh,
+                            &plane_o.as_region(),
+                            &plane_r.as_region(),
+                        );
+                    }
+                }
+
+                /* check if motion cost_best is less than minimum cost_best */
+                if cost < cost_best {
+                    mv_best_x = mv_x;
+                    mv_best_y = mv_y;
+                    cost_best = cost;
+                    best_mv_bits = mv_bits;
+                }
+            }
+        }
+
+        /* set best MV */
+        mv[MV_X] = ((mv_best_x - x) << 2);
+        mv[MV_Y] = ((mv_best_y - y) << 2);
+
+        if bi != BI_NORMAL && best_mv_bits > 0 {
             self.mot_bits[lidx] = best_mv_bits;
         }
 

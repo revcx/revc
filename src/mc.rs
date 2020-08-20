@@ -562,7 +562,7 @@ fn evc_mc_c_nn(
     }
 }
 
-fn evc_mc_l(
+pub(crate) fn evc_mc_l(
     ori_mv_x: i16,
     ori_mv_y: i16,
     r: &PlaneRegion<'_, pel>,
