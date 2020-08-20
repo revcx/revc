@@ -1713,19 +1713,18 @@ impl EvceCtx {
             self.core.dist_cu_best = i32::MAX;
 
             if self.core.cost_best != MAX_COST {
-                unimplemented!();
-            /*if let Some(pic) = &self.pintra.pic_o {
-                let frame = &pic.borrow().frame;
-                let planes = &frame.borrow().planes;
-                self.core.inter_satd = evce_satd_16b(
-                    x as usize,
-                    y as usize,
-                    1 << log2_cuw as usize,
-                    1 << log2_cuh as usize,
-                    &planes[Y_C].as_region(),
-                    &self.pinter,
-                );
-            }*/
+                if let Some(pic) = &self.pintra.pic_o {
+                    let frame = &pic.borrow().frame;
+                    let planes = &frame.borrow().planes;
+                    self.core.inter_satd = evce_satd_16b(
+                        x as usize,
+                        y as usize,
+                        1 << log2_cuw as usize,
+                        1 << log2_cuh as usize,
+                        &planes[Y_C].as_region(),
+                        &self.pinter.pred[self.mode.pred_y_best_idx][0].data[Y_C],
+                    );
+                }
             } else {
                 self.core.inter_satd = u32::MAX;
             }

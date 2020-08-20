@@ -125,7 +125,7 @@ pub(crate) struct EvcePInter {
     pub(crate) mot_bits: [u32; REFP_NUM],
 
     /* temporary prediction buffer (only used for ME)*/
-    pred: [[CUBuffer<pel>; 2]; InterPredDir::PRED_NUM as usize + 1],
+    pub(crate) pred: [[CUBuffer<pel>; 2]; InterPredDir::PRED_NUM as usize + 1],
 
     /* reconstruction buffer */
     rec: [CUBuffer<pel>; InterPredDir::PRED_NUM as usize],
