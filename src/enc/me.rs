@@ -31,7 +31,6 @@ impl EvcePInter {
         let mut mvt = [0i16; MV_D];
         let mut cost = std::u32::MAX;
         let mut cost_best = std::u32::MAX;
-        let ri = refi; /* reference buffer index */
         let mut tmpstep = 0;
         let mut beststep = 0;
 
@@ -52,14 +51,14 @@ impl EvcePInter {
 
         mvc[MV_X] = EVC_CLIP3(self.min_clip[MV_X], self.max_clip[MV_X], mvc[MV_X]);
         mvc[MV_Y] = EVC_CLIP3(self.min_clip[MV_Y], self.max_clip[MV_Y], mvc[MV_Y]);
-        self.get_range_ipel(&mvc, &mut range, bi == BI_NORMAL, ri, lidx, refp);
+        self.get_range_ipel(&mvc, &mut range, bi == BI_NORMAL, refi, lidx, refp);
 
         cost = self.me_ipel_diamond(
             x,
             y,
             1 << log2_cuw,
             1 << log2_cuh,
-            ri,
+            refi,
             lidx,
             &mut range,
             &gmvp,
@@ -83,10 +82,11 @@ impl EvcePInter {
         }
 
         if bi == BI_NON && beststep > RASTER_SEARCH_THD {
-            //TODO: cost = me_raster(pi, x, y, log2_cuw, log2_cuh, ri, lidx, range, gmvp, mvt);
+            cost = self.me_raster(
+                x, y, log2_cuw, log2_cuh, refi, lidx, &range, &gmvp, &mut mvt, refp,
+            );
             if cost < cost_best {
                 beststep = RASTER_SEARCH_THD;
-
                 cost_best = cost;
 
                 mv[MV_X] = mvt[MV_X];
@@ -98,7 +98,7 @@ impl EvcePInter {
             mvc[MV_X] = x + (mv[MV_X] >> 2);
             mvc[MV_Y] = y + (mv[MV_Y] >> 2);
 
-            self.get_range_ipel(&mvc, &mut range, bi == BI_NORMAL, ri, lidx, refp);
+            self.get_range_ipel(&mvc, &mut range, bi == BI_NORMAL, refi, lidx, refp);
 
             mvi[MV_X] = mv[MV_X] + (x << 2);
             mvi[MV_Y] = mv[MV_Y] + (y << 2);
@@ -109,7 +109,7 @@ impl EvcePInter {
                 y,
                 1 << log2_cuw,
                 1 << log2_cuh,
-                ri,
+                refi,
                 lidx,
                 &mut range,
                 &gmvp,
@@ -136,7 +136,7 @@ impl EvcePInter {
 
         if self.me_level > ME_LEV_IPEL {
             /* sub-pel ME */
-            //TODO:  cost = me_spel_pattern(pi, x, y, log2_cuw, log2_cuh, ri, lidx, gmvp, mv, mvt, bi);
+            //TODO:  cost = me_spel_pattern(pi, x, y, log2_cuw, log2_cuh, refi, lidx, gmvp, mv, mvt, bi);
 
             if cost < cost_best {
                 cost_best = cost;
@@ -148,11 +148,11 @@ impl EvcePInter {
             mvc[MV_X] = x + (mv[MV_X] >> 2);
             mvc[MV_Y] = y + (mv[MV_Y] >> 2);
 
-            self.get_range_ipel(&mvc, &mut range, bi == BI_NORMAL, ri, lidx, refp);
+            self.get_range_ipel(&mvc, &mut range, bi == BI_NORMAL, refi, lidx, refp);
 
             mvi[MV_X] = mv[MV_X] + (x << 2);
             mvi[MV_Y] = mv[MV_Y] + (y << 2);
-            //TODO:  cost = me_ipel_refinement(pi, x, y, log2_cuw, log2_cuh, ri, lidx, range, gmvp, mvi, mvt, bi, &tmpstep, MAX_REFINE_SEARCH_STEP);
+            //TODO:  cost = me_ipel_refinement(pi, x, y, log2_cuw, log2_cuh, refi, lidx, range, gmvp, mvi, mvt, bi, &tmpstep, MAX_REFINE_SEARCH_STEP);
             if cost < cost_best {
                 cost_best = cost;
 
@@ -169,7 +169,7 @@ impl EvcePInter {
         mvc: &[i16],
         range: &mut [[i16; MV_D]],
         bi: bool,
-        ri: i8,
+        refi: i8,
         lidx: usize,
         refp: &Vec<Vec<EvcRefP>>,
     ) {
@@ -177,7 +177,8 @@ impl EvcePInter {
         let max_search_range = EVC_CLIP3(
             self.max_search_range >> 2,
             self.max_search_range,
-            (self.max_search_range * (self.poc - refp[ri as usize][lidx].poc as i32).abs() as i16
+            (self.max_search_range
+                * (self.poc - refp[refi as usize][lidx].poc as i32).abs() as i16
                 + offset as i16)
                 / self.gop_size as i16,
         );
@@ -472,6 +473,139 @@ impl EvcePInter {
         mv[MV_Y] = ((mv_best_y - y) << 2);
 
         if bi != BI_NORMAL && best_mv_bits > 0 {
+            self.mot_bits[lidx] = best_mv_bits;
+        }
+
+        cost_best
+    }
+
+    fn me_raster(
+        &mut self,
+        x: i16,
+        y: i16,
+        log2_cuw: usize,
+        log2_cuh: usize,
+        refi: i8,
+        lidx: usize,
+        range: &[[i16; MV_D]],
+        gmvp: &[i16],
+        mv: &mut [i16],
+        refp: &Vec<Vec<EvcRefP>>,
+    ) -> u32 {
+        let search_step_x = std::cmp::max(RASTER_SEARCH_STEP, (1 << (log2_cuw - 1))); /* Adaptive step size : Half of CU dimension */
+        let search_step_y = std::cmp::max(RASTER_SEARCH_STEP, (1 << (log2_cuh - 1))); /* Adaptive step size : Half of CU dimension */
+        let mut center_mv = [0i16; MV_D];
+        let mut best_mv_bits = 0;
+        let mut cost_best = std::u32::MAX;
+
+        for mv_y in (range[MV_RANGE_MIN][MV_Y]..=range[MV_RANGE_MAX][MV_Y])
+            .step_by((search_step_y * (refi as i16 + 1)) as usize)
+        {
+            for mv_x in (range[MV_RANGE_MIN][MV_X]..=range[MV_RANGE_MAX][MV_X])
+                .step_by((search_step_x * (refi as i16 + 1)) as usize)
+            {
+                /* get MVD bits */
+                let mv_bits = get_mv_bits(
+                    (mv_x << 2) - gmvp[MV_X],
+                    (mv_y << 2) - gmvp[MV_Y],
+                    self.num_refp as usize,
+                    refi as usize,
+                );
+
+                /* get MVD cost_best */
+                let mut cost = MV_COST(self.lambda_mv, mv_bits);
+
+                /* get sad */
+                if let (Some(pic_o), Some(pic_r)) = (&self.pic_o, &refp[refi as usize][lidx].pic) {
+                    let (frame_o, frame_r) = (&pic_o.borrow().frame, &pic_r.borrow().frame);
+                    let (plane_o, plane_r) =
+                        (&frame_o.borrow().planes[Y_C], &frame_r.borrow().planes[Y_C]);
+                    cost += evce_sad_16b(
+                        x,
+                        y,
+                        mv_x,
+                        mv_y,
+                        1 << log2_cuw,
+                        1 << log2_cuh,
+                        &plane_o.as_region(),
+                        &plane_r.as_region(),
+                    );
+                }
+
+                /* check if motion cost_best is less than minimum cost_best */
+                if cost < cost_best {
+                    mv[MV_X] = ((mv_x - x) << 2);
+                    mv[MV_Y] = ((mv_y - y) << 2);
+                    cost_best = cost;
+                    best_mv_bits = mv_bits;
+                }
+            }
+        }
+
+        /* Grid search around best mv for all dyadic step sizes till integer pel */
+        let mut search_step = (refi as i16 + 1) * std::cmp::max(search_step_x, search_step_y) >> 1;
+
+        while search_step > 0 {
+            center_mv[MV_X] = mv[MV_X];
+            center_mv[MV_Y] = mv[MV_Y];
+
+            for i in (-search_step..=search_step).step_by(search_step as usize) {
+                for j in (-search_step..=search_step).step_by(search_step as usize) {
+                    let mv_x = (center_mv[MV_X] >> 2) + x + j;
+                    let mv_y = (center_mv[MV_Y] >> 2) + y + i;
+
+                    if (mv_x < range[MV_RANGE_MIN][MV_X]) || (mv_x > range[MV_RANGE_MAX][MV_X]) {
+                        continue;
+                    }
+                    if (mv_y < range[MV_RANGE_MIN][MV_Y]) || (mv_y > range[MV_RANGE_MAX][MV_Y]) {
+                        continue;
+                    }
+
+                    /* get MVD bits */
+                    let mv_bits = get_mv_bits(
+                        (mv_x << 2) - gmvp[MV_X],
+                        (mv_y << 2) - gmvp[MV_Y],
+                        self.num_refp as usize,
+                        refi as usize,
+                    );
+
+                    /* get MVD cost_best */
+                    let mut cost = MV_COST(self.lambda_mv, mv_bits);
+
+                    /* get sad */
+                    if let (Some(pic_o), Some(pic_r)) =
+                        (&self.pic_o, &refp[refi as usize][lidx].pic)
+                    {
+                        let (frame_o, frame_r) = (&pic_o.borrow().frame, &pic_r.borrow().frame);
+                        let (plane_o, plane_r) =
+                            (&frame_o.borrow().planes[Y_C], &frame_r.borrow().planes[Y_C]);
+                        cost += evce_sad_16b(
+                            x,
+                            y,
+                            mv_x,
+                            mv_y,
+                            1 << log2_cuw,
+                            1 << log2_cuh,
+                            &plane_o.as_region(),
+                            &plane_r.as_region(),
+                        );
+                    }
+
+                    /* check if motion cost_best is less than minimum cost_best */
+                    if cost < cost_best {
+                        mv[MV_X] = ((mv_x - x) << 2);
+                        mv[MV_Y] = ((mv_y - y) << 2);
+                        cost_best = cost;
+                        best_mv_bits = mv_bits;
+                    }
+                }
+            }
+
+            /* Halve the step size */
+            search_step >>= 1;
+        }
+
+        if best_mv_bits > 0 {
             self.mot_bits[lidx] = best_mv_bits;
         }
 
