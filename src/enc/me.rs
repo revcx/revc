@@ -1,4 +1,5 @@
 use super::pinter::*;
+use super::sad::*;
 use super::*;
 use crate::def::*;
 
@@ -53,7 +54,22 @@ impl EvcePInter {
         mvc[MV_Y] = EVC_CLIP3(self.min_clip[MV_Y], self.max_clip[MV_Y], mvc[MV_Y]);
         self.get_range_ipel(&mvc, &mut range, bi == BI_NORMAL, ri, lidx, refp);
 
-        //TODO:      cost = me_ipel_diamond(pi, x, y, log2_cuw, log2_cuh, ri, lidx, range, gmvp, mvi, mvt, bi, &tmpstep, MAX_FIRST_SEARCH_STEP);
+        cost = self.me_ipel_diamond(
+            x,
+            y,
+            1 << log2_cuw,
+            1 << log2_cuh,
+            ri,
+            lidx,
+            &mut range,
+            &gmvp,
+            &mvi,
+            &mut mvt,
+            bi,
+            &mut tmpstep,
+            MAX_FIRST_SEARCH_STEP,
+            refp,
+        );
 
         if cost < cost_best {
             cost_best = cost;
@@ -88,7 +104,22 @@ impl EvcePInter {
             mvi[MV_Y] = mv[MV_Y] + (y << 2);
 
             beststep = 0;
-            //TODO: cost = me_ipel_diamond(pi, x, y, log2_cuw, log2_cuh, ri, lidx, range, gmvp, mvi, mvt, bi, &tmpstep, MAX_REFINE_SEARCH_STEP);
+            cost = self.me_ipel_diamond(
+                x,
+                y,
+                1 << log2_cuw,
+                1 << log2_cuh,
+                ri,
+                lidx,
+                &mut range,
+                &gmvp,
+                &mvi,
+                &mut mvt,
+                bi,
+                &mut tmpstep,
+                MAX_REFINE_SEARCH_STEP,
+                refp,
+            );
             if cost < cost_best {
                 cost_best = cost;
 
@@ -183,8 +214,8 @@ impl EvcePInter {
         &mut self,
         x: i16,
         y: i16,
-        log2_cuw: usize,
-        log2_cuh: usize,
+        cuw: usize,
+        cuh: usize,
         refi: i8,
         lidx: usize,
         range: &mut [[i16; MV_D]],
@@ -196,21 +227,12 @@ impl EvcePInter {
         faststep: i16,
         refp: &Vec<Vec<EvcRefP>>,
     ) -> u32 {
-        //EVC_PIC      *ref_pic;
-        //pel           *org, *ref;
         let mut cost = std::u32::MAX;
         let mut cost_best = std::u32::MAX;
         let mut mv_bits = 0;
-        let mut best_mv_bits = 0;
         let mut mv_x = 0;
         let mut mv_y = 0;
-        let mut mv_best_x = 0;
-        let mut mv_best_y = 0;
         let lidx_r = if lidx == REFP_0 { REFP_1 } else { REFP_0 };
-        /*s16           *org_bi = self.org_bi;
-
-        int            step, i, j;
-        s16            imv_x, imv_y;*/
         let mut mvc = [0i16; MV_D];
         let mut min_cmv_x = 0;
         let mut min_cmv_y = 0;
@@ -220,8 +242,6 @@ impl EvcePInter {
         let mut mvsize = 1;
         let mut not_found_best = 0;
 
-        //org = self.o[Y_C] + y * self.s_o[Y_C] + x;
-        //ref_pic = self.refp[refi][lidx].pic;
         let mut best_mv_bits = 0;
         let mut step = 0;
         let mut mv_best_x = EVC_CLIP3(self.min_clip[MV_X], self.max_clip[MV_X], (mvi[MV_X] >> 2));
@@ -283,14 +303,44 @@ impl EvcePInter {
                             /* get MVD cost_best */
                             cost = MV_COST(self.lambda_mv, mv_bits);
 
-                            //ref = ref_pic->y + mv_x + mv_y * ref_pic->s_l;
-
                             if bi != 0 {
                                 /* get sad */
-                                //TODO: cost += evce_sad_bi_16b(log2_cuw, log2_cuh, org_bi, ref, 1 << log2_cuw, ref_pic->s_l);
+                                if let Some(pic_r) = &refp[refi as usize][lidx].pic {
+                                    let frame_r = &pic_r.borrow().frame;
+                                    let plane_r = &frame_r.borrow().planes[Y_C];
+                                    cost += evce_sad_bi_16b(
+                                        x,
+                                        y,
+                                        mv_x,
+                                        mv_y,
+                                        cuw,
+                                        cuh,
+                                        &self.org_bi.data[Y_C],
+                                        &plane_r.as_region(),
+                                    ) >> 1;
+                                }
                             } else {
                                 /* get sad */
-                                //TODO: cost += evce_sad_16b(log2_cuw, log2_cuh, org, ref, self.s_o[Y_C], ref_pic->s_l);
+                                if let (Some(pic_o), Some(pic_r)) =
+                                    (&self.pic_o, &refp[refi as usize][lidx].pic)
+                                {
+                                    let (frame_o, frame_r) =
+                                        (&pic_o.borrow().frame, &pic_r.borrow().frame);
+                                    let (plane_o, plane_r) = (
+                                        &frame_o.borrow().planes[Y_C],
+                                        &frame_r.borrow().planes[Y_C],
+                                    );
+                                    cost += evce_sad_16b(
+                                        x,
+                                        y,
+                                        mv_x,
+                                        mv_y,
+                                        cuw,
+                                        cuh,
+                                        &plane_o.as_region(),
+                                        &plane_r.as_region(),
+                                    );
+                                }
                             }
 
                             /* check if motion cost_best is less than minimum cost_best */
@@ -351,13 +401,42 @@ impl EvcePInter {
                         /* get MVD cost_best */
                         cost = MV_COST(self.lambda_mv, mv_bits);
 
-                        //ref = ref_pic->y + mv_x + mv_y * ref_pic->s_l;
                         if bi != 0 {
                             /* get sad */
-                            //TODO: cost += evce_sad_bi_16b(log2_cuw, log2_cuh, org_bi, ref, 1 << log2_cuw, ref_pic->s_l);
+                            if let Some(pic_r) = &refp[refi as usize][lidx].pic {
+                                let frame_r = &pic_r.borrow().frame;
+                                let plane_r = &frame_r.borrow().planes[Y_C];
+                                cost += evce_sad_bi_16b(
+                                    x,
+                                    y,
+                                    mv_x,
+                                    mv_y,
+                                    cuw,
+                                    cuh,
+                                    &self.org_bi.data[Y_C],
+                                    &plane_r.as_region(),
+                                ) >> 1;
+                            }
                         } else {
                             /* get sad */
-                            //TODO: cost += evce_sad_16b(log2_cuw, log2_cuh, org, ref, self.s_o[Y_C], ref_pic->s_l);
+                            if let (Some(pic_o), Some(pic_r)) =
+                                (&self.pic_o, &refp[refi as usize][lidx].pic)
+                            {
+                                let (frame_o, frame_r) =
+                                    (&pic_o.borrow().frame, &pic_r.borrow().frame);
+                                let (plane_o, plane_r) =
+                                    (&frame_o.borrow().planes[Y_C], &frame_r.borrow().planes[Y_C]);
+                                cost += evce_sad_16b(
+                                    x,
+                                    y,
+                                    mv_x,
+                                    mv_y,
+                                    cuw,
+                                    cuh,
+                                    &plane_o.as_region(),
+                                    &plane_r.as_region(),
+                                );
+                            }
                         }
 
                         /* check if motion cost_best is less than minimum cost_best */

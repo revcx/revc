@@ -121,7 +121,7 @@ pub(crate) struct EvcePInter {
     mv: [[[i16; MV_D]; REFP_NUM]; InterPredDir::PRED_NUM as usize],
     pub(crate) mvd: [[[i16; MV_D]; REFP_NUM]; InterPredDir::PRED_NUM as usize],
 
-    org_bi: CUBuffer<i16>,
+    pub(crate) org_bi: CUBuffer<i16>,
     pub(crate) mot_bits: [u32; REFP_NUM],
 
     /* temporary prediction buffer (only used for ME)*/
@@ -153,7 +153,7 @@ pub(crate) struct EvcePInter {
     pub(crate) search_pattern_qpel_cnt: u8,
 
     /* original (input) picture buffer */
-    pic_o: Option<Rc<RefCell<EvcPic>>>,
+    pub(crate) pic_o: Option<Rc<RefCell<EvcPic>>>,
     /* mode picture buffer */
     pic_m: Option<Rc<RefCell<EvcPic>>>,
     /* motion vector map */
@@ -470,7 +470,7 @@ impl EvceCtx {
             &is_coef,
         );
 
-        if let Some(pic) = &self.pintra.pic_o {
+        if let Some(pic) = &self.pinter.pic_o {
             let frame = &pic.borrow().frame;
             let planes = &frame.borrow().planes;
             for i in 0..N_C {
@@ -606,7 +606,7 @@ impl EvceCtx {
                     self.poc.poc_val,
                 );
 
-                if let Some(pic) = &self.pintra.pic_o {
+                if let Some(pic) = &self.pinter.pic_o {
                     let frame = &pic.borrow().frame;
                     let planes = &frame.borrow().planes;
                     cy = evce_ssd_16b(
@@ -818,7 +818,7 @@ impl EvceCtx {
                 0,
             );
 
-            if let Some(pic) = &self.pintra.pic_o {
+            if let Some(pic) = &self.pinter.pic_o {
                 let frame = &pic.borrow().frame;
                 let plane_y = &frame.borrow().planes[Y_C];
                 get_org_bi(
@@ -981,7 +981,7 @@ impl EvceCtx {
 
         /* get residual */
 
-        if let Some(pic) = &self.pintra.pic_o {
+        if let Some(pic) = &self.pinter.pic_o {
             let frame = &pic.borrow().frame;
             let planes = &frame.borrow().planes;
 
@@ -1065,7 +1065,7 @@ impl EvceCtx {
 
             self.calc_delta_dist_filter_boundary();
 
-            if let Some(pic) = &self.pintra.pic_o {
+            if let Some(pic) = &self.pinter.pic_o {
                 let frame = &pic.borrow().frame;
                 let planes = &frame.borrow().planes;
                 for i in 0..N_C {
