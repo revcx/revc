@@ -270,6 +270,9 @@ pub(crate) struct EvceCore {
     rdoq_est: EvceRdoqEst,
 
     evc_tbl_qp_chroma_dynamic_ext: Vec<Vec<i8>>, // [[i8; MAX_QP_TABLE_SIZE_EXT]; 2],
+
+    #[cfg(feature = "trace_cudata")]
+    trace_idx: u64,
 }
 impl EvceCore {
     pub(crate) fn new() -> Self {
@@ -977,7 +980,11 @@ impl EvceCtx {
         /* initialize bitstream container */
         self.bs.init();
         self.bs.tracer = self.tracer.take();
-        //EVC_TRACE_COUNTER_RESET(&mut self.bs.tracer);
+
+        #[cfg(feature = "trace_cudata")]
+        {
+            self.core.trace_idx = 0;
+        }
 
         for slice_num in 0..num_slice_in_pic {
             self.slice_num = slice_num;
@@ -1651,6 +1658,12 @@ impl EvceCtx {
         let enc_dqp = 0;
         let slice_type = self.slice_type;
 
+        #[cfg(feature = "trace_cudata")]
+        {
+            self.core.trace_idx = self.map_cu_data[self.core.lcu_num as usize].trace_idx[cup];
+            assert_ne!(self.core.trace_idx, 0);
+        }
+
         self.cu_init(x, y, cup, cuw, cuh);
 
         EVC_TRACE_COUNTER(&mut self.bs.tracer);
@@ -1798,8 +1811,14 @@ impl EvceCtx {
             }
 
             if core.cu_mode == PredMode::MODE_INTRA {
-                assert!(cu_data.ipm[0][cup as usize] != IntraPredDir::IPD_INVALID);
-                assert!(cu_data.ipm[1][cup as usize] != IntraPredDir::IPD_INVALID);
+                assert_ne!(
+                    cu_data.ipm[0][cup as usize] as i8,
+                    IntraPredDir::IPD_INVALID as i8
+                );
+                assert_ne!(
+                    cu_data.ipm[1][cup as usize] as i8,
+                    IntraPredDir::IPD_INVALID as i8
+                );
 
                 core.mpm_b_list = evc_get_mpm_b(
                     core.x_scu,
@@ -1847,40 +1866,16 @@ impl EvceCtx {
 
         self.evce_set_enc_info();
 
-        /*#if TRACE_ENC_CU_DATA
-            EVC_TRACE_COUNTER;
-            EVC_TRACE_STR("RDO check id ");
-            EVC_TRACE_INT((int)core.trace_idx);
-            EVC_TRACE_STR("\n");
-            evc_assert(core.trace_idx != 0);
-        #endif
-        #if TRACE_ENC_HISTORIC
-            //if (core.cu_mode != MODE_INTRA)
-            {
-                EVC_TRACE_COUNTER;
-                EVC_TRACE_STR("Historic (");
-                EVC_TRACE_INT((int)core.history_buffer.currCnt);
-                EVC_TRACE_STR("): ");
-                for (int i = 0; i < core.history_buffer.currCnt; ++i)
-                {
-                    EVC_TRACE_STR("(");
-                    EVC_TRACE_INT((int)core.history_buffer.history_mv_table[i][REFP_0][MV_X]);
-                    EVC_TRACE_STR(", ");
-                    EVC_TRACE_INT((int)core.history_buffer.history_mv_table[i][REFP_0][MV_Y]);
-                    EVC_TRACE_STR("; ");
-                    EVC_TRACE_INT((int)core.history_buffer.history_refi_table[i][REFP_0]);
-                    EVC_TRACE_STR("), (");
-                    EVC_TRACE_INT((int)core.history_buffer.history_mv_table[i][REFP_1][MV_X]);
-                    EVC_TRACE_STR(", ");
-                    EVC_TRACE_INT((int)core.history_buffer.history_mv_table[i][REFP_1][MV_Y]);
-                    EVC_TRACE_STR("; ");
-                    EVC_TRACE_INT((int)core.history_buffer.history_refi_table[i][REFP_1]);
-                    EVC_TRACE_STR("); ");
-                }
-                EVC_TRACE_STR("\n");
-            }
-        #endif
+        #[cfg(feature = "trace_cudata")]
+        {
+            EVC_TRACE_COUNTER(&mut self.bs.tracer);
+            EVC_TRACE(&mut self.bs.tracer, "RDO check id ");
+            EVC_TRACE(&mut self.bs.tracer, self.core.trace_idx);
+            EVC_TRACE(&mut self.bs.tracer, " \n");
+            assert_ne!(self.core.trace_idx, 0);
+        }
 
+        /*
         #if MVF_TRACE
             // Trace MVF in encoder
             {
