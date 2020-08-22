@@ -944,14 +944,19 @@ impl EvceCtx {
             self.last_intra_poc = self.poc.poc_val;
         }
 
-        //TODO: initialize map here?
-        /*
-        size = sizeof(s8) * self.f_scu * REFP_NUM;
-        evc_mset_x64a(self.map_refi, -1, size);
-
-        size = sizeof(s16) * self.f_scu * REFP_NUM * MV_D;
-        evc_mset_x64a(self.map_mv, 0, size);
-         */
+        if let (Some(map_refi), Some(map_mv)) = (&mut self.map_refi, &mut self.map_mv) {
+            let (mut map_refi, mut map_mv) = (map_refi.borrow_mut(), map_mv.borrow_mut());
+            for v in &mut *map_refi {
+                v[REFP_0] = -1;
+                v[REFP_1] = -1;
+            }
+            for v in &mut *map_mv {
+                v[REFP_0][MV_X] = 0;
+                v[REFP_0][MV_Y] = 0;
+                v[REFP_1][MV_X] = 0;
+                v[REFP_1][MV_Y] = 0;
+            }
+        }
 
         /* clear map */
         for v in &mut self.map_scu {
