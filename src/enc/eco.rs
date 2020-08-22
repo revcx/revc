@@ -786,6 +786,13 @@ pub(crate) fn evce_eco_refi(
             }
         }
     }
+
+    EVC_TRACE_COUNTER(&mut bs.tracer);
+    EVC_TRACE(&mut bs.tracer, "num_refp ");
+    EVC_TRACE(&mut bs.tracer, num_refp);
+    EVC_TRACE(&mut bs.tracer, " refi ");
+    EVC_TRACE(&mut bs.tracer, refi);
+    EVC_TRACE(&mut bs.tracer, " \n");
 }
 
 fn evce_eco_abs_mvd(bs: &mut EvceBsw, sbac: &mut EvceSbac, model: &mut SBAC_CTX_MODEL, sym: u32) {
