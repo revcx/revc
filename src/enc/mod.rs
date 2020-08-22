@@ -972,6 +972,7 @@ impl EvceCtx {
         /* initialize bitstream container */
         self.bs.init();
         self.bs.tracer = self.tracer.take();
+        EVC_TRACE_COUNTER_RESET(&mut self.bs.tracer);
 
         for slice_num in 0..num_slice_in_pic {
             self.slice_num = slice_num;
@@ -1096,9 +1097,9 @@ impl EvceCtx {
                 /* analyzer lcu */
 
                 // TRACE_RDO = 0: comment this line, otherwise, 2: uncomment it
-                // self.core.bs_temp.tracer = self.bs.tracer.take();
+                self.core.bs_temp.tracer = self.bs.tracer.take();
                 self.mode_analyze_lcu();
-                // self.bs.tracer = self.core.bs_temp.tracer.take();
+                self.bs.tracer = self.core.bs_temp.tracer.take();
 
                 /* entropy coding ************************************************/
                 self.evce_eco_tree(

@@ -34,6 +34,13 @@ pub(crate) fn EVC_TRACE_COUNTER(tracer: &mut Option<Tracer>) {
 }
 
 #[cfg(feature = "trace")]
+pub(crate) fn EVC_TRACE_COUNTER_RESET(tracer: &mut Option<Tracer>) {
+    if let Some((writer, counter)) = tracer {
+        *counter = 0;
+    }
+}
+
+#[cfg(feature = "trace")]
 pub(crate) fn EVC_TRACE<T: Display>(tracer: &mut Option<Tracer>, name: T) {
     if let Some((writer, _)) = tracer {
         writer.write_fmt(format_args!("{}", name));
@@ -222,8 +229,12 @@ pub(crate) fn TRACE_DBF(
 pub(crate) fn OPEN_TRACE(encoder: bool) -> Option<Tracer> {
     None
 }
+
 #[cfg(not(feature = "trace"))]
 pub(crate) fn EVC_TRACE_COUNTER(tracer: &mut Option<Tracer>) {}
+
+#[cfg(not(feature = "trace"))]
+pub(crate) fn EVC_TRACE_COUNTER_RESET(tracer: &mut Option<Tracer>) {}
 
 #[cfg(not(feature = "trace"))]
 pub(crate) fn EVC_TRACE<T: Display>(writer: &mut Option<Tracer>, name: T) {}
