@@ -1183,6 +1183,7 @@ impl EvceCtx {
         if let Some(pic) = &pic_curr {
             let frame = &pic.borrow().frame;
             frame.borrow_mut().pad();
+            stat.rec = Some(Rc::clone(frame));
         }
 
         /* picture buffer management */

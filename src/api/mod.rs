@@ -192,6 +192,7 @@ pub struct EvcStat {
     /* picture number increased whenever encoding a frame */
     /* quantization parameter used for encoding */
     pub qp: u8,
+    pub rec: Option<Rc<RefCell<Frame<pel>>>>,
 }
 
 pub const MAX_NUM_REF_PICS: usize = 21;

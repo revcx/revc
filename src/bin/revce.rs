@@ -652,6 +652,15 @@ fn main() -> std::io::Result<()> {
                     if cli.verbose {
                         print_stat(&stat, duration.as_millis() as usize);
                     }
+                    if let Some(rec_frame) = stat.rec {
+                        if let Some(rec_muxer) = &mut cli.rec {
+                            rec_muxer.write(
+                                Data::RefFrame(rec_frame),
+                                cli.bitdepth,
+                                Rational::new(cli.enc.time_base.den, cli.enc.time_base.num),
+                            )?;
+                        }
+                    }
                     bit_tot += stat.bytes << 3;
                 }
 
