@@ -4,17 +4,22 @@ The fastest and safest EVC encoder and decoder
 
 # Roadmap
 
-- [ ] 0.1 Translation: ETM baseline from C to Rust
+- [ ] 0.1 Translation:
   - [x] Translate ETM baseline decoder from C to Rust
   - [ ] Translate ETM baseline encoder from C to Rust		 
-- [ ] 0.2 Modernization: re-architect REVC to revce/revcd, like rav1e/dav1d
-- [ ] 0.3 Optimization: multi-threading and assembly
-  - [ ] multi-threading
-  - [ ] assembly
+- [ ] 0.2 Optimization:
+  - [ ] profiling and benchmarking
+  - [ ] rust safe code optimization
+  - [ ] assembly optimization
     - [ ] armeabi-v7a
     - [ ] arm64-v8a
     - [ ] x86
-    - [ ] x86_64
+    - [ ] x86_64  
+  - [ ] multi-threading optimization
+- [ ] 0.3 Modernization
+  - [ ] rate control
+  - [ ] practical usecases: RTC, Live Streaming, VOD, etc
+
 
 # Usage
 
