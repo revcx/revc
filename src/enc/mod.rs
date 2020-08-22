@@ -972,7 +972,7 @@ impl EvceCtx {
         /* initialize bitstream container */
         self.bs.init();
         self.bs.tracer = self.tracer.take();
-        EVC_TRACE_COUNTER_RESET(&mut self.bs.tracer);
+        //EVC_TRACE_COUNTER_RESET(&mut self.bs.tracer);
 
         for slice_num in 0..num_slice_in_pic {
             self.slice_num = slice_num;
