@@ -757,7 +757,7 @@ pub(crate) enum MODE_CONS {
 
 impl Default for MODE_CONS {
     fn default() -> Self {
-        MODE_CONS::eOnlyIntra
+        MODE_CONS::eAll
     }
 }
 

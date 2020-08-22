@@ -406,12 +406,18 @@ pub(crate) fn evce_eco_pred_mode(
             0
         },
     );
-    /*EVC_TRACE_COUNTER;
-    EVC_TRACE_STR("pred mode ");
-    EVC_TRACE_INT(pred_mode == MODE_INTRA ? MODE_INTRA : MODE_INTER);
-    EVC_TRACE_STR("\n");
 
-    return EVC_OK;*/
+    EVC_TRACE_COUNTER(&mut bs.tracer);
+    EVC_TRACE(&mut bs.tracer, "pred mode ");
+    EVC_TRACE(
+        &mut bs.tracer,
+        if pred_mode == PredMode::MODE_INTRA {
+            PredMode::MODE_INTRA as u8
+        } else {
+            PredMode::MODE_INTER as u8
+        },
+    );
+    EVC_TRACE(&mut bs.tracer, " \n");
 }
 
 pub(crate) fn evce_eco_cbf(
@@ -669,12 +675,12 @@ pub(crate) fn evce_eco_skip_flag(
 ) {
     sbac.encode_bin(bs, &mut sbac_ctx.skip_flag[ctx], flag);
 
-    /*    EVC_TRACE_COUNTER;
-    EVC_TRACE_STR("skip flag ");
-    EVC_TRACE_INT(flag);
-    EVC_TRACE_STR("ctx ");
-    EVC_TRACE_INT(ctx);
-    EVC_TRACE_STR("\n");*/
+    EVC_TRACE_COUNTER(&mut bs.tracer);
+    EVC_TRACE(&mut bs.tracer, "skip flag ");
+    EVC_TRACE(&mut bs.tracer, flag);
+    EVC_TRACE(&mut bs.tracer, " ctx ");
+    EVC_TRACE(&mut bs.tracer, ctx);
+    EVC_TRACE(&mut bs.tracer, " \n");
 }
 
 pub(crate) fn evce_eco_mvp_idx(
@@ -685,10 +691,10 @@ pub(crate) fn evce_eco_mvp_idx(
 ) {
     sbac.write_truncate_unary_sym(bs, &mut sbac_ctx.mvp_idx, mvp_idx, 3, 4);
 
-    /*EVC_TRACE_COUNTER;
-    EVC_TRACE_STR("mvp idx ");
-    EVC_TRACE_INT(mvp_idx);
-    EVC_TRACE_STR("\n");*/
+    EVC_TRACE_COUNTER(&mut bs.tracer);
+    EVC_TRACE(&mut bs.tracer, "mvp idx ");
+    EVC_TRACE(&mut bs.tracer, mvp_idx);
+    EVC_TRACE(&mut bs.tracer, " \n");
 }
 
 pub(crate) fn evce_eco_direct_mode_flag(
@@ -699,10 +705,17 @@ pub(crate) fn evce_eco_direct_mode_flag(
 ) {
     sbac.encode_bin(bs, &mut sbac_ctx.direct_mode_flag[0], direct_mode_flag);
 
-    /* EVC_TRACE_COUNTER;
-    EVC_TRACE_STR("direct_mode_flag ");
-    EVC_TRACE_INT(direct_mode_flag ? PRED_DIR : 0);
-    EVC_TRACE_STR("\n");*/
+    EVC_TRACE_COUNTER(&mut bs.tracer);
+    EVC_TRACE(&mut bs.tracer, "direct_mode_flag ");
+    EVC_TRACE(
+        &mut bs.tracer,
+        if direct_mode_flag != 0 {
+            InterPredDir::PRED_DIR as u8
+        } else {
+            0
+        },
+    );
+    EVC_TRACE(&mut bs.tracer, " \n");
 }
 
 pub(crate) fn evce_eco_inter_pred_idc(
@@ -730,13 +743,20 @@ pub(crate) fn evce_eco_inter_pred_idc(
             sbac.encode_bin(bs, &mut sbac_ctx.inter_dir[1], 1);
         }
     }
-    /*
-    #if ENC_DEC_TRACE
-        EVC_TRACE_COUNTER;
-        EVC_TRACE_STR("inter dir ");
-        EVC_TRACE_INT(REFI_IS_VALID(refi[REFP_0]) && REFI_IS_VALID(refi[REFP_1])? PRED_BI : (REFI_IS_VALID(refi[REFP_0]) ? PRED_L0 : PRED_L1));
-        EVC_TRACE_STR("\n");
-    #endif*/
+
+    EVC_TRACE_COUNTER(&mut bs.tracer);
+    EVC_TRACE(&mut bs.tracer, "inter dir ");
+    EVC_TRACE(
+        &mut bs.tracer,
+        if REFI_IS_VALID(refi[REFP_0]) && REFI_IS_VALID(refi[REFP_1]) {
+            InterPredDir::PRED_BI
+        } else if REFI_IS_VALID(refi[REFP_0]) {
+            InterPredDir::PRED_L0
+        } else {
+            InterPredDir::PRED_L1
+        } as u8,
+    );
+    EVC_TRACE(&mut bs.tracer, " \n");
 }
 
 pub(crate) fn evce_eco_refi(
@@ -825,12 +845,12 @@ pub(crate) fn evce_eco_mvd(
         sbac.encode_bin_ep(bs, t0);
     }
 
-    /*EVC_TRACE_COUNTER;
-    EVC_TRACE_STR("mvd x ");
-    EVC_TRACE_INT(mvd[MV_X]);
-    EVC_TRACE_STR("mvd y ");
-    EVC_TRACE_INT(mvd[MV_Y]);
-    EVC_TRACE_STR("\n");*/
+    EVC_TRACE_COUNTER(&mut bs.tracer);
+    EVC_TRACE(&mut bs.tracer, "mvd x ");
+    EVC_TRACE(&mut bs.tracer, mvd[MV_X]);
+    EVC_TRACE(&mut bs.tracer, " mvd y ");
+    EVC_TRACE(&mut bs.tracer, mvd[MV_Y]);
+    EVC_TRACE(&mut bs.tracer, " \n");
 }
 
 pub(crate) fn evce_eco_coef(
