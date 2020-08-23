@@ -590,6 +590,7 @@ pub(crate) fn evce_eco_run_length_cc(
         }
     }
 
+    /*
     EVC_TRACE_COUNTER(&mut bs.tracer);
     EVC_TRACE(&mut bs.tracer, "coef luma ");
     for scan_pos in 0..num_coeff {
@@ -597,6 +598,7 @@ pub(crate) fn evce_eco_run_length_cc(
         EVC_TRACE(&mut bs.tracer, " ")
     }
     EVC_TRACE(&mut bs.tracer, "\n");
+     */
 }
 
 pub(crate) fn evce_eco_xcoef(

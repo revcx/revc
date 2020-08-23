@@ -184,8 +184,8 @@ impl EvcePInter {
         let mut pinter = EvcePInter::default();
 
         /* set maximum/minimum value of search range */
-        pinter.min_clip[MV_X] = 1 - (MAX_CU_SIZE as i16);
-        pinter.min_clip[MV_Y] = 1 - (MAX_CU_SIZE as i16);
+        pinter.min_clip[MV_X] = 1 - 128; //(MAX_CU_SIZE as i16);
+        pinter.min_clip[MV_Y] = 1 - 128; //(MAX_CU_SIZE as i16);
         pinter.max_clip[MV_X] = w as i16 - 1;
         pinter.max_clip[MV_Y] = h as i16 - 1;
 
