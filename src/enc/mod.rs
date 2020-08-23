@@ -13,6 +13,7 @@ pub(crate) mod util;
 use super::api::frame::*;
 use super::api::*;
 use super::def::*;
+use super::df::*;
 use super::ipred::*;
 use super::picman::*;
 use super::tbl::*;
@@ -988,7 +989,6 @@ impl EvceCtx {
 
         for slice_num in 0..num_slice_in_pic {
             self.slice_num = slice_num;
-            //let bs = &mut self.bs;
 
             if self.poc.poc_val > self.last_intra_poc {
                 self.last_intra_poc = i32::MAX;
@@ -1144,25 +1144,12 @@ impl EvceCtx {
                     self.sbac_enc.finish(&mut self.bs);
                     break;
                 }
-            } //End of LCU processing loop for a tile
+            } //End of Slice encoding LCU loop
 
             /* deblocking filter */
             if self.sh.deblocking_filter_on {
-                unimplemented!();
+                self.evce_deblock();
             }
-
-            /*self.core.x_lcu = 0;
-            self.core.y_lcu = 0;
-            self.core.x_pel = 0;
-            self.core.y_pel = 0;
-            self.core.lcu_num = 0;
-            self.lcu_cnt = self.f_lcu;
-            for i in 0..self.f_scu as usize {
-                self.map_scu[i].CLR_COD();
-            }
-
-            self.sh.qp_prev_eco = self.sh.qp;
-             */
         }
 
         /* de-init BSW */
@@ -1874,61 +1861,6 @@ impl EvceCtx {
             EVC_TRACE(&mut self.bs.tracer, " \n");
             assert_ne!(self.core.trace_idx, 0);
         }
-
-        /*
-        #if MVF_TRACE
-            // Trace MVF in encoder
-            {
-                s8(*map_refi)[REFP_NUM];
-                s16(*map_mv)[REFP_NUM][MV_D];
-                u32  *map_scu;
-                map_refi = self.map_refi + core.scup;
-                map_scu = self.map_scu + core.scup;
-                map_mv = self.map_mv + core.scup;
-
-                for(i = 0; i < h; i++)
-                {
-                    for(j = 0; j < w; j++)
-                    {
-                        EVC_TRACE_COUNTER;
-                        EVC_TRACE_STR(" x: ");
-                        EVC_TRACE_INT(j);
-                        EVC_TRACE_STR(" y: ");
-                        EVC_TRACE_INT(i);
-
-                        EVC_TRACE_STR(" ref0: ");
-                        EVC_TRACE_INT(map_refi[j][REFP_0]);
-                        EVC_TRACE_STR(" mv: ");
-                        EVC_TRACE_MV(map_mv[j][REFP_0][MV_X], map_mv[j][REFP_0][MV_Y]);
-
-                        EVC_TRACE_STR(" ref1: ");
-                        EVC_TRACE_INT(map_refi[j][REFP_1]);
-                        EVC_TRACE_STR(" mv: ");
-                        EVC_TRACE_MV(map_mv[j][REFP_1][MV_X], map_mv[j][REFP_1][MV_Y]);
-
-                        EVC_TRACE_STR(" affine: ");
-                        EVC_TRACE_INT(MCU_GET_AFF(map_scu[j]));
-                        if(MCU_GET_AFF(map_scu[j]))
-                        {
-                            EVC_TRACE_STR(" logw: ");
-                            EVC_TRACE_INT(MCU_GET_AFF_LOGW(map_affine[j]));
-                            EVC_TRACE_STR(" logh: ");
-                            EVC_TRACE_INT(MCU_GET_AFF_LOGH(map_affine[j]));
-                            EVC_TRACE_STR(" xoff: ");
-                            EVC_TRACE_INT(MCU_GET_AFF_XOFF(map_affine[j]));
-                            EVC_TRACE_STR(" yoff: ");
-                            EVC_TRACE_INT(MCU_GET_AFF_YOFF(map_affine[j]));
-                        }
-
-                        EVC_TRACE_STR("\n");
-                    }
-
-                    map_refi += self.w_scu;
-                    map_mv += self.w_scu;
-                    map_scu += self.w_scu;
-                }
-            }
-        #endif*/
     }
 
     fn cu_init(&mut self, x: u16, y: u16, cup: usize, cuw: u16, cuh: u16) {
@@ -2085,6 +2017,254 @@ impl EvceCtx {
         /* append bs.pkt to ctx.pkt */
         if let Some(pkt) = self.bs.pkt.take() {
             self.pkt.extend_from_slice(&pkt.data);
+        }
+    }
+
+    fn deblock_tree(
+        &mut self,
+        x: u16,
+        y: u16,
+        cuw: u16,
+        cuh: u16,
+        cud: u16,
+        cup: u16,
+        is_hor_edge: bool,
+        tree_cons: &TREE_CONS_NEW,
+    ) {
+        self.core.tree_cons.changed = false;
+        self.core.tree_cons.tree_type = tree_cons.tree_type;
+        self.core.tree_cons.mode_cons = tree_cons.mode_cons;
+        let lcu_num = (x >> self.log2_max_cuwh) + (y >> self.log2_max_cuwh) * self.w_lcu;
+        let split_mode = evc_get_split_mode(
+            cud,
+            cup,
+            cuw,
+            cuh,
+            self.max_cuwh,
+            &self.map_cu_data[lcu_num as usize].split_mode,
+        );
+
+        EVC_TRACE_COUNTER(&mut self.bs.tracer);
+        EVC_TRACE(&mut self.bs.tracer, "split_mod ");
+        EVC_TRACE(&mut self.bs.tracer, split_mode as u8);
+        EVC_TRACE(&mut self.bs.tracer, " \n");
+
+        if split_mode != SplitMode::NO_SPLIT {
+            let split_struct = evc_split_get_part_structure(
+                split_mode,
+                x,
+                y,
+                cuw,
+                cuh,
+                cup,
+                cud,
+                self.log2_max_cuwh - MIN_CU_LOG2 as u8,
+            );
+
+            // In base profile we have small chroma blocks
+            let tree_constrain_for_child = TREE_CONS_NEW {
+                tree_type: TREE_TYPE::TREE_LC,
+                mode_cons: MODE_CONS::eAll,
+            };
+
+            for part_num in 0..split_struct.part_count {
+                let cur_part_num = part_num;
+                let sub_cuw = split_struct.width[cur_part_num];
+                let sub_cuh = split_struct.height[cur_part_num];
+                let x_pos = split_struct.x_pos[cur_part_num];
+                let y_pos = split_struct.y_pos[cur_part_num];
+
+                if x_pos < self.w && y_pos < self.h {
+                    self.deblock_tree(
+                        x_pos,
+                        y_pos,
+                        sub_cuw,
+                        sub_cuh,
+                        split_struct.cud[cur_part_num],
+                        split_struct.cup[cur_part_num],
+                        is_hor_edge,
+                        &tree_constrain_for_child,
+                    );
+                }
+            }
+
+            self.core.tree_cons.changed = false;
+            self.core.tree_cons.tree_type = tree_cons.tree_type;
+            self.core.tree_cons.mode_cons = tree_cons.mode_cons;
+        } else if let (Some(pic), Some(map_refi), Some(map_mv)) =
+            (&self.pic[PIC_IDX_MODE], &self.map_refi, &self.map_mv)
+        {
+            // deblock
+            if is_hor_edge {
+                if cuh > MAX_TR_SIZE as u16 {
+                    evc_deblock_cu_hor(
+                        &mut self.bs.tracer,
+                        &*pic.borrow(),
+                        x as usize,
+                        y as usize,
+                        cuw as usize,
+                        cuh as usize >> 1,
+                        &mut self.map_scu,
+                        &*map_refi.borrow(),
+                        &*map_mv.borrow(),
+                        self.w_scu as usize,
+                        &self.core.tree_cons,
+                        &self.core.evc_tbl_qp_chroma_dynamic_ext,
+                    );
+
+                    evc_deblock_cu_hor(
+                        &mut self.bs.tracer,
+                        &*pic.borrow(),
+                        x as usize,
+                        y as usize + MAX_TR_SIZE,
+                        cuw as usize,
+                        cuh as usize >> 1,
+                        &mut self.map_scu,
+                        &*map_refi.borrow(),
+                        &*map_mv.borrow(),
+                        self.w_scu as usize,
+                        &self.core.tree_cons,
+                        &self.core.evc_tbl_qp_chroma_dynamic_ext,
+                    );
+                } else {
+                    evc_deblock_cu_hor(
+                        &mut self.bs.tracer,
+                        &*pic.borrow(),
+                        x as usize,
+                        y as usize,
+                        cuw as usize,
+                        cuh as usize,
+                        &mut self.map_scu,
+                        &*map_refi.borrow(),
+                        &*map_mv.borrow(),
+                        self.w_scu as usize,
+                        &self.core.tree_cons,
+                        &self.core.evc_tbl_qp_chroma_dynamic_ext,
+                    );
+                }
+            } else {
+                if cuw > MAX_TR_SIZE as u16 {
+                    evc_deblock_cu_ver(
+                        &mut self.bs.tracer,
+                        &*pic.borrow(),
+                        x as usize,
+                        y as usize,
+                        cuw as usize >> 1,
+                        cuh as usize,
+                        &mut self.map_scu,
+                        &*map_refi.borrow(),
+                        &*map_mv.borrow(),
+                        self.w_scu as usize,
+                        &self.core.tree_cons,
+                        &self.core.evc_tbl_qp_chroma_dynamic_ext,
+                        self.w as usize,
+                    );
+                    evc_deblock_cu_ver(
+                        &mut self.bs.tracer,
+                        &*pic.borrow(),
+                        x as usize + MAX_TR_SIZE,
+                        y as usize,
+                        cuw as usize >> 1,
+                        cuh as usize,
+                        &mut self.map_scu,
+                        &*map_refi.borrow(),
+                        &*map_mv.borrow(),
+                        self.w_scu as usize,
+                        &self.core.tree_cons,
+                        &self.core.evc_tbl_qp_chroma_dynamic_ext,
+                        self.w as usize,
+                    );
+                } else {
+                    evc_deblock_cu_ver(
+                        &mut self.bs.tracer,
+                        &*pic.borrow(),
+                        x as usize,
+                        y as usize,
+                        cuw as usize,
+                        cuh as usize,
+                        &mut self.map_scu,
+                        &*map_refi.borrow(),
+                        &*map_mv.borrow(),
+                        self.w_scu as usize,
+                        &self.core.tree_cons,
+                        &self.core.evc_tbl_qp_chroma_dynamic_ext,
+                        self.w as usize,
+                    );
+                }
+            }
+        }
+
+        self.core.tree_cons.changed = false;
+        self.core.tree_cons.tree_type = tree_cons.tree_type;
+        self.core.tree_cons.mode_cons = tree_cons.mode_cons;
+    }
+
+    fn evce_deblock(&mut self) {
+        if let Some(pic) = &self.pic[PIC_IDX_MODE] {
+            let mut p = pic.borrow_mut();
+            p.pic_qp_u_offset = self.sh.qp_u_offset;
+            p.pic_qp_v_offset = self.sh.qp_v_offset;
+        }
+
+        let scu_in_lcu_wh = 1 << (self.log2_max_cuwh - MIN_CU_LOG2 as u8);
+
+        let x_l = 0; //entry point lcu's x location
+        let y_l = 0; // entry point lcu's y location
+        let x_r = x_l + self.w_lcu;
+        let y_r = y_l + self.h_lcu;
+        let l_scu = x_l * scu_in_lcu_wh;
+        let r_scu = EVC_CLIP3(0, self.w_scu, x_r * scu_in_lcu_wh);
+        let t_scu = y_l * scu_in_lcu_wh;
+        let b_scu = EVC_CLIP3(0, self.h_scu, y_r * scu_in_lcu_wh);
+
+        for j in t_scu..b_scu {
+            for i in l_scu..r_scu {
+                self.map_scu[(i + j * self.w_scu) as usize].CLR_COD();
+            }
+        }
+
+        /* horizontal filtering */
+        for j in y_l..y_r {
+            for i in x_l..x_r {
+                self.deblock_tree(
+                    (i << self.log2_max_cuwh),
+                    (j << self.log2_max_cuwh),
+                    self.max_cuwh,
+                    self.max_cuwh,
+                    0,
+                    0,
+                    false, /*horizontal filtering of vertical edge*/
+                    &TREE_CONS_NEW {
+                        tree_type: TREE_TYPE::TREE_LC,
+                        mode_cons: MODE_CONS::eAll,
+                    },
+                );
+            }
+        }
+
+        for j in t_scu..b_scu {
+            for i in l_scu..r_scu {
+                self.map_scu[(i + j * self.w_scu) as usize].CLR_COD();
+            }
+        }
+
+        /* vertical filtering */
+        for j in y_l..y_r {
+            for i in x_l..x_r {
+                self.deblock_tree(
+                    (i << self.log2_max_cuwh),
+                    (j << self.log2_max_cuwh),
+                    self.max_cuwh,
+                    self.max_cuwh,
+                    0,
+                    0,
+                    true, /*vertical filtering of horizontal edge*/
+                    &TREE_CONS_NEW {
+                        tree_type: TREE_TYPE::TREE_LC,
+                        mode_cons: MODE_CONS::eAll,
+                    },
+                );
+            }
         }
     }
 }

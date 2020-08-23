@@ -1575,7 +1575,6 @@ impl EvcdCtx {
         /* horizontal filtering */
         for j in y_l..y_r {
             for i in x_l..x_r {
-                //eprint!("{} ", j * self.w_lcu + i);
                 self.deblock_tree(
                     (i << self.log2_max_cuwh),
                     (j << self.log2_max_cuwh),
