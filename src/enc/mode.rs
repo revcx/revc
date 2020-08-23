@@ -219,6 +219,7 @@ impl EvceCUData {
 
     fn mode_cpy_rec_to_ref(
         &mut self,
+        tracer: &mut Option<Tracer>,
         mut x: usize,
         mut y: usize,
         mut w: usize,
@@ -236,6 +237,8 @@ impl EvceCUData {
                     dst[y + j][x + i] = src[j * w + i];
                 }
             }
+
+            TRACE_RECO(tracer, Y_C, w, h, src)
         }
 
         if evc_check_chroma(tree_cons) {
@@ -254,6 +257,8 @@ impl EvceCUData {
                         dst[y + j][x + i] = src[j * w + i];
                     }
                 }
+
+                TRACE_RECO(tracer, U_C, w, h, src)
             }
 
             {
@@ -265,6 +270,8 @@ impl EvceCUData {
                         dst[y + j][x + i] = src[j * w + i];
                     }
                 }
+
+                TRACE_RECO(tracer, V_C, w, h, src)
             }
         }
     }
@@ -874,6 +881,7 @@ impl EvceCtx {
                             let cu_data_best =
                                 &mut self.core.cu_data_best[log2_cuw - 2][log2_cuh - 2];
                             cu_data_best.mode_cpy_rec_to_ref(
+                                &mut self.core.bs_temp.tracer,
                                 x0 as usize,
                                 y0 as usize,
                                 cuw as usize,
@@ -1200,6 +1208,7 @@ impl EvceCtx {
         if let Some(pic) = &self.pic[PIC_IDX_MODE] {
             let cu_data_best = &mut self.core.cu_data_best[log2_cuw - 2][log2_cuh - 2];
             cu_data_best.mode_cpy_rec_to_ref(
+                &mut self.core.bs_temp.tracer,
                 x0 as usize,
                 y0 as usize,
                 cuw as usize,

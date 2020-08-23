@@ -160,7 +160,7 @@ pub(crate) fn TRACE_RECO(
     ch_type: usize,
     cuw: usize,
     cuh: usize,
-    rec: &mut [pel],
+    rec: &[pel],
 ) {
     EVC_TRACE_COUNTER(tracer);
     EVC_TRACE(tracer, "Reco for ");
@@ -293,7 +293,7 @@ pub(crate) fn TRACE_RECO(
     ch_type: usize,
     cuw: usize,
     cuh: usize,
-    rec: &mut [pel],
+    rec: &[pel],
 ) {
 }
 
