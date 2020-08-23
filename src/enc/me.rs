@@ -26,6 +26,7 @@ static test_pos: [[i16; 2]; 9] = [
 impl EvcePInter {
     pub(crate) fn pinter_me_epzs(
         &mut self,
+        tracer: &mut Option<Tracer>,
         x: i16,
         y: i16,
         log2_cuw: usize,
@@ -46,6 +47,10 @@ impl EvcePInter {
         let mut cost_best = std::u32::MAX;
         let mut tmpstep = 0;
         let mut beststep = 0;
+
+        TRACE_ME(
+            tracer, x, y, log2_cuw, log2_cuh, refi, lidx, mvp, mv, bi, cost_best, true,
+        );
 
         gmvp[MV_X] = mvp[MV_X] + (x << 2);
         gmvp[MV_Y] = mvp[MV_Y] + (y << 2);
@@ -190,6 +195,10 @@ impl EvcePInter {
                 mv[MV_Y] = mvt[MV_Y];
             }
         }
+
+        TRACE_ME(
+            tracer, x, y, log2_cuw, log2_cuh, refi, lidx, mvp, mv, bi, cost_best, false,
+        );
 
         cost_best
     }
@@ -677,7 +686,7 @@ impl EvcePInter {
             let mut mv_bits =
                 get_mv_bits(mv_x - gmvp[MV_X], mv_y - gmvp[MV_Y], self.num_refp, refi);
 
-            if bi != 9 {
+            if bi != 0 {
                 mv_bits += self.mot_bits[lidx_r];
             }
 

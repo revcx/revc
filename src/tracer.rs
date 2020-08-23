@@ -247,6 +247,52 @@ pub(crate) fn TRACE_DBF(
     EVC_TRACE(tracer, "\n");
 }
 
+#[cfg(feature = "trace_me")]
+pub(crate) fn TRACE_ME(
+    tracer: &mut Option<Tracer>,
+    x: i16,
+    y: i16,
+    log2_cuw: usize,
+    log2_cuh: usize,
+    refi: i8,
+    lidx: usize,
+    mvp: &[i16],
+    mv: &[i16],
+    bi: u8,
+    cost: u32,
+    beg: bool,
+) {
+    EVC_TRACE_COUNTER(tracer);
+    EVC_TRACE(tracer, if beg { "me beg: x:" } else { "me end: x:" });
+    EVC_TRACE(tracer, x);
+    EVC_TRACE(tracer, " y:");
+    EVC_TRACE(tracer, y);
+    EVC_TRACE(tracer, " width:");
+    EVC_TRACE(tracer, 1 << log2_cuw);
+    EVC_TRACE(tracer, " height:");
+    EVC_TRACE(tracer, 1 << log2_cuh);
+    EVC_TRACE(tracer, " bi:");
+    EVC_TRACE(tracer, bi);
+    if beg {
+        EVC_TRACE(tracer, " mvp_x:");
+        EVC_TRACE(tracer, mvp[MV_X]);
+        EVC_TRACE(tracer, " mvp_y:");
+        EVC_TRACE(tracer, mvp[MV_Y]);
+        EVC_TRACE(tracer, " refi:");
+        EVC_TRACE(tracer, refi);
+        EVC_TRACE(tracer, " lidx:");
+        EVC_TRACE(tracer, lidx);
+    } else {
+        EVC_TRACE(tracer, " mv_x :");
+        EVC_TRACE(tracer, mv[MV_X]);
+        EVC_TRACE(tracer, " mv_y :");
+        EVC_TRACE(tracer, mv[MV_Y]);
+        EVC_TRACE(tracer, " cost:");
+        EVC_TRACE(tracer, cost);
+    }
+    EVC_TRACE(tracer, " \n");
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[cfg(not(feature = "trace"))]
@@ -341,5 +387,22 @@ pub(crate) fn TRACE_DBF(
     size: usize,
     hor: bool,
     dbf: &PlaneRegionMut<'_, pel>,
+) {
+}
+
+#[cfg(not(feature = "trace_me"))]
+pub(crate) fn TRACE_ME(
+    tracer: &mut Option<Tracer>,
+    x: i16,
+    y: i16,
+    log2_cuw: usize,
+    log2_cuh: usize,
+    refi: i8,
+    lidx: usize,
+    mvp: &[i16],
+    mv: &[i16],
+    bi: u8,
+    cost: u32,
+    beg: bool,
 ) {
 }

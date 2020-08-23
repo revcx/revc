@@ -332,6 +332,7 @@ impl EvceCtx {
                 let mvp = self.pinter.mvp_scale[lidx][refi_cur][mvp_idx[lidx] as usize];
                 let mut mv = self.pinter.mv[pidx][lidx];
                 mecost = self.pinter.pinter_me_epzs(
+                    &mut self.core.bs_temp.tracer,
                     x as i16,
                     y as i16,
                     log2_cuw,
@@ -860,6 +861,7 @@ impl EvceCtx {
                 let mvp = self.pinter.mvp[lidx_ref][mvp_idx as usize];
                 let mut mv = self.pinter.mv_scale[lidx_ref][refi_cur];
                 mecost = self.pinter.pinter_me_epzs(
+                    &mut self.core.bs_temp.tracer,
                     x as i16,
                     y as i16,
                     log2_cuw,

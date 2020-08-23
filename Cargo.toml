@@ -20,6 +20,7 @@ trace_pred = ["trace"]
 trace_reco = ["trace"]
 trace_dbf = ["trace"]
 trace_cudata = ["trace"]
+trace_me = ["trace"]
 
 [dependencies]
 log = "0.4"
