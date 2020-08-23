@@ -1148,7 +1148,13 @@ impl EvceCtx {
                 self.core.dqp_temp_run = self.core.dqp_curr_best[log2_cuw - 2][log2_cuh - 2];
                 self.core.s_temp_run.bit_reset();
 
-                self.evce_rdo_bit_cnt_cu_inter(self.sh.slice_type, self.core.scup, pidx, mvp_idx);
+                self.evce_rdo_bit_cnt_cu_inter(
+                    self.sh.slice_type,
+                    self.core.scup,
+                    pidx,
+                    mvp_idx,
+                    pred_coef_idx,
+                );
 
                 let bit_cnt = self.core.s_temp_run.get_bit_number();
                 cost += (self.lambda[0] * bit_cnt as f64);
@@ -1187,7 +1193,13 @@ impl EvceCtx {
 
             self.core.s_temp_run.bit_reset();
 
-            self.evce_rdo_bit_cnt_cu_inter(self.sh.slice_type, self.core.scup, pidx, mvp_idx);
+            self.evce_rdo_bit_cnt_cu_inter(
+                self.sh.slice_type,
+                self.core.scup,
+                pidx,
+                mvp_idx,
+                pred_coef_idx,
+            );
 
             let bit_cnt = self.core.s_temp_run.get_bit_number();
             cost += (self.lambda[0] * bit_cnt as f64);
@@ -1226,7 +1238,7 @@ impl EvceCtx {
                         self.core.s_temp_run = self.core.s_temp_prev_comp_run;
                         self.core.c_temp_run = self.core.c_temp_prev_comp_run;
                         self.core.s_temp_run.bit_reset();
-                        self.evce_rdo_bit_cnt_cu_inter_comp(i, pidx);
+                        self.evce_rdo_bit_cnt_cu_inter_comp(i, pidx, pred_coef_idx);
 
                         let bit_cnt = self.core.s_temp_run.get_bit_number();
                         cost += (self.lambda[i] * bit_cnt as f64);
@@ -1264,7 +1276,13 @@ impl EvceCtx {
                 self.core.dqp_temp_run = self.core.dqp_curr_best[log2_cuw - 2][log2_cuh - 2];
                 self.core.s_temp_run.bit_reset();
 
-                self.evce_rdo_bit_cnt_cu_inter(self.sh.slice_type, self.core.scup, pidx, mvp_idx);
+                self.evce_rdo_bit_cnt_cu_inter(
+                    self.sh.slice_type,
+                    self.core.scup,
+                    pidx,
+                    mvp_idx,
+                    pred_coef_idx,
+                );
 
                 let bit_cnt = self.core.s_temp_run.get_bit_number();
                 cost += (self.lambda[0] * bit_cnt as f64);
@@ -1326,7 +1344,13 @@ impl EvceCtx {
 
             self.core.s_temp_run.bit_reset();
 
-            self.evce_rdo_bit_cnt_cu_inter(self.sh.slice_type, self.core.scup, pidx, mvp_idx);
+            self.evce_rdo_bit_cnt_cu_inter(
+                self.sh.slice_type,
+                self.core.scup,
+                pidx,
+                mvp_idx,
+                pred_coef_idx,
+            );
 
             let bit_cnt = self.core.s_temp_run.get_bit_number();
             cost_best += (self.lambda[0] * bit_cnt as f64);

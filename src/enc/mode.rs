@@ -2085,10 +2085,11 @@ impl EvceCtx {
         cup: u32,
         pidx: usize,
         mvp_idx: &[u8],
+        coef_idx: usize,
     ) {
         //refi=&self.pinter.refi[pidx],
         //mvd =&self.pinter.mvd[pidx],
-        //coef=&self.pinter.coef[pidx],
+        //coef=&self.pinter.coef[coef_idx],
 
         if slice_type != SliceType::EVC_ST_I {
             self.core.s_temp_run.encode_bin(
@@ -2182,7 +2183,7 @@ impl EvceCtx {
             &mut self.core.bs_temp,
             &mut self.core.s_temp_run,
             &mut self.core.c_temp_run,
-            &self.pinter.coef[pidx],
+            &self.pinter.coef[coef_idx],
             self.core.log2_cuw,
             self.core.log2_cuh,
             PredMode::MODE_INTER,
@@ -2207,8 +2208,13 @@ impl EvceCtx {
         }
     }
 
-    pub(crate) fn evce_rdo_bit_cnt_cu_inter_comp(&mut self, ch_type: usize, pidx: usize) {
-        //coef=&self.pinter.coef[pidx],
+    pub(crate) fn evce_rdo_bit_cnt_cu_inter_comp(
+        &mut self,
+        ch_type: usize,
+        pidx: usize,
+        coef_idx: usize,
+    ) {
+        //coef=&self.pinter.coef[coef_idx],
         //int* nnz = self.core.nnz;
         //EVCE_SBAC* sbac = &self.core.s_temp_run;
         let log2_cuw = self.core.log2_cuw;
@@ -2224,7 +2230,7 @@ impl EvceCtx {
             &mut self.core.bs_temp,
             &mut self.core.s_temp_run,
             &mut self.core.c_temp_run,
-            &self.pinter.coef[pidx],
+            &self.pinter.coef[coef_idx],
             log2_cuw,
             log2_cuh,
             PredMode::MODE_INTER,
