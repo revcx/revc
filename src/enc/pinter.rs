@@ -1106,8 +1106,10 @@ impl EvceCtx {
                     }
 
                     dist[0][i] += self.core.delta_dist[i];
+                }
 
-                    //complete rec
+                //complete rec
+                for i in 0..N_C {
                     if self.core.nnz[i] == 0 {
                         evc_recon(
                             &mut self.core.bs_temp.tracer,
