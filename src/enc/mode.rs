@@ -227,6 +227,15 @@ impl EvceCUData {
         planes: &mut [Plane<pel>; N_C],
         tree_cons: &TREE_CONS,
     ) {
+        let mut stride = w;
+        if x + w > planes[Y_C].cfg.width {
+            w = planes[Y_C].cfg.width - x;
+        }
+
+        if y + h > planes[Y_C].cfg.height {
+            h = planes[Y_C].cfg.height - y;
+        }
+
         if evc_check_luma(tree_cons) {
             /* luma */
             let dst = &mut planes[Y_C].as_region_mut();
@@ -234,11 +243,11 @@ impl EvceCUData {
 
             for j in 0..h {
                 for i in 0..w {
-                    dst[y + j][x + i] = src[j * w + i];
+                    dst[y + j][x + i] = src[j * stride + i];
                 }
             }
 
-            TRACE_RECO(tracer, Y_C, w, h, src)
+            TRACE_CUDATA(tracer, Y_C, w, h, stride, src)
         }
 
         if evc_check_chroma(tree_cons) {
@@ -247,6 +256,7 @@ impl EvceCUData {
             y >>= 1;
             w >>= 1;
             h >>= 1;
+            stride >>= 1;
 
             {
                 let dst = &mut planes[U_C].as_region_mut();
@@ -254,11 +264,11 @@ impl EvceCUData {
 
                 for j in 0..h {
                     for i in 0..w {
-                        dst[y + j][x + i] = src[j * w + i];
+                        dst[y + j][x + i] = src[j * stride + i];
                     }
                 }
 
-                TRACE_RECO(tracer, U_C, w, h, src)
+                TRACE_CUDATA(tracer, U_C, w, h, stride, src)
             }
 
             {
@@ -267,11 +277,11 @@ impl EvceCUData {
 
                 for j in 0..h {
                     for i in 0..w {
-                        dst[y + j][x + i] = src[j * w + i];
+                        dst[y + j][x + i] = src[j * stride + i];
                     }
                 }
 
-                TRACE_RECO(tracer, V_C, w, h, src)
+                TRACE_CUDATA(tracer, V_C, w, h, stride, src)
             }
         }
     }

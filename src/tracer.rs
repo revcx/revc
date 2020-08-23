@@ -177,6 +177,30 @@ pub(crate) fn TRACE_RECO(
     EVC_TRACE(tracer, " \n");
 }
 
+#[cfg(feature = "trace_reco")]
+pub(crate) fn TRACE_CUDATA(
+    tracer: &mut Option<Tracer>,
+    ch_type: usize,
+    cuw: usize,
+    cuh: usize,
+    stride: usize,
+    rec: &[pel],
+) {
+    EVC_TRACE_COUNTER(tracer);
+    EVC_TRACE(tracer, "CUDATA for ");
+    EVC_TRACE(tracer, ch_type);
+    EVC_TRACE(tracer, " : ");
+    for j in 0..cuh {
+        for i in 0..cuw {
+            if !(i == 0 && j == 0) {
+                EVC_TRACE(tracer, " , ");
+            }
+            EVC_TRACE(tracer, rec[j * stride + i]);
+        }
+    }
+    EVC_TRACE(tracer, " \n");
+}
+
 #[cfg(feature = "trace_dbf")]
 pub(crate) fn TRACE_DBF(
     tracer: &mut Option<Tracer>,
@@ -293,6 +317,17 @@ pub(crate) fn TRACE_RECO(
     ch_type: usize,
     cuw: usize,
     cuh: usize,
+    rec: &[pel],
+) {
+}
+
+#[cfg(not(feature = "trace_reco"))]
+pub(crate) fn TRACE_CUDATA(
+    tracer: &mut Option<Tracer>,
+    ch_type: usize,
+    cuw: usize,
+    cuh: usize,
+    stride: usize,
     rec: &[pel],
 ) {
 }
