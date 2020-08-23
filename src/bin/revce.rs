@@ -68,11 +68,6 @@ fn parse_config(matches: &ArgMatches<'_>) -> std::io::Result<EncoderConfig> {
         .unwrap()
         .parse()
         .unwrap();
-    max_interval = if max_interval == 0 {
-        MAX_MAX_KEY_FRAME_INTERVAL
-    } else {
-        max_interval
-    };
     let mut min_interval: usize = matches
         .value_of("MIN_KEYFRAME_INTERVAL")
         .unwrap()
