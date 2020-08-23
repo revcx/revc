@@ -128,7 +128,11 @@ fn parse_config(matches: &ArgMatches<'_>) -> std::io::Result<EncoderConfig> {
         .unwrap_or("6")
         .parse()
         .unwrap();
-    cfg.max_b_frames = matches.value_of("USE_DQP").unwrap_or("0").parse().unwrap();
+    cfg.max_b_frames = matches
+        .value_of("MAX_B_FRAMES")
+        .unwrap_or("0")
+        .parse()
+        .unwrap();
     cfg.ref_pic_gap_length = matches
         .value_of("REF_PIC_GAP_LENGTH")
         .unwrap_or("0")
