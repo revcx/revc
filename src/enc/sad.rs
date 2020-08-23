@@ -308,21 +308,21 @@ pub(crate) fn evce_ssd_16b(
 
 /* SAD for 16bit **************************************************************/
 pub(crate) fn evce_sad_16b(
-    x: i16,
-    y: i16,
+    x: usize,
+    y: usize,
     mv_x: i16,
     mv_y: i16,
     cuw: usize,
     cuh: usize,
-    src1: &PlaneRegion<'_, pel>,
-    src2: &PlaneRegion<'_, pel>,
+    org_pic: &PlaneRegion<'_, pel>,
+    ref_pic: &PlaneRegion<'_, pel>,
 ) -> u32 {
     let mut sad = 0;
 
     for j in 0..cuh {
         for i in 0..cuw {
-            sad += (src1[y as usize + j][x as usize + i] as i16
-                - src2[std::cmp::max(mv_y + j as i16, 0) as usize]
+            sad += (org_pic[y + j][x + i] as i16
+                - ref_pic[std::cmp::max(mv_y + j as i16, 0) as usize]
                     [std::cmp::max(mv_x + i as i16, 0) as usize] as i16)
                 .abs() as u32;
         }
@@ -332,19 +332,21 @@ pub(crate) fn evce_sad_16b(
 }
 
 pub(crate) fn evce_sad_bi_16b(
-    x: i16,
-    y: i16,
+    mv_x: i16,
+    mv_y: i16,
     cuw: usize,
     cuh: usize,
-    src1: &[i16],
-    src2: &PlaneRegion<'_, pel>,
+    org_bi: &[i16],
+    ref_pic: &PlaneRegion<'_, pel>,
 ) -> u32 {
     let mut sad = 0;
 
     for j in 0..cuh {
         for i in 0..cuw {
-            sad += (src1[j * cuw + i] as i16 - src2[y as usize + j][x as usize + i] as i16).abs()
-                as u32;
+            sad += (org_bi[j * cuw + i] as i16
+                - ref_pic[std::cmp::max(mv_y + j as i16, 0) as usize]
+                    [std::cmp::max(mv_x + i as i16, 0) as usize] as i16)
+                .abs() as u32;
         }
     }
 
@@ -352,31 +354,30 @@ pub(crate) fn evce_sad_bi_16b(
 }
 
 pub(crate) fn evce_sad_16i(
-    x: i16,
-    y: i16,
+    x: usize,
+    y: usize,
     cuw: usize,
     cuh: usize,
-    src1: &PlaneRegion<'_, pel>,
-    src2: &[pel],
+    org_pic: &PlaneRegion<'_, pel>,
+    pred: &[pel],
 ) -> u32 {
     let mut sad = 0;
 
     for j in 0..cuh {
         for i in 0..cuw {
-            sad += (src1[y as usize + j][x as usize + i] as i16 - src2[j * cuw + i] as i16).abs()
-                as u32;
+            sad += (org_pic[y + j][x + i] as i16 - pred[j * cuw + i] as i16).abs() as u32;
         }
     }
 
     sad >> (BIT_DEPTH - 8)
 }
 
-pub(crate) fn evce_sad_bi_16i(cuw: usize, cuh: usize, src1: &[i16], src2: &[pel]) -> u32 {
+pub(crate) fn evce_sad_bi_16i(cuw: usize, cuh: usize, org_bi: &[i16], pred: &[pel]) -> u32 {
     let mut sad = 0;
 
     for j in 0..cuh {
         for i in 0..cuw {
-            sad += (src1[j * cuw + i] as i16 - src2[j * cuw + i] as i16).abs() as u32;
+            sad += (org_bi[j * cuw + i] as i16 - pred[j * cuw + i] as i16).abs() as u32;
         }
     }
 

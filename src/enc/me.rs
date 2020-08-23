@@ -349,8 +349,8 @@ impl EvcePInter {
                                     let frame_r = &pic_r.borrow().frame;
                                     let plane_r = &frame_r.borrow().planes[Y_C];
                                     cost += evce_sad_bi_16b(
-                                        x,
-                                        y,
+                                        mv_x,
+                                        mv_y,
                                         cuw,
                                         cuh,
                                         &self.org_bi.data[Y_C],
@@ -369,8 +369,8 @@ impl EvcePInter {
                                         &frame_r.borrow().planes[Y_C],
                                     );
                                     cost += evce_sad_16b(
-                                        x,
-                                        y,
+                                        x as usize,
+                                        y as usize,
                                         mv_x,
                                         mv_y,
                                         cuw,
@@ -445,8 +445,8 @@ impl EvcePInter {
                                 let frame_r = &pic_r.borrow().frame;
                                 let plane_r = &frame_r.borrow().planes[Y_C];
                                 cost += evce_sad_bi_16b(
-                                    x,
-                                    y,
+                                    mv_x,
+                                    mv_y,
                                     cuw,
                                     cuh,
                                     &self.org_bi.data[Y_C],
@@ -463,8 +463,8 @@ impl EvcePInter {
                                 let (plane_o, plane_r) =
                                     (&frame_o.borrow().planes[Y_C], &frame_r.borrow().planes[Y_C]);
                                 cost += evce_sad_16b(
-                                    x,
-                                    y,
+                                    x as usize,
+                                    y as usize,
                                     mv_x,
                                     mv_y,
                                     cuw,
@@ -556,8 +556,8 @@ impl EvcePInter {
                     let (plane_o, plane_r) =
                         (&frame_o.borrow().planes[Y_C], &frame_r.borrow().planes[Y_C]);
                     cost += evce_sad_16b(
-                        x,
-                        y,
+                        x as usize,
+                        y as usize,
                         mv_x,
                         mv_y,
                         1 << log2_cuw,
@@ -615,8 +615,8 @@ impl EvcePInter {
                         let (plane_o, plane_r) =
                             (&frame_o.borrow().planes[Y_C], &frame_r.borrow().planes[Y_C]);
                         cost += evce_sad_16b(
-                            x,
-                            y,
+                            x as usize,
+                            y as usize,
                             mv_x,
                             mv_y,
                             1 << log2_cuw,
@@ -719,8 +719,8 @@ impl EvcePInter {
                     let frame_o = &pic_o.borrow().frame;
                     let plane_o = &frame_o.borrow().planes[Y_C];
                     cost += evce_sad_16i(
-                        x,
-                        y,
+                        x as usize,
+                        y as usize,
                         cuw,
                         cuh,
                         &plane_o.as_region(),
@@ -786,8 +786,8 @@ impl EvcePInter {
                         let frame_o = &pic_o.borrow().frame;
                         let plane_o = &frame_o.borrow().planes[Y_C];
                         cost += evce_sad_16i(
-                            x,
-                            y,
+                            x as usize,
+                            y as usize,
                             cuw,
                             cuh,
                             &plane_o.as_region(),
@@ -876,8 +876,8 @@ impl EvcePInter {
                         let frame_r = &pic_r.borrow().frame;
                         let plane_r = &frame_r.borrow().planes[Y_C];
                         cost += evce_sad_bi_16b(
-                            x,
-                            y,
+                            mv_x,
+                            mv_y,
                             cuw,
                             cuh,
                             &self.org_bi.data[Y_C],
@@ -893,8 +893,8 @@ impl EvcePInter {
                         let (plane_o, plane_r) =
                             (&frame_o.borrow().planes[Y_C], &frame_r.borrow().planes[Y_C]);
                         cost += evce_sad_16b(
-                            x,
-                            y,
+                            x as usize,
+                            y as usize,
                             mv_x,
                             mv_y,
                             cuw,
