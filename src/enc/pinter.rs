@@ -435,7 +435,7 @@ impl EvceCtx {
 
         if self.pinter.slice_type == SliceType::EVC_ST_B {
             pidx = InterPredDir::PRED_BI as usize;
-            //cost = self.analyze_bi(x, y, log2_cuw, log2_cuh, cost_inter);
+            cost = self.analyze_bi(x, y, log2_cuw, log2_cuh, &cost_inter);
             cost_inter[pidx] = cost;
 
             if cost < cost_best {
