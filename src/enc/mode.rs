@@ -455,7 +455,7 @@ pub(crate) struct EvceMode {
     /* mv */
     pub(crate) mv: [[i16; MV_D]; REFP_NUM],
 
-    pub(crate) pred_y_best_idx: usize, //pel  *pred_y_best;
+    pub(crate) inter_best_idx: usize, //pel  *pred_y_best;
 
     cu_mode: MCU,
 
@@ -1739,7 +1739,7 @@ impl EvceCtx {
                     self.core.cuh,
                     self.core.cud,
                     &self.core.ctmp,
-                    &self.pintra.rec,
+                    &self.pinter.rec[self.mode.inter_best_idx],
                     &self.core.tree_cons,
                     self.slice_num,
                     &self.core.ipm,
@@ -1776,7 +1776,7 @@ impl EvceCtx {
                         1 << log2_cuw as usize,
                         1 << log2_cuh as usize,
                         &planes[Y_C].as_region(),
-                        &self.pinter.pred[self.mode.pred_y_best_idx][0].data[Y_C],
+                        &self.pinter.pred[self.mode.inter_best_idx][0].data[Y_C],
                     );
                 }
             } else {

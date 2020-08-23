@@ -128,7 +128,7 @@ pub(crate) struct EvcePInter {
     pub(crate) pred: [[CUBuffer<pel>; 2]; InterPredDir::PRED_NUM as usize + 1],
 
     /* reconstruction buffer */
-    rec: [CUBuffer<pel>; InterPredDir::PRED_NUM as usize],
+    pub(crate) rec: [CUBuffer<pel>; InterPredDir::PRED_NUM as usize],
     /* last one buffer used for RDO */
     pub(crate) coef: [CUBuffer<i16>; InterPredDir::PRED_NUM as usize + 1],
 
@@ -497,7 +497,7 @@ impl EvceCtx {
             }
         }
 
-        self.mode.pred_y_best_idx = best_idx; //self.pinter.pred[best_idx][0][0];
+        self.mode.inter_best_idx = best_idx; //self.pinter.pred[best_idx][0][0];
 
         /* save all cu inforamtion ********************/
         for lidx in 0..REFP_NUM {

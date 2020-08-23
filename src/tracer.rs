@@ -177,7 +177,7 @@ pub(crate) fn TRACE_RECO(
     EVC_TRACE(tracer, " \n");
 }
 
-#[cfg(feature = "trace_reco")]
+#[cfg(feature = "trace_cudata")]
 pub(crate) fn TRACE_CUDATA(
     tracer: &mut Option<Tracer>,
     ch_type: usize,
@@ -321,7 +321,7 @@ pub(crate) fn TRACE_RECO(
 ) {
 }
 
-#[cfg(not(feature = "trace_reco"))]
+#[cfg(not(feature = "trace_cudata"))]
 pub(crate) fn TRACE_CUDATA(
     tracer: &mut Option<Tracer>,
     ch_type: usize,
