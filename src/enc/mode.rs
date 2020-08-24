@@ -2326,10 +2326,10 @@ impl EvceCtx {
 
     pub(crate) fn calc_delta_dist_filter_boundary(
         &mut self,
-        mut x: i16,
-        mut y: i16,
-        mut log2_cuw: usize,
-        mut log2_cuh: usize,
+        x: i16,
+        y: i16,
+        log2_cuw: usize,
+        log2_cuh: usize,
         avail_lr: u16,
         intra_flag: bool,
         src_is_rec: bool,
@@ -2353,35 +2353,14 @@ impl EvceCtx {
             &self.pinter.pred[pred_rec_idx][0]
         };
 
-        let mut cuw = 1i16 << log2_cuw;
-        let mut cuh = 1i16 << log2_cuh;
-        let mut x_offset = 8; //for preparing deblocking filter taps
-        let mut y_offset = 8;
-        let mut x_tm = 4; //for calculating template dist
-        let mut y_tm = 4; //must be the same as x_tm
-        let mut log2_x_tm = 2;
-        let mut log2_y_tm = 2;
-        /* EVC_PIC * pic_dbk = ctx -> pic_dbk;
-        int s_l_dbk = pic_dbk ->s_l;
-        int s_c_dbk = pic_dbk -> s_c;
-        int s_l_org = pic_org -> s_l;
-        int s_c_org = pic_org-> s_c;
-        pel * dst_y = pic_dbk -> y + y * s_l_dbk + x;
-        pel * dst_u = pic_dbk -> u + (y > > 1) * s_c_dbk + (x > > 1);
-        pel * dst_v = pic_dbk -> v + (y > > 1) * s_c_dbk + (x > > 1);
-        pel * org_y = pic_org-> y + y * s_l_org + x;
-        pel* org_u = pic_org -> u + (y >> 1) * s_c_org + (x > > 1);
-        pel * org_v = pic_org -> v + (y > > 1) * s_c_org + (x > > 1);*/
-        let x_scu = x >> MIN_CU_LOG2;
-        let y_scu = y >> MIN_CU_LOG2;
-        let t = x_scu + y_scu * self.w_scu as i16;
-
-        //cu info to save
-        let mut intra_flag_save = false;
-        let mut cbf_l_save = false;
-
-        let y_begin = 0;
-        let y_begin_uv = 0;
+        let cuw = 1i16 << log2_cuw;
+        let cuh = 1i16 << log2_cuh;
+        let x_offset = 8; //for preparing deblocking filter taps
+        let y_offset = 8;
+        let x_tm = 4; //for calculating template dist
+        let y_tm = 4; //must be the same as x_tm
+        let log2_x_tm = 2;
+        let log2_y_tm = 2;
 
         //reset
         for i in 0..N_C {
@@ -2435,11 +2414,12 @@ impl EvceCtx {
             );
         }
 
+        /*********************** calc dist of un-filtered pixels *******************************/
         if let (Some(dbk), Some(org)) = (&self.pic_dbk, &self.pic[PIC_IDX_ORIG]) {
             let (frame_dbk, frame_org) = (&dbk.borrow().frame, &org.borrow().frame);
             let (dst, org) = (&frame_dbk.borrow().planes, &frame_org.borrow().planes);
 
-            dist_nofilt(
+            self.core.dist_nofilt[Y_C] = dist_nofilt(
                 x,
                 y,
                 x_tm,
@@ -2453,7 +2433,7 @@ impl EvceCtx {
                 &org[Y_C].as_region(),
             );
 
-            dist_nofilt(
+            self.core.dist_nofilt[U_C] = dist_nofilt(
                 x >> 1,
                 y >> 1,
                 x_tm >> 1,
@@ -2467,7 +2447,7 @@ impl EvceCtx {
                 &org[U_C].as_region(),
             );
 
-            dist_nofilt(
+            self.core.dist_nofilt[V_C] = dist_nofilt(
                 x >> 1,
                 y >> 1,
                 x_tm >> 1,
@@ -2482,198 +2462,184 @@ impl EvceCtx {
             );
         }
 
-        /*
-            /********************************* filter the pred/rec **************************************/
-            if(do_filter)
-            {
-                pic_dbk->pic_deblock_alpha_offset = self.deblock_alpha_offset;
-                pic_dbk->pic_deblock_beta_offset = self.deblock_beta_offset;
-                int w_scu = cuw >> MIN_CU_LOG2;
-                int h_scu = cuh >> MIN_CU_LOG2;
-                int ind, k;
-                //save current best cu info
-                intra_flag_save       = MCU_GET_IF(self.map_scu[t]);
-                cbf_l_save            = MCU_GET_CBFL(self.map_scu[t]);
-                //set map info of current cu to current mode
-                for(j = 0; j < h_scu; j++)
-                {
-                    ind = (y_scu + j) * self.w_scu + x_scu;
-                    for(i = 0; i < w_scu; i++)
-                    {
-                        k = ind + i;
+        /********************************* filter the pred/rec **************************************/
 
-                        if (evce_check_luma(ctx, core))
-                        {
-                        if(intra_flag)
-                            MCU_SET_IF(self.map_scu[k]);
-                        else
-                            MCU_CLR_IF(self.map_scu[k]);
-                        if(cbf_l)
-                            MCU_SET_CBFL(self.map_scu[k]);
-                        else
-                            MCU_CLR_CBFL(self.map_scu[k]);
-                        }
+        let x_scu = x as usize >> MIN_CU_LOG2;
+        let y_scu = y as usize >> MIN_CU_LOG2;
+        let t = x_scu + y_scu * self.w_scu as usize;
 
-                        if(refi != NULL && !is_mv_from_mvf)
-                        {
-                            self.map_refi[k][REFP_0] = refi[REFP_0];
-                            self.map_refi[k][REFP_1] = refi[REFP_1];
-                            self.map_mv[k][REFP_0][MV_X] = mv[REFP_0][MV_X];
-                            self.map_mv[k][REFP_0][MV_Y] = mv[REFP_0][MV_Y];
-                            self.map_mv[k][REFP_1][MV_X] = mv[REFP_1][MV_X];
-                            self.map_mv[k][REFP_1][MV_Y] = mv[REFP_1][MV_Y];
+        let w_scu = cuw as usize >> MIN_CU_LOG2;
+        let h_scu = cuh as usize >> MIN_CU_LOG2;
 
-                            self.map_unrefined_mv[k][REFP_0][MV_X] = mv[REFP_0][MV_X];
-                            self.map_unrefined_mv[k][REFP_0][MV_Y] = mv[REFP_0][MV_Y];
-                            self.map_unrefined_mv[k][REFP_1][MV_X] = mv[REFP_1][MV_X];
-                            self.map_unrefined_mv[k][REFP_1][MV_Y] = mv[REFP_1][MV_Y];
-                        }
-        #if DQP
-                        if(self.pps.cu_qp_delta_enabled_flag)
-                        {
-                            MCU_RESET_QP(self.map_scu[k]);
-                            MCU_SET_QP(self.map_scu[k], self.self.core.qp);
-                        }
-                        else
-                        {
-                            MCU_SET_QP(self.map_scu[k], self.tile[self.core.tile_idx].qp);
-                        }
-        #else
-                        MCU_SET_QP(self.map_scu[k], self.tile[self.core.tile_idx].qp); //TODO: this is wrong when using cu delta qp
-        #endif
-                        //clear coded (necessary)
-                        MCU_CLR_COD(self.map_scu[k]);
+        //save current best cu info
+        let intra_flag_save = self.map_scu[t].GET_IF() != 0;
+        let cbf_l_save = self.map_scu[t].GET_CBFL() != 0;
+        //set map info of current cu to current mode
+        for j in 0..h_scu {
+            let ind = (y_scu + j) * self.w_scu as usize + x_scu;
+            for i in 0..w_scu {
+                let k = ind + i;
+
+                if evc_check_luma(&self.core.tree_cons) {
+                    if intra_flag {
+                        self.map_scu[k].SET_IF();
+                    } else {
+                        self.map_scu[k].CLR_IF();
+                    }
+
+                    if cbf_l {
+                        self.map_scu[k].SET_CBFL();
+                    } else {
+                        self.map_scu[k].CLR_CBFL();
                     }
                 }
 
-                if (ats_inter_info && cbf_l)
-                {
-                    set_cu_cbf_flags(1, ats_inter_info, log2_cuw, log2_cuh, self.map_scu + t, self.w_scu);
+                if !intra_flag {
+                    if let (Some(map_refi), Some(map_mv)) = (&mut self.map_refi, &mut self.map_mv) {
+                        let (mut map_refi, mut map_mv) =
+                            (map_refi.borrow_mut(), map_mv.borrow_mut());
+
+                        map_refi[k][REFP_0] = refi[REFP_0];
+                        map_refi[k][REFP_1] = refi[REFP_1];
+                        map_mv[k][REFP_0][MV_X] = mv[REFP_0][MV_X];
+                        map_mv[k][REFP_0][MV_Y] = mv[REFP_0][MV_Y];
+                        map_mv[k][REFP_1][MV_X] = mv[REFP_1][MV_X];
+                        map_mv[k][REFP_1][MV_Y] = mv[REFP_1][MV_Y];
+                    }
+                }
+                if self.pps.cu_qp_delta_enabled_flag {
+                    self.map_scu[k].RESET_QP();
                 }
 
-                //first, horizontal filtering
-                // As of now filtering across tile boundaries is disabled
-                evc_deblock_cu_hor(pic_dbk, x, y, cuw, cuh, self.map_scu, self.map_refi, self.map_mv, self.w_scu, self.log2_max_cuwh, self.refp, 0
-                    , self.core.tree_cons
-                    , self.map_tidx, 0
-        #if ADDB_FLAG_FIX
-                    , self.sps.tool_addb
-        #endif
-        #if DEBLOCKING_FIX
-                    , self.map_ats_inter
-        #endif
-                );
+                self.map_scu[k].SET_QP(self.core.qp as u32);
 
-                //clean coded flag in between two directional filtering (not necessary here)
-                for(j = 0; j < h_scu; j++)
-                {
-                    ind = (y_scu + j) * self.w_scu + x_scu;
-                    for(i = 0; i < w_scu; i++)
-                    {
-                        k = ind + i;
-                        MCU_CLR_COD(self.map_scu[k]);
+                //clear coded (necessary)
+                self.map_scu[k].CLR_COD();
+            }
+        }
+
+        if let (Some(pic_dbk), Some(map_refi), Some(map_mv)) =
+            (&self.pic_dbk, &self.map_refi, &self.map_mv)
+        {
+            //first, horizontal filtering
+            // As of now filtering across tile boundaries is disabled
+            evc_deblock_cu_hor(
+                &mut self.core.bs_temp.tracer,
+                &*pic_dbk.borrow(),
+                x as usize,
+                y as usize,
+                cuw as usize,
+                cuh as usize,
+                &mut self.map_scu,
+                &*map_refi.borrow(),
+                &*map_mv.borrow(),
+                self.w_scu as usize,
+                &self.core.tree_cons,
+                &self.core.evc_tbl_qp_chroma_dynamic_ext,
+            );
+
+            //clean coded flag in between two directional filtering (not necessary here)
+            for j in 0..h_scu {
+                let ind = (y_scu + j) * self.w_scu as usize + x_scu;
+                for i in 0..w_scu {
+                    let k = ind + i;
+                    self.map_scu[k].CLR_COD();
+                }
+            }
+
+            //then, vertical filtering
+            evc_deblock_cu_ver(
+                &mut self.core.bs_temp.tracer,
+                &*pic_dbk.borrow(),
+                x as usize,
+                y as usize,
+                cuw as usize,
+                cuh as usize,
+                &mut self.map_scu,
+                &*map_refi.borrow(),
+                &*map_mv.borrow(),
+                self.w_scu as usize,
+                &self.core.tree_cons,
+                &self.core.evc_tbl_qp_chroma_dynamic_ext,
+                self.w as usize,
+            );
+        }
+
+        //recover best cu info
+        for j in 0..h_scu {
+            let ind = (y_scu + j) * self.w_scu as usize + x_scu;
+            for i in 0..w_scu {
+                let k = ind + i;
+
+                if evc_check_luma(&self.core.tree_cons) {
+                    if intra_flag_save {
+                        self.map_scu[k].SET_IF();
+                    } else {
+                        self.map_scu[k].CLR_IF();
+                    }
+
+                    if cbf_l_save {
+                        self.map_scu[k].SET_CBFL();
+                    } else {
+                        self.map_scu[k].CLR_CBFL();
                     }
                 }
 
-                //then, vertical filtering
-                evc_deblock_cu_ver(pic_dbk, x, y, cuw, cuh, self.map_scu, self.map_refi, self.map_mv, self.w_scu, self.log2_max_cuwh
-        #if FIX_PARALLEL_DBF
-                                   , self.map_cu_mode
-        #endif
-                                   , self.refp, 0
-                    , self.core.tree_cons
-                    , self.map_tidx, 0
-        #if ADDB_FLAG_FIX
-                    , self.sps.tool_addb
-        #endif
-        #if DEBLOCKING_FIX
-                    , self.map_ats_inter
-        #endif
-                );
+                self.map_scu[k].CLR_COD();
+            }
+        }
 
-                //recover best cu info
-                for(j = 0; j < h_scu; j++)
-                {
-                    ind = (y_scu + j) * self.w_scu + x_scu;
-                    for(i = 0; i < w_scu; i++)
-                    {
-                        k = ind + i;
+        /*********************** calc dist of filtered pixels *******************************/
+        if let (Some(dbk), Some(org)) = (&self.pic_dbk, &self.pic[PIC_IDX_ORIG]) {
+            let (frame_dbk, frame_org) = (&dbk.borrow().frame, &org.borrow().frame);
+            let (dst, org) = (&frame_dbk.borrow().planes, &frame_org.borrow().planes);
 
-                        if (evce_check_luma(ctx, core))
-                        {
-                            if (intra_flag_save)
-                            {
-                                MCU_SET_IF(self.map_scu[k]);
-                            }
-                            else
-                            {
-                                MCU_CLR_IF(self.map_scu[k]);
-                            }
+            self.core.dist_nofilt[Y_C] = dist_nofilt(
+                x,
+                y,
+                x_tm,
+                y_tm,
+                log2_cuw,
+                log2_cuh,
+                log2_x_tm,
+                log2_y_tm,
+                avail_lr,
+                &dst[Y_C].as_region(),
+                &org[Y_C].as_region(),
+            );
 
-                            if (cbf_l_save)
-                            {
-                                MCU_SET_CBFL(self.map_scu[k]);
-                            }
-                            else
-                            {
-                                MCU_CLR_CBFL(self.map_scu[k]);
-                            }
-                        }
+            self.core.dist_nofilt[U_C] = dist_nofilt(
+                x >> 1,
+                y >> 1,
+                x_tm >> 1,
+                y_tm >> 1,
+                log2_cuw - 1,
+                log2_cuh - 1,
+                log2_x_tm - 1,
+                log2_y_tm - 1,
+                avail_lr,
+                &dst[U_C].as_region(),
+                &org[U_C].as_region(),
+            );
 
-                        MCU_CLR_COD(self.map_scu[k]);
-                    }
-                }
-            }
-            /*********************** calc dist of filtered pixels *******************************/
-            //add current
-            self.core.dist_filter[Y_C] += evce_ssd_16b(log2_cuw, log2_cuh, dst_y, org_y, s_l_dbk, s_l_org);
-            //add  top
-            if (y != y_begin)
-            {
-                self.core.dist_filter[Y_C] += evce_ssd_16b(log2_cuw, log2_y_tm, dst_y - y_tm * s_l_dbk, org_y - y_tm * s_l_org, s_l_dbk, s_l_org);
-            }
-            //add left
-            if(avail_lr == LR_10 || avail_lr == LR_11)
-            {
-                self.core.dist_filter[Y_C] += evce_ssd_16b(log2_x_tm, log2_cuh, dst_y - x_tm, org_y - x_tm, s_l_dbk, s_l_org);
-            }
-            //add right
-            if(avail_lr == LR_01 || avail_lr == LR_11)
-            {
-                self.core.dist_filter[Y_C] += evce_ssd_16b(log2_x_tm, log2_cuh, dst_y + cuw, org_y + cuw, s_l_dbk, s_l_org);
-            }
-            //modify parameters from y to uv
-            cuw >>= 1;  cuh >>= 1;  x_offset >>= 1;  y_offset >>= 1;  s_src >>= 1;  x >>= 1;  y >>= 1;  x_tm >>= 1;  y_tm >>= 1;
-            log2_cuw -= 1;  log2_cuh -= 1;  log2_x_tm -= 1;  log2_y_tm -= 1;
-            //add current
-            self.core.dist_filter[U_C] += evce_ssd_16b(log2_cuw, log2_cuh, dst_u, org_u, s_c_dbk, s_c_org);
-            self.core.dist_filter[V_C] += evce_ssd_16b(log2_cuw, log2_cuh, dst_v, org_v, s_c_dbk, s_c_org);
-            //add top
-            if (y != y_begin_uv)
-            {
-                self.core.dist_filter[U_C] += evce_ssd_16b(log2_cuw, log2_y_tm, dst_u - y_tm * s_c_dbk, org_u - y_tm * s_c_org, s_c_dbk, s_c_org);
-                self.core.dist_filter[V_C] += evce_ssd_16b(log2_cuw, log2_y_tm, dst_v - y_tm * s_c_dbk, org_v - y_tm * s_c_org, s_c_dbk, s_c_org);
-            }
-            //add left
-            if(avail_lr == LR_10 || avail_lr == LR_11)
-            {
-                self.core.dist_filter[U_C] += evce_ssd_16b(log2_x_tm, log2_cuh, dst_u - x_tm, org_u - x_tm, s_c_dbk, s_c_org);
-                self.core.dist_filter[V_C] += evce_ssd_16b(log2_x_tm, log2_cuh, dst_v - x_tm, org_v - x_tm, s_c_dbk, s_c_org);
-            }
-            //add right
-            if(avail_lr == LR_01 || avail_lr == LR_11)
-            {
-                self.core.dist_filter[U_C] += evce_ssd_16b(log2_x_tm, log2_cuh, dst_u + cuw, org_u + cuw, s_c_dbk, s_c_org);
-                self.core.dist_filter[V_C] += evce_ssd_16b(log2_x_tm, log2_cuh, dst_v + cuw, org_v + cuw, s_c_dbk, s_c_org);
-            }
-            //recover
-            cuw <<= 1;  cuh <<= 1;  x_offset <<= 1;  y_offset <<= 1;  s_src <<= 1;  x <<= 1;  y <<= 1;  x_tm <<= 1;  y_tm <<= 1;
-            log2_cuw += 1;  log2_cuh += 1;  log2_x_tm += 1;  log2_y_tm += 1;
+            self.core.dist_nofilt[V_C] = dist_nofilt(
+                x >> 1,
+                y >> 1,
+                x_tm >> 1,
+                y_tm >> 1,
+                log2_cuw - 1,
+                log2_cuh - 1,
+                log2_x_tm - 1,
+                log2_y_tm - 1,
+                avail_lr,
+                &dst[V_C].as_region(),
+                &org[V_C].as_region(),
+            );
+        }
 
-            /******************************* derive delta dist ********************************/
-            self.core.delta_dist[Y_C] = self.core.dist_filter[Y_C] - self.core.dist_nofilt[Y_C];
-            self.core.delta_dist[U_C] = self.core.dist_filter[U_C] - self.core.dist_nofilt[U_C];
-            self.core.delta_dist[V_C] = self.core.dist_filter[V_C] - self.core.dist_nofilt[V_C];
-         */
+        /******************************* derive delta dist ********************************/
+        self.core.delta_dist[Y_C] = self.core.dist_filter[Y_C] - self.core.dist_nofilt[Y_C];
+        self.core.delta_dist[U_C] = self.core.dist_filter[U_C] - self.core.dist_nofilt[U_C];
+        self.core.delta_dist[V_C] = self.core.dist_filter[V_C] - self.core.dist_nofilt[V_C];
     }
 }
