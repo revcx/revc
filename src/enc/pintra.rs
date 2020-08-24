@@ -539,7 +539,20 @@ impl EvceCtx {
                 ) as f64;
             }
 
-            self.calc_delta_dist_filter_boundary(); //, PIC_MODE(ctx), PIC_ORIG(ctx), cuw, cuh, pi->rec, cuw, x, y, core->avail_lr, 1, core->nnz[Y_C] != 0, NULL, NULL, 0, core->ats_inter_info, core);
+            self.calc_delta_dist_filter_boundary(
+                x,
+                y,
+                log2_cuw,
+                log2_cuh,
+                self.core.avail_lr,
+                true,
+                true,
+                0,
+                self.core.nnz[Y_C] != 0,
+                &[],
+                &[],
+            );
+
             cost += self.core.delta_dist[Y_C] as f64;
             *dist = cost as i32;
             cost += (self.lambda[0] * bit_cnt as f64);
@@ -678,10 +691,23 @@ impl EvceCtx {
                     ) as f64;
             }
 
-            self.calc_delta_dist_filter_boundary(); //ctx, PIC_MODE(ctx), PIC_ORIG(ctx), cuw, cuh, pi -> rec, cuw, x, y, core -> avail_lr, 1,
-                                                    // !evce_check_luma(ctx, core)?
-                                                    // core -> cu_data_temp[log2_cuw - 2][log2_cuh - 2].nnz[Y_C] != 0:
-                                                    // core -> nnz[Y_C] != 0, NULL, NULL, 0, core -> ats_inter_info, core);
+            self.calc_delta_dist_filter_boundary(
+                x,
+                y,
+                log2_cuw,
+                log2_cuh,
+                self.core.avail_lr,
+                true,
+                true,
+                0,
+                //if !evc_check_luma(&self.core.tree_cons) {
+                //self.core.cu_data_temp[log2_cuw - 2][log2_cuh - 2].nnz[Y_C] != 0
+                //} else {
+                self.core.nnz[Y_C] != 0,
+                //},
+                &[],
+                &[],
+            );
 
             cost += (self.core.delta_dist[U_C] as f64 * self.dist_chroma_weight[0])
                 + (self.core.delta_dist[V_C] as f64 * self.dist_chroma_weight[1]);

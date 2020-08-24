@@ -642,8 +642,20 @@ impl EvceCtx {
                     );
                 }
 
-                self.calc_delta_dist_filter_boundary(); //ctx, PIC_MODE(ctx), PIC_ORIG(ctx), cuw, cuh, self.pinter.pred[PRED_NUM][0], cuw, x, y, self.core.avail_lr, 0, 0
-                                                        //, refi, mvp, 0, self.core.ats_inter_info, core);
+                self.calc_delta_dist_filter_boundary(
+                    x,
+                    y,
+                    log2_cuw,
+                    log2_cuh,
+                    self.core.avail_lr,
+                    false,
+                    false,
+                    InterPredDir::PRED_NUM as usize,
+                    false,
+                    &refi,
+                    &mvp,
+                );
+
                 cy += self.core.delta_dist[Y_C];
                 cu += self.core.delta_dist[U_C];
                 cv += self.core.delta_dist[V_C];
@@ -1078,7 +1090,23 @@ impl EvceCtx {
                 &is_coef,
             );
 
-            self.calc_delta_dist_filter_boundary();
+            {
+                let refi = self.pinter.refi[pidx];
+                let mv = self.pinter.mv[pidx];
+                self.calc_delta_dist_filter_boundary(
+                    x,
+                    y,
+                    log2_cuw,
+                    log2_cuh,
+                    self.core.avail_lr,
+                    false,
+                    false,
+                    pred_coef_idx,
+                    false,
+                    &refi,
+                    &mv,
+                );
+            }
 
             if let Some(pic) = &self.pinter.pic_o {
                 let frame = &pic.borrow().frame;
@@ -1128,8 +1156,24 @@ impl EvceCtx {
             }
 
             //filter rec and calculate ssd
-            self.calc_delta_dist_filter_boundary(); //ctx, PIC_MODE(ctx), PIC_ORIG(ctx), cuw, cuh, rec, cuw, x, y, self.core.avail_lr, 0
-                                                    //, nnz[Y_C] != 0, self.pinter.refi[pidx], self.pinter.mv[pidx], is_from_mv_field, self.core.ats_inter_info, core);
+            {
+                let refi = self.pinter.refi[pidx];
+                let mv = self.pinter.mv[pidx];
+                self.calc_delta_dist_filter_boundary(
+                    x,
+                    y,
+                    log2_cuw,
+                    log2_cuh,
+                    self.core.avail_lr,
+                    false,
+                    true,
+                    pidx,
+                    self.core.nnz[Y_C] != 0,
+                    &refi,
+                    &mv,
+                );
+            }
+
             for i in 0..N_C {
                 dist[1][i] += self.core.delta_dist[i];
             }
@@ -1332,8 +1376,24 @@ impl EvceCtx {
                 self.core.nnz[i] = 0;
             }
 
-            self.calc_delta_dist_filter_boundary(); //ctx, PIC_MODE(ctx), PIC_ORIG(ctx), cuw, cuh, pred[0], cuw, x, y, self.core.avail_lr, 0, 0
-                                                    //, self.pinter.refi[pidx], self.pinter.mv[pidx], is_from_mv_field, self.core.ats_inter_info, core);
+            {
+                let refi = self.pinter.refi[pidx];
+                let mv = self.pinter.mv[pidx];
+                self.calc_delta_dist_filter_boundary(
+                    x,
+                    y,
+                    log2_cuw,
+                    log2_cuh,
+                    self.core.avail_lr,
+                    false,
+                    false,
+                    pred_coef_idx,
+                    false,
+                    &refi,
+                    &mv,
+                );
+            }
+
             for i in 0..N_C {
                 dist[0][i] = dist_no_resi[i];
                 dist[0][i] += self.core.delta_dist[i];
