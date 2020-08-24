@@ -274,3 +274,84 @@ pub(crate) fn get_mv_bits(mvd_x: i16, mvd_y: i16, num_refp: u8, refi: i8) -> u32
 pub(crate) fn MV_COST(lambda_mv: u32, mv_bits: u32) -> u32 {
     (lambda_mv * mv_bits + (1 << 15)) >> 16
 }
+
+pub(crate) fn fill_dbf_block(
+    x: i16,
+    y: i16,
+    x_offset: i16,
+    y_offset: i16,
+    cuw: i16,
+    cuh: i16,
+    avail_lr: u16,
+    dst: &mut PlaneRegionMut<'_, pel>,
+    src: &[pel],
+    rec: &PlaneRegion<'_, pel>,
+) {
+    //fill src to dst
+    for j in 0..cuh {
+        for i in 0..cuw {
+            dst[(y + j) as usize][(x + i) as usize] =
+                src[(j as i32 * cuw as i32 + i as i32) as usize];
+        }
+    }
+
+    //fill top
+    if y != 0 {
+        for j in 0..y_offset {
+            for i in 0..cuw {
+                dst[std::cmp::max(y - y_offset + j, 0) as usize][(x + i) as usize] =
+                    rec[std::cmp::max(y - y_offset + j, 0) as usize][(x + i) as usize];
+            }
+        }
+    }
+
+    //fill left
+    if avail_lr == LR_10 || avail_lr == LR_11 {
+        for j in 0..cuh {
+            for i in 0..x_offset {
+                dst[(y + j) as usize][std::cmp::max(x - x_offset + i, 0) as usize] =
+                    rec[(y + j) as usize][std::cmp::max(x - x_offset + i, 0) as usize];
+            }
+        }
+    }
+
+    //fill right
+    if avail_lr == LR_01 || avail_lr == LR_11 {
+        for j in 0..cuh {
+            for i in 0..x_offset {
+                dst[(y + j) as usize][(x + cuw + i) as usize] =
+                    rec[(y + j) as usize][(x + cuw + i) as usize];
+            }
+        }
+    }
+}
+
+pub(crate) fn dist_nofilt(
+    x: i16,
+    y: i16,
+    x_tm: i16,
+    y_tm: i16,
+    log2_cuw: usize,
+    log2_cuh: usize,
+    log2_x_tm: usize,
+    log2_y_tm: usize,
+    avail_lr: u16,
+    dst: &PlaneRegion<'_, pel>,
+    org: &PlaneRegion<'_, pel>,
+) -> i64 {
+    //add distortion of current
+    let mut dist_nofilt = evce_ssd_16i(x, y, log2_cuw, log2_cuh, dst, org);
+
+    //add distortion of top
+    if y != 0 {
+        dist_nofilt += evce_ssd_16i(x, y - y_tm, log2_cuw, log2_y_tm, dst, org);
+    }
+    if avail_lr == LR_10 || avail_lr == LR_11 {
+        dist_nofilt += evce_ssd_16i(x - x_tm, y, log2_x_tm, log2_cuh, dst, org);
+    }
+    if avail_lr == LR_01 || avail_lr == LR_11 {
+        dist_nofilt += evce_ssd_16i(x + (1 << log2_cuw), y, log2_x_tm, log2_cuh, dst, org);
+    }
+
+    dist_nofilt
+}

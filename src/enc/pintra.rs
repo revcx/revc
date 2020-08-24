@@ -540,8 +540,8 @@ impl EvceCtx {
             }
 
             self.calc_delta_dist_filter_boundary(
-                x,
-                y,
+                x as i16,
+                y as i16,
                 log2_cuw,
                 log2_cuh,
                 self.core.avail_lr,
@@ -692,8 +692,8 @@ impl EvceCtx {
             }
 
             self.calc_delta_dist_filter_boundary(
-                x,
-                y,
+                x as i16,
+                y as i16,
                 log2_cuw,
                 log2_cuh,
                 self.core.avail_lr,

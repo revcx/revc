@@ -2326,10 +2326,10 @@ impl EvceCtx {
 
     pub(crate) fn calc_delta_dist_filter_boundary(
         &mut self,
-        x: usize,
-        y: usize,
-        log2_cuw: usize,
-        log2_cuh: usize,
+        mut x: i16,
+        mut y: i16,
+        mut log2_cuw: usize,
+        mut log2_cuh: usize,
         avail_lr: u16,
         intra_flag: bool,
         src_is_rec: bool,
@@ -2353,14 +2353,14 @@ impl EvceCtx {
             &self.pinter.pred[pred_rec_idx][0]
         };
 
-        let cuw = 1 << log2_cuw;
-        let cuh = 1 << log2_cuh;
-        let x_offset = 8; //for preparing deblocking filter taps
-        let y_offset = 8;
-        let x_tm = 4; //for calculating template dist
-        let y_tm = 4; //must be the same as x_tm
-        let log2_x_tm = 2;
-        let log2_y_tm = 2;
+        let mut cuw = 1i16 << log2_cuw;
+        let mut cuh = 1i16 << log2_cuh;
+        let mut x_offset = 8; //for preparing deblocking filter taps
+        let mut y_offset = 8;
+        let mut x_tm = 4; //for calculating template dist
+        let mut y_tm = 4; //must be the same as x_tm
+        let mut log2_x_tm = 2;
+        let mut log2_y_tm = 2;
         /* EVC_PIC * pic_dbk = ctx -> pic_dbk;
         int s_l_dbk = pic_dbk ->s_l;
         int s_c_dbk = pic_dbk -> s_c;
@@ -2374,7 +2374,7 @@ impl EvceCtx {
         pel * org_v = pic_org -> v + (y > > 1) * s_c_org + (x > > 1);*/
         let x_scu = x >> MIN_CU_LOG2;
         let y_scu = y >> MIN_CU_LOG2;
-        let t = x_scu + y_scu * self.w_scu as usize;
+        let t = x_scu + y_scu * self.w_scu as i16;
 
         //cu info to save
         let mut intra_flag_save = false;
@@ -2390,119 +2390,99 @@ impl EvceCtx {
         }
 
         /********************** prepare pred/rec pixels (not filtered) ****************************/
+        if let (Some(dbk), Some(rec)) = (&self.pic_dbk, &self.pic[PIC_IDX_MODE]) {
+            let (frame_dbk, frame_rec) = (&dbk.borrow().frame, &rec.borrow().frame);
+            let dst = &mut frame_dbk.borrow_mut().planes;
+            let rec = &frame_rec.borrow().planes;
+
+            fill_dbf_block(
+                x,
+                y,
+                x_offset,
+                y_offset,
+                cuw,
+                cuh,
+                avail_lr,
+                &mut dst[Y_C].as_region_mut(),
+                &src.data[Y_C],
+                &rec[Y_C].as_region(),
+            );
+
+            fill_dbf_block(
+                x >> 1,
+                y >> 1,
+                x_offset >> 1,
+                y_offset >> 1,
+                cuw >> 1,
+                cuh >> 1,
+                avail_lr,
+                &mut dst[U_C].as_region_mut(),
+                &src.data[U_C],
+                &rec[U_C].as_region(),
+            );
+
+            fill_dbf_block(
+                x >> 1,
+                y >> 1,
+                x_offset >> 1,
+                y_offset >> 1,
+                cuw >> 1,
+                cuh >> 1,
+                avail_lr,
+                &mut dst[V_C].as_region_mut(),
+                &src.data[V_C],
+                &rec[V_C].as_region(),
+            );
+        }
+
+        if let (Some(dbk), Some(org)) = (&self.pic_dbk, &self.pic[PIC_IDX_ORIG]) {
+            let (frame_dbk, frame_org) = (&dbk.borrow().frame, &org.borrow().frame);
+            let (dst, org) = (&frame_dbk.borrow().planes, &frame_org.borrow().planes);
+
+            dist_nofilt(
+                x,
+                y,
+                x_tm,
+                y_tm,
+                log2_cuw,
+                log2_cuh,
+                log2_x_tm,
+                log2_y_tm,
+                avail_lr,
+                &dst[Y_C].as_region(),
+                &org[Y_C].as_region(),
+            );
+
+            dist_nofilt(
+                x >> 1,
+                y >> 1,
+                x_tm >> 1,
+                y_tm >> 1,
+                log2_cuw - 1,
+                log2_cuh - 1,
+                log2_x_tm - 1,
+                log2_y_tm - 1,
+                avail_lr,
+                &dst[U_C].as_region(),
+                &org[U_C].as_region(),
+            );
+
+            dist_nofilt(
+                x >> 1,
+                y >> 1,
+                x_tm >> 1,
+                y_tm >> 1,
+                log2_cuw - 1,
+                log2_cuh - 1,
+                log2_x_tm - 1,
+                log2_y_tm - 1,
+                avail_lr,
+                &dst[V_C].as_region(),
+                &org[V_C].as_region(),
+            );
+        }
+
         /*
-            //fill src to dst
-            for(i = 0; i < cuh; i++)
-                evc_mcpy(dst_y + i*s_l_dbk, src[Y_C] + i*s_src, cuw * sizeof(pel));
-
-            //fill top
-            if (y != y_begin)
-            {
-                for(i = 0; i < y_offset; i++)
-                    evc_mcpy(dst_y + (-y_offset + i)*s_l_dbk, pic_rec->y + (y - y_offset + i)*s_l_dbk + x, cuw * sizeof(pel));
-            }
-
-            //fill left
-            if(avail_lr == LR_10 || avail_lr == LR_11)
-            {
-                for(i = 0; i < cuh; i++)
-                    evc_mcpy(dst_y + i*s_l_dbk - x_offset, pic_rec->y + (y + i)*s_l_dbk + (x - x_offset), x_offset * sizeof(pel));
-            }
-
-            //fill right
-            if(avail_lr == LR_01 || avail_lr == LR_11)
-            {
-                for(i = 0; i < cuh; i++)
-                    evc_mcpy(dst_y + i*s_l_dbk + cuw, pic_rec->y + (y + i)*s_l_dbk + (x + cuw), x_offset * sizeof(pel));
-            }
-
-            //modify parameters from y to uv
-            cuw >>= 1;  cuh >>= 1;  x_offset >>= 1;  y_offset >>= 1;  s_src >>= 1;  x >>= 1;  y >>= 1;  x_tm >>= 1;  y_tm >>= 1;
-            log2_cuw -= 1;  log2_cuh -= 1;  log2_x_tm -= 1;  log2_y_tm -= 1;
-
-            //fill src to dst
-            for(i = 0; i < cuh; i++)
-            {
-                evc_mcpy(dst_u + i * s_c_dbk, src[U_C] + i * s_src, cuw * sizeof(pel));
-                evc_mcpy(dst_v + i * s_c_dbk, src[V_C] + i * s_src, cuw * sizeof(pel));
-            }
-
-            //fill top
-            if (y != y_begin_uv)
-            {
-                for(i = 0; i < y_offset; i++)
-                {
-                    evc_mcpy(dst_u + (-y_offset + i)*s_c_dbk, pic_rec->u + (y - y_offset + i)*s_c_dbk + x, cuw * sizeof(pel));
-                    evc_mcpy(dst_v + (-y_offset + i)*s_c_dbk, pic_rec->v + (y - y_offset + i)*s_c_dbk + x, cuw * sizeof(pel));
-                }
-            }
-
-            //fill left
-            if (avail_lr == LR_10 || avail_lr == LR_11)
-            {
-                for(i = 0; i < cuh; i++)
-                {
-                    evc_mcpy(dst_u + i * s_c_dbk - x_offset, pic_rec->u + (y + i)*s_c_dbk + (x - x_offset), x_offset * sizeof(pel));
-                    evc_mcpy(dst_v + i * s_c_dbk - x_offset, pic_rec->v + (y + i)*s_c_dbk + (x - x_offset), x_offset * sizeof(pel));
-                }
-            }
-
-            //fill right
-            if(avail_lr == LR_01 || avail_lr == LR_11)
-            {
-                for(i = 0; i < cuh; i++)
-                {
-                    evc_mcpy(dst_u + i * s_c_dbk + cuw, pic_rec->u + (y + i)*s_c_dbk + (x + cuw), x_offset * sizeof(pel));
-                    evc_mcpy(dst_v + i * s_c_dbk + cuw, pic_rec->v + (y + i)*s_c_dbk + (x + cuw), x_offset * sizeof(pel));
-                }
-            }
-
-            //recover
-            cuw <<= 1;  cuh <<= 1;  x_offset <<= 1;  y_offset <<= 1;  s_src <<= 1;  x <<= 1;  y <<= 1;  x_tm <<= 1;  y_tm <<= 1;
-            log2_cuw += 1;  log2_cuh += 1;  log2_x_tm += 1;  log2_y_tm += 1;
-
-            //add distortion of current
-            self.core.dist_nofilt[Y_C] += evce_ssd_16b(log2_cuw, log2_cuh, dst_y, org_y, s_l_dbk, s_l_org);
-
-            //add distortion of top
-            if (y != y_begin)
-
-            {
-                self.core.dist_nofilt[Y_C] += evce_ssd_16b(log2_cuw, log2_y_tm, dst_y - y_tm * s_l_dbk, org_y - y_tm * s_l_org, s_l_dbk, s_l_org);
-            }
-            if(avail_lr == LR_10 || avail_lr == LR_11)
-            {
-                self.core.dist_nofilt[Y_C] += evce_ssd_16b(log2_x_tm, log2_cuh, dst_y - x_tm, org_y - x_tm, s_l_dbk, s_l_org);
-            }
-            if(avail_lr == LR_01 || avail_lr == LR_11)
-            {
-                self.core.dist_nofilt[Y_C] += evce_ssd_16b(log2_x_tm, log2_cuh, dst_y + cuw, org_y + cuw, s_l_dbk, s_l_org);
-            }
-            cuw >>= 1;  cuh >>= 1;  x_offset >>= 1;  y_offset >>= 1;  s_src >>= 1;  x >>= 1;  y >>= 1;  x_tm >>= 1;  y_tm >>= 1;
-            log2_cuw -= 1;  log2_cuh -= 1;  log2_x_tm -= 1;  log2_y_tm -= 1;
-            self.core.dist_nofilt[U_C] += evce_ssd_16b(log2_cuw, log2_cuh, dst_u, org_u, s_c_dbk, s_c_org);
-            self.core.dist_nofilt[V_C] += evce_ssd_16b(log2_cuw, log2_cuh, dst_v, org_v, s_c_dbk, s_c_org);
-
-            if (y != y_begin_uv)
-            {
-                self.core.dist_nofilt[U_C] += evce_ssd_16b(log2_cuw, log2_y_tm, dst_u - y_tm*s_c_dbk, org_u - y_tm*s_c_org, s_c_dbk, s_c_org);
-                self.core.dist_nofilt[V_C] += evce_ssd_16b(log2_cuw, log2_y_tm, dst_v - y_tm*s_c_dbk, org_v - y_tm*s_c_org, s_c_dbk, s_c_org);
-            }
-            if(avail_lr == LR_10 || avail_lr == LR_11)
-            {
-                self.core.dist_nofilt[U_C] += evce_ssd_16b(log2_x_tm, log2_cuh, dst_u - x_tm, org_u - x_tm, s_c_dbk, s_c_org);
-                self.core.dist_nofilt[V_C] += evce_ssd_16b(log2_x_tm, log2_cuh, dst_v - x_tm, org_v - x_tm, s_c_dbk, s_c_org);
-            }
-            if(avail_lr == LR_01 || avail_lr == LR_11)
-            {
-                self.core.dist_nofilt[U_C] += evce_ssd_16b(log2_x_tm, log2_cuh, dst_u + cuw, org_u + cuw, s_c_dbk, s_c_org);
-                self.core.dist_nofilt[V_C] += evce_ssd_16b(log2_x_tm, log2_cuh, dst_v + cuw, org_v + cuw, s_c_dbk, s_c_org);
-            }
-
-            //recover
-            cuw <<= 1;  cuh <<= 1;  x_offset <<= 1;  y_offset <<= 1;  s_src <<= 1;  x <<= 1;  y <<= 1;  x_tm <<= 1;  y_tm <<= 1;
-            log2_cuw += 1;  log2_cuh += 1;  log2_x_tm += 1;  log2_y_tm += 1;
-
             /********************************* filter the pred/rec **************************************/
             if(do_filter)
             {
