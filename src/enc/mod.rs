@@ -1109,9 +1109,9 @@ impl EvceCtx {
                 /* analyzer lcu */
 
                 // TRACE_RDO = 0: comment this line, otherwise, 2: uncomment it
-                self.core.bs_temp.tracer = self.bs.tracer.take();
+                //self.core.bs_temp.tracer = self.bs.tracer.take();
                 self.mode_analyze_lcu();
-                self.bs.tracer = self.core.bs_temp.tracer.take();
+                //self.bs.tracer = self.core.bs_temp.tracer.take();
 
                 /* entropy coding ************************************************/
                 self.evce_eco_tree(
@@ -2044,10 +2044,10 @@ impl EvceCtx {
             &self.map_cu_data[lcu_num as usize].split_mode,
         );
 
-        EVC_TRACE_COUNTER(&mut self.bs.tracer);
+        /*EVC_TRACE_COUNTER(&mut self.bs.tracer);
         EVC_TRACE(&mut self.bs.tracer, "split_mod ");
         EVC_TRACE(&mut self.bs.tracer, split_mode as u8);
-        EVC_TRACE(&mut self.bs.tracer, " \n");
+        EVC_TRACE(&mut self.bs.tracer, " \n");*/
 
         if split_mode != SplitMode::NO_SPLIT {
             let split_struct = evc_split_get_part_structure(

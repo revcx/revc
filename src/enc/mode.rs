@@ -2594,7 +2594,7 @@ impl EvceCtx {
             let (frame_dbk, frame_org) = (&dbk.borrow().frame, &org.borrow().frame);
             let (dst, org) = (&frame_dbk.borrow().planes, &frame_org.borrow().planes);
 
-            self.core.dist_nofilt[Y_C] = dist_nofilt(
+            self.core.dist_filter[Y_C] = dist_nofilt(
                 x,
                 y,
                 x_tm,
@@ -2608,7 +2608,7 @@ impl EvceCtx {
                 &org[Y_C].as_region(),
             );
 
-            self.core.dist_nofilt[U_C] = dist_nofilt(
+            self.core.dist_filter[U_C] = dist_nofilt(
                 x >> 1,
                 y >> 1,
                 x_tm >> 1,
@@ -2622,7 +2622,7 @@ impl EvceCtx {
                 &org[U_C].as_region(),
             );
 
-            self.core.dist_nofilt[V_C] = dist_nofilt(
+            self.core.dist_filter[V_C] = dist_nofilt(
                 x >> 1,
                 y >> 1,
                 x_tm >> 1,
