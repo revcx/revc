@@ -661,13 +661,13 @@ fn main() -> std::io::Result<()> {
                         }
                     }
                     bit_tot += stat.bytes << 3;
-                }
 
-                cli.muxer.write(
-                    data,
-                    cli.bitdepth,
-                    Rational::new(cli.enc.time_base.den, cli.enc.time_base.num),
-                )?;
+                    cli.muxer.write(
+                        data,
+                        cli.bitdepth,
+                        Rational::new(cli.enc.time_base.den, cli.enc.time_base.num),
+                    )?;
+                }
             }
             Err(err) => {
                 if err == EvcError::EVC_OK_NO_MORE_OUTPUT {

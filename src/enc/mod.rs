@@ -516,7 +516,7 @@ pub(crate) struct EvceCtx {
     Just count of encoded picture correctly) */
     pic_cnt: usize,
     /* current picture input count (only update when CTX0) */
-    pic_icnt: usize,
+    pic_icnt: isize,
     /* total input picture count (only used for bumping process) */
     pic_ticnt: usize,
     /* remaining pictures is encoded to p or b slice (only used for bumping process) */
@@ -525,7 +525,7 @@ pub(crate) struct EvceCtx {
     only used for bumping process) */
     force_ignored_cnt: usize,
     /* initial frame return number(delayed input count) due to B picture or Forecast */
-    frm_rnum: usize,
+    frm_rnum: isize,
     /* current encoding slice number in one picture */
     slice_num: usize,
     /* first mb number of current encoding slice in one picture */
@@ -734,7 +734,7 @@ impl EvceCtx {
             Just count of encoded picture correctly) */
             pic_cnt: 0,
             /* current picture input count (only update when CTX0) */
-            pic_icnt: 0,
+            pic_icnt: -1,
             /* total input picture count (only used for bumping process) */
             pic_ticnt: 0,
             /* remaining pictures is encoded to p or b slice (only used for bumping process) */
@@ -743,7 +743,7 @@ impl EvceCtx {
             only used for bumping process) */
             force_ignored_cnt: 0,
             /* initial frame return number(delayed input count) due to B picture or Forecast */
-            frm_rnum: param.max_b_frames as usize,
+            frm_rnum: param.max_b_frames as isize,
             /* current encoding slice number in one picture */
             slice_num: 0,
             /* first mb number of current encoding slice in one picture */
@@ -822,15 +822,16 @@ impl EvceCtx {
     }
 
     pub(crate) fn encode_frm(&mut self) -> Result<EvcStat, EvcError> {
-        if self.frm.is_none() {
+        if self.frm.is_none() && !self.flush {
             self.flush = true;
+            self.pic_ticnt = self.pic_icnt as usize;
         } else {
             if let Some(f) = self.frm.take() {
-                self.pico_idx = self.pic_icnt % self.pico_max_cnt;
-                let pico = &mut self.pico_buf[self.pico_idx];
-                pico.pic_icnt = self.pic_icnt;
-                pico.is_used = true;
                 self.pic_icnt += 1;
+                self.pico_idx = (self.pic_icnt as usize) % self.pico_max_cnt;
+                let pico = &mut self.pico_buf[self.pico_idx];
+                pico.pic_icnt = self.pic_icnt as usize;
+                pico.is_used = true;
 
                 pico.pic.borrow_mut().frame = Rc::new(RefCell::new(f));
 
@@ -843,7 +844,7 @@ impl EvceCtx {
         /* store input picture and return if needed */
         self.check_frame_delay()?;
 
-        let pic_cnt = self.pic_icnt as isize - self.frm_rnum as isize;
+        let pic_cnt = self.pic_icnt - self.frm_rnum;
         self.force_slice = if (self.pic_ticnt % self.gop_size) as isize
             >= (self.pic_ticnt as isize - pic_cnt + 1)
             && self.flush
@@ -1295,11 +1296,11 @@ impl EvceCtx {
                 self.slice_ref_flag = true;
 
                 /* flush the first IDR picture */
-                self.pic[PIC_IDX_ORIG] = Some(Rc::clone(&self.pico_buf[0].pic));
-            //self.pico = self.pico_buf[0];
+                self.pico_idx = 0;
+                self.pic[PIC_IDX_ORIG] = Some(Rc::clone(&self.pico_buf[self.pico_idx].pic));
             } else if self.force_slice {
                 force_cnt = self.force_ignored_cnt as usize;
-                while (force_cnt < gop_size) {
+                while force_cnt < gop_size {
                     pic_icnt = self.pic_cnt + self.param.max_b_frames as usize + force_cnt;
                     pic_imcnt = pic_icnt;
 
@@ -1308,6 +1309,7 @@ impl EvceCtx {
                     if self.poc.poc_val <= self.pic_ticnt as i32 {
                         break;
                     }
+                    force_cnt += 1;
                 }
                 self.force_ignored_cnt = force_cnt;
             } else {

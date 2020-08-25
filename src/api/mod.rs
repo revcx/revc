@@ -511,7 +511,6 @@ impl EncoderConfig {
             if !(config.max_b_frames == 0
                 || config.max_b_frames == 1
                 || config.max_b_frames == 3
-                || config.max_b_frames == 5
                 || config.max_b_frames == 7
                 || config.max_b_frames == 15)
             {
@@ -635,9 +634,25 @@ impl Context {
                 Ok(stat)
             }
             Context::Encoder(ctx) => {
-                let stat = Some(ctx.0.encode_frm()?);
-                let packet = ctx.0.pull_pkt()?;
-                *data = Data::RefPacket(packet);
+                let mut stat = None;
+                let mut pull_pkt = false;
+                match ctx.0.encode_frm() {
+                    Ok(st) => {
+                        pull_pkt = true;
+                        stat = Some(st);
+                    }
+                    Err(err) => {
+                        if err != EvcError::EVC_OK_OUTPUT_NOT_AVAILABLE {
+                            return Err(err);
+                        }
+                    }
+                }
+
+                if pull_pkt {
+                    let packet = ctx.0.pull_pkt()?;
+                    *data = Data::RefPacket(packet);
+                }
+
                 Ok(stat)
             }
             Context::Invalid(_) => Err(EvcError::EVC_ERR_UNSUPPORTED),

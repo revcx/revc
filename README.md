@@ -6,7 +6,7 @@ The fastest and safest EVC encoder and decoder
 
 - [ ] 0.1 Translation:
   - [x] Translate ETM baseline decoder from C to Rust
-  - [ ] Translate ETM baseline encoder from C to Rust		 
+  - [x] Translate ETM baseline encoder from C to Rust		 
 - [ ] 0.2 Optimization:
   - [ ] profiling and benchmarking
   - [ ] rust safe code optimization
