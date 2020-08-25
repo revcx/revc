@@ -30,7 +30,7 @@ impl Demuxer for NaluDemuxer {
         let mut data: Vec<u8> = vec![0; nal_unit_length as usize];
         self.reader.read_exact(&mut data)?;
 
-        Ok(Data::Packet(Some(Packet { data, pts: 0 })))
+        Ok(Data::Packet(Some(Packet { data, ts: 0 })))
     }
 
     fn info(&self) -> Option<VideoInfo> {

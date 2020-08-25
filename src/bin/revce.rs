@@ -8,12 +8,17 @@ mod io;
 
 use clap::{App, AppSettings, Arg, ArgMatches};
 
+use std::cell::RefCell;
+use std::collections::BTreeMap;
 use std::fs::File;
 use std::io::prelude::*;
+use std::rc::Rc;
 use std::time::Instant;
 
 use io::demuxer::VideoInfo;
+use io::muxer::Muxer;
 use io::*;
+use revc::api::frame::*;
 use revc::api::*;
 
 struct CLISettings {
@@ -435,6 +440,39 @@ fn parse_cli() -> std::io::Result<CLISettings> {
     })
 }
 
+fn write_rec_frames(
+    cli: &mut CLISettings,
+    map_rec: &mut BTreeMap<u64, Option<Rc<RefCell<Frame<u16>>>>>,
+    pic_ocnt: &mut u64,
+) -> std::io::Result<()> {
+    for (ts, rec) in map_rec.iter_mut() {
+        if *ts == *pic_ocnt {
+            if let Some(rec_muxer) = &mut cli.rec {
+                if let Some(rec_frame) = rec.take() {
+                    rec_muxer.write(
+                        Data::RefFrame(rec_frame),
+                        cli.bitdepth,
+                        Rational::new(cli.enc.time_base.den, cli.enc.time_base.num),
+                    )?;
+                }
+            }
+            *pic_ocnt += 1;
+        }
+    }
+
+    let to_be_removed: Vec<u64> = map_rec
+        .iter()
+        .filter(|x| *(x.0) < *pic_ocnt)
+        .map(|x| *(x.0))
+        .collect();
+
+    for ts in &to_be_removed {
+        map_rec.remove(ts);
+    }
+
+    Ok(())
+}
+
 fn print_config(cli: &CLISettings) {
     //if(op_verbose < VERBOSE_ALL) return;
 
@@ -600,13 +638,15 @@ fn main() -> std::io::Result<()> {
 
     let mut bit_tot = 0;
     let mut clk_tot = 0;
-    let mut pic_cnt = 0;
+    let mut pic_icnt = 0;
+    let mut pic_ocnt = 0;
+    let mut map_rec = BTreeMap::new();
 
     let mut state = EvceState::STATE_ENCODING;
 
     loop {
         if state == EvceState::STATE_ENCODING {
-            if cli.frames != 0 && pic_cnt >= cli.frames {
+            if cli.frames != 0 && pic_icnt >= cli.frames {
                 if cli.verbose {
                     eprint!("bumping process starting...\n");
                 }
@@ -615,13 +655,18 @@ fn main() -> std::io::Result<()> {
             } else {
                 match cli.demuxer.read() {
                     Ok(mut data) => {
+                        if let Data::Frame(frame) = &mut data {
+                            if let Some(frm) = frame {
+                                frm.ts = pic_icnt as u64;
+                            }
+                        }
                         let start = Instant::now();
                         let ret = ctx.push(&mut data);
                         let duration = start.elapsed();
                         clk_tot += duration.as_millis() as usize;
 
                         match ret {
-                            Ok(_) => pic_cnt += 1,
+                            Ok(_) => pic_icnt += 1,
                             Err(err) => {
                                 eprint!("Encoding error = {:?}\n", err);
                                 break;
@@ -652,13 +697,8 @@ fn main() -> std::io::Result<()> {
                         print_stat(&stat, duration.as_millis() as usize);
                     }
                     if let Some(rec_frame) = stat.rec {
-                        if let Some(rec_muxer) = &mut cli.rec {
-                            rec_muxer.write(
-                                Data::RefFrame(rec_frame),
-                                cli.bitdepth,
-                                Rational::new(cli.enc.time_base.den, cli.enc.time_base.num),
-                            )?;
-                        }
+                        let ts = rec_frame.borrow().ts;
+                        map_rec.insert(ts, Some(rec_frame));
                     }
                     bit_tot += stat.bytes << 3;
 
@@ -668,6 +708,8 @@ fn main() -> std::io::Result<()> {
                         Rational::new(cli.enc.time_base.den, cli.enc.time_base.num),
                     )?;
                 }
+
+                write_rec_frames(&mut cli, &mut map_rec, &mut pic_ocnt)?;
             }
             Err(err) => {
                 if err == EvcError::EVC_OK_NO_MORE_OUTPUT {
@@ -683,7 +725,7 @@ fn main() -> std::io::Result<()> {
     }
 
     if cli.verbose {
-        print_summary(cli.enc.fps, bit_tot, pic_cnt, clk_tot);
+        print_summary(cli.enc.fps, bit_tot, pic_icnt, clk_tot);
     }
 
     Ok(())

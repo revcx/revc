@@ -56,7 +56,7 @@ impl EvceBsw {
         self.leftbits = 32;
         self.pkt = Some(Packet {
             data: Vec::with_capacity(1024), // 1K?
-            pts: 0,
+            ts: 0,
         });
         self.tracer = None;
     }

@@ -446,7 +446,7 @@ pub(crate) struct EvceCtx {
     /* input frame */
     frm: Option<Frame<pel>>,
     /* output packet */
-    pkt: Vec<u8>,
+    pkt: Option<Packet>,
 
     flush: bool,
     /* address of current input picture, ref_picture  buffer structure */
@@ -665,7 +665,7 @@ impl EvceCtx {
             magic: EVCE_MAGIC_CODE,
 
             frm: None,
-            pkt: vec![],
+            pkt: Some(Packet::default()),
 
             flush: false,
             /* address of current input picture, ref_picture  buffer structure */
@@ -867,9 +867,13 @@ impl EvceCtx {
     }
 
     pub(crate) fn pull_pkt(&mut self) -> Result<Rc<RefCell<Packet>>, EvcError> {
-        let data = self.pkt.clone();
-        self.pkt.clear();
-        Ok(Rc::new(RefCell::new(Packet { data, pts: 0 })))
+        let pkt = self.pkt.take();
+        self.pkt = Some(Packet::default());
+        if let Some(data) = pkt {
+            Ok(Rc::new(RefCell::new(data)))
+        } else {
+            Err(EvcError::EVC_ERR_EMPTY_PACKET)
+        }
     }
 
     fn check_frame_delay(&self) -> Result<(), EvcError> {
@@ -1161,8 +1165,10 @@ impl EvceCtx {
         self.bs.write_nalu_size();
 
         /* append bs.pkt to ctx.pkt */
-        if let Some(pkt) = self.bs.pkt.take() {
-            self.pkt.extend_from_slice(&pkt.data);
+        if let Some(bs_pkt) = self.bs.pkt.take() {
+            if let Some(pkt) = &mut self.pkt {
+                pkt.data.extend_from_slice(&bs_pkt.data);
+            }
         }
 
         Ok(())
@@ -1182,28 +1188,23 @@ impl EvceCtx {
         }
 
         /* picture buffer management */
-
-        //let mut refp = self.refp.borrow_mut();
         self.rpm.evc_picman_put_pic(
             pic_curr,
             self.nalu.nal_unit_type == NaluType::EVC_IDR_NUT,
             self.poc.poc_val as u32,
             self.nalu.nuh_temporal_id,
             false,
-            &mut self.refp, // *refp,
+            &mut self.refp,
             self.slice_ref_flag,
             self.ref_pic_gap_length,
         );
 
-        /*
-        imgb_o = PIC_ORIG(ctx)->imgb;
-        evc_assert(imgb_o != NULL);
-
-        imgb_c = PIC_CURR(ctx)->imgb;
-        evc_assert(imgb_c != NULL);*/
-
         /* set stat */
-        stat.bytes = self.pkt.len();
+        stat.bytes = if let Some(pkt) = &self.pkt {
+            pkt.data.len()
+        } else {
+            0
+        };
         stat.nalu_type = if self.slice_type == SliceType::EVC_ST_I {
             NaluType::EVC_IDR_NUT
         } else {
@@ -1226,12 +1227,17 @@ impl EvceCtx {
         //self.param.f_ifrm = 0; /* clear force-IDR flag */ //TODO
         let pico = &mut self.pico_buf[self.pico_idx];
         pico.is_used = false;
-        /*
-                imgb_c->ts[0] = bitb->ts[0] = imgb_o->ts[0];
-                imgb_c->ts[1] = bitb->ts[1] = imgb_o->ts[1];
-                imgb_c->ts[2] = bitb->ts[2] = imgb_o->ts[2];
-                imgb_c->ts[3] = bitb->ts[3] = imgb_o->ts[3];
-        */
+
+        if let (Some(pkt), Some(org), Some(cur)) = (
+            &mut self.pkt,
+            &self.pic[PIC_IDX_ORIG],
+            &self.pic[PIC_IDX_CURR],
+        ) {
+            let (frame_org, frame_cur) = (&org.borrow().frame, &cur.borrow().frame);
+            pkt.ts = frame_org.borrow().ts;
+            frame_cur.borrow_mut().ts = pkt.ts;
+        }
+
         Ok(stat)
     }
 
@@ -1978,14 +1984,11 @@ impl EvceCtx {
         /* write the bitstream size */
         self.bs.write_nalu_size();
 
-        /* set stat ***************************************************************/
-        //evc_mset(stat, 0, sizeof(EVCE_STAT));
-        //stat->write = EVC_BSW_GET_WRITE_BYTE(bs);
-        //stat->nalu_type = EVC_SPS_NUT;
-
         /* append bs.pkt to ctx.pkt */
-        if let Some(pkt) = self.bs.pkt.take() {
-            self.pkt.extend_from_slice(&pkt.data);
+        if let Some(bs_pkt) = self.bs.pkt.take() {
+            if let Some(pkt) = &mut self.pkt {
+                pkt.data.extend_from_slice(&bs_pkt.data);
+            }
         }
     }
 
@@ -2011,14 +2014,11 @@ impl EvceCtx {
         /* write the bitstream size */
         self.bs.write_nalu_size();
 
-        /* set stat ***************************************************************/
-        //evc_mset(stat, 0, sizeof(EVCE_STAT));
-        //stat->write = EVC_BSW_GET_WRITE_BYTE(bs);
-        //stat->nalu_type = EVC_PPS_NUT;
-
         /* append bs.pkt to ctx.pkt */
-        if let Some(pkt) = self.bs.pkt.take() {
-            self.pkt.extend_from_slice(&pkt.data);
+        if let Some(bs_pkt) = self.bs.pkt.take() {
+            if let Some(pkt) = &mut self.pkt {
+                pkt.data.extend_from_slice(&bs_pkt.data);
+            }
         }
     }
 

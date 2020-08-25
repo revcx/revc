@@ -205,6 +205,7 @@ pub fn tile_log2(sz: i32, tgt: i32) -> i32 {
 pub struct Frame<T: Pixel> {
     pub planes: [Plane<T>; N_C],
     pub chroma_sampling: ChromaSampling,
+    pub ts: u64,
     pub crop_l: i16,
     pub crop_r: i16,
     pub crop_t: i16,
@@ -235,6 +236,7 @@ impl<T: Pixel> Frame<T> {
                 ),
             ],
             chroma_sampling,
+            ts: 0,
             crop_l: 0,
             crop_r: 0,
             crop_t: 0,

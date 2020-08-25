@@ -248,12 +248,12 @@ pub enum Data {
 #[derive(Debug, Default)]
 pub struct Packet {
     pub data: Vec<u8>,
-    pub pts: u64,
+    pub ts: u64,
 }
 
 impl fmt::Display for Packet {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Packet {} - {} bytes", self.pts, self.data.len())
+        write!(f, "Packet {} - {} bytes", self.ts, self.data.len())
     }
 }
 
