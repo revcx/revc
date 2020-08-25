@@ -38,32 +38,50 @@ done
 
 for QP in 22 27 32 37
 do
-md5sum -b                     ./tmp/test_ld_p_nodb_q${QP}_etm.yuv | awk '{print $1,"./tmp/test_ld_p_nodb_q'${QP}'_revc.yuv"}' > ./tmp/test_ld_p_nodb_q${QP}.txt
-md5sum -b                     ./tmp/test_ld_b_nodb_q${QP}_etm.yuv | awk '{print $1,"./tmp/test_ld_b_nodb_q'${QP}'_revc.yuv"}' > ./tmp/test_ld_b_nodb_q${QP}.txt
-md5sum -b                     ./tmp/test_ra_b_nodb_q${QP}_etm.yuv | awk '{print $1,"./tmp/test_ra_b_nodb_q'${QP}'_revc.yuv"}' > ./tmp/test_ra_b_nodb_q${QP}.txt
+md5sum -b                     ./tmp/test_ld_p_nodb_q${QP}_etm.yuv | awk '{print $1,"./tmp/test_ld_p_nodb_q'${QP}'_revc.yuv"}' > ./tmp/test_ld_p_nodb_q${QP}_yuv.txt
+md5sum -b                     ./tmp/test_ld_b_nodb_q${QP}_etm.yuv | awk '{print $1,"./tmp/test_ld_b_nodb_q'${QP}'_revc.yuv"}' > ./tmp/test_ld_b_nodb_q${QP}_yuv.txt
+md5sum -b                     ./tmp/test_ra_b_nodb_q${QP}_etm.yuv | awk '{print $1,"./tmp/test_ra_b_nodb_q'${QP}'_revc.yuv"}' > ./tmp/test_ra_b_nodb_q${QP}_yuv.txt
 
-md5sum -b                     ./tmp/test_ld_p_q${QP}_etm.yuv      | awk '{print $1,"./tmp/test_ld_p_q'${QP}'_revc.yuv"}'      > ./tmp/test_ld_p_q${QP}.txt
-md5sum -b                     ./tmp/test_ld_b_q${QP}_etm.yuv      | awk '{print $1,"./tmp/test_ld_b_q'${QP}'_revc.yuv"}'      > ./tmp/test_ld_b_q${QP}.txt
-md5sum -b                     ./tmp/test_ra_b_q${QP}_etm.yuv      | awk '{print $1,"./tmp/test_ra_b_q'${QP}'_revc.yuv"}'      > ./tmp/test_ra_b_q${QP}.txt
+md5sum -b                     ./tmp/test_ld_p_nodb_q${QP}_etm.evc | awk '{print $1,"./tmp/test_ld_p_nodb_q'${QP}'_revc.evc"}' > ./tmp/test_ld_p_nodb_q${QP}_evc.txt
+md5sum -b                     ./tmp/test_ld_b_nodb_q${QP}_etm.evc | awk '{print $1,"./tmp/test_ld_b_nodb_q'${QP}'_revc.evc"}' > ./tmp/test_ld_b_nodb_q${QP}_evc.txt
+md5sum -b                     ./tmp/test_ra_b_nodb_q${QP}_etm.evc | awk '{print $1,"./tmp/test_ra_b_nodb_q'${QP}'_revc.evc"}' > ./tmp/test_ra_b_nodb_q${QP}_evc.txt
+
+md5sum -b                     ./tmp/test_ld_p_q${QP}_etm.yuv      | awk '{print $1,"./tmp/test_ld_p_q'${QP}'_revc.yuv"}'      > ./tmp/test_ld_p_q${QP}_yuv.txt
+md5sum -b                     ./tmp/test_ld_b_q${QP}_etm.yuv      | awk '{print $1,"./tmp/test_ld_b_q'${QP}'_revc.yuv"}'      > ./tmp/test_ld_b_q${QP}_yuv.txt
+md5sum -b                     ./tmp/test_ra_b_q${QP}_etm.yuv      | awk '{print $1,"./tmp/test_ra_b_q'${QP}'_revc.yuv"}'      > ./tmp/test_ra_b_q${QP}_yuv.txt
+
+md5sum -b                     ./tmp/test_ld_p_q${QP}_etm.evc      | awk '{print $1,"./tmp/test_ld_p_q'${QP}'_revc.evc"}'      > ./tmp/test_ld_p_q${QP}_evc.txt
+md5sum -b                     ./tmp/test_ld_b_q${QP}_etm.evc      | awk '{print $1,"./tmp/test_ld_b_q'${QP}'_revc.evc"}'      > ./tmp/test_ld_b_q${QP}_evc.txt
+md5sum -b                     ./tmp/test_ra_b_q${QP}_etm.evc      | awk '{print $1,"./tmp/test_ra_b_q'${QP}'_revc.evc"}'      > ./tmp/test_ra_b_q${QP}_evc.txt
 
 for BFRM in 1 3 7 15
 do
-md5sum -b                     ./tmp/test_ra_b${BFRM}_q${QP}_etm.yuv      | awk '{print $1,"./tmp/test_ra_b'${BFRM}'_q'${QP}'_revc.yuv"}'      > ./tmp/test_ra_b${BFRM}_q${QP}.txt
+md5sum -b                     ./tmp/test_ra_b${BFRM}_q${QP}_etm.yuv      | awk '{print $1,"./tmp/test_ra_b'${BFRM}'_q'${QP}'_revc.yuv"}'      > ./tmp/test_ra_b${BFRM}_q${QP}_yuv.txt
+md5sum -b                     ./tmp/test_ra_b${BFRM}_q${QP}_etm.evc      | awk '{print $1,"./tmp/test_ra_b'${BFRM}'_q'${QP}'_revc.evc"}'      > ./tmp/test_ra_b${BFRM}_q${QP}_evc.txt
 done
 done
 
 for QP in 22 27 32 37
 do
-md5sum -c                    ./tmp/test_ld_p_nodb_q${QP}.txt
-md5sum -c                    ./tmp/test_ld_b_nodb_q${QP}.txt
-md5sum -c                    ./tmp/test_ra_b_nodb_q${QP}.txt
+md5sum -c                    ./tmp/test_ld_p_nodb_q${QP}_yuv.txt
+md5sum -c                    ./tmp/test_ld_b_nodb_q${QP}_yuv.txt
+md5sum -c                    ./tmp/test_ra_b_nodb_q${QP}_yuv.txt
 
-md5sum -c                    ./tmp/test_ld_p_q${QP}.txt
-md5sum -c                    ./tmp/test_ld_b_q${QP}.txt
-md5sum -c                    ./tmp/test_ra_b_q${QP}.txt
+md5sum -c                    ./tmp/test_ld_p_nodb_q${QP}_evc.txt
+md5sum -c                    ./tmp/test_ld_b_nodb_q${QP}_evc.txt
+md5sum -c                    ./tmp/test_ra_b_nodb_q${QP}_evc.txt
+
+md5sum -c                    ./tmp/test_ld_p_q${QP}_yuv.txt
+md5sum -c                    ./tmp/test_ld_b_q${QP}_yuv.txt
+md5sum -c                    ./tmp/test_ra_b_q${QP}_yuv.txt
+
+md5sum -c                    ./tmp/test_ld_p_q${QP}_evc.txt
+md5sum -c                    ./tmp/test_ld_b_q${QP}_evc.txt
+md5sum -c                    ./tmp/test_ra_b_q${QP}_evc.txt
 
 for BFRM in 1 3 7 15
 do
-md5sum -c                    ./tmp/test_ra_b${BFRM}_q${QP}.txt
+md5sum -c                    ./tmp/test_ra_b${BFRM}_q${QP}_yuv.txt
+md5sum -c                    ./tmp/test_ra_b${BFRM}_q${QP}_evc.txt
 done
 done
