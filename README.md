@@ -16,7 +16,7 @@ The fastest and safest EVC encoder and decoder
 
 ## Overview
 MPEG-5 Essential Video Coding (EVC) baseline profile is royalty-free. It includes only technologies that are more than 20 years old or that were submitted with a royalty-free declaration. 
-Compared to H.264/AVC High Profile (JM19.0), MPEG-5 EVC (ETM baseline) provides about 30% BD-rate reduction with reduced encoding computation complexity and comparable decoding computation complexity.
+Compared to H.264/AVC High Profile (JM19.0), MPEG-5 EVC Baseline Profile (ETM 6.1) provides about 30% BD-rate reduction with reduced encoding computation complexity and comparable decoding computation complexity.
 
 REVC is a Rust-based EVC (baseline) video codec implementation.
 
