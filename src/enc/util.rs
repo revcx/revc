@@ -355,3 +355,33 @@ pub(crate) fn dist_nofilt(
 
     dist_nofilt
 }
+
+pub(crate) fn calc_psnr(
+    w: u16,
+    h: u16,
+    d: usize,
+    org: &PlaneRegion<'_, pel>,
+    rec: &PlaneRegion<'_, pel>,
+) -> f64 {
+    let mut sum = 0i64;
+    for y in 0..h as usize {
+        for x in 0..w as usize {
+            let diff = if d == 10 {
+                org[y][x] as i64 - rec[y][x] as i64
+            } else {
+                ((org[y][x] + 2) >> 2) as i64 - ((rec[y][x] + 2) >> 2) as i64
+            };
+            sum += diff * diff;
+        }
+    }
+    if sum == 0 {
+        100.0
+    } else {
+        let mse = sum as f64 / (w * h) as f64;
+        if d == 10 {
+            10.0 * ((255.0 * 255.0 * 16.0) / mse).log10()
+        } else {
+            10.0 * ((255.0 * 255.0) / mse).log10()
+        }
+    }
+}

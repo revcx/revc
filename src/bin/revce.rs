@@ -545,10 +545,17 @@ fn print_stat(stat: &EvcStat, duration: usize) {
         SliceType::EVC_ST_B => 'B',
         _ => 'U',
     };
-    eprint!(
-        "{:<7}{:<5}({})     {:<5}{:<10.4}{:<10.4}{:<10.4}{:<10}{:<10}",
-        stat.poc, stat.tid, stype, stat.qp, 0.0, 0.0, 0.0, stat.bytes, duration
-    );
+    if let Some(psnr) = &stat.psnr {
+        eprint!(
+            "{:<7}{:<5}({})     {:<5}{:<10.4}{:<10.4}{:<10.4}{:<10}{:<10}",
+            stat.poc, stat.tid, stype, stat.qp, psnr[0], psnr[1], psnr[2], stat.bytes, duration
+        );
+    } else {
+        eprint!(
+            "{:<7}{:<5}({})     {:<5}{:<10.4}{:<10.4}{:<10.4}{:<10}{:<10}",
+            stat.poc, stat.tid, stype, stat.qp, 0.0, 0.0, 0.0, stat.bytes, duration
+        );
+    }
     for i in 0..2 {
         eprint!("[L{} ", i);
         for j in 0..stat.refpic_num[i] as usize {
@@ -559,31 +566,31 @@ fn print_stat(stat: &EvcStat, duration: usize) {
     eprint!("\n");
 }
 
-fn print_summary(fps: u64, bit_tot: usize, pic_cnt: usize, clk_tot: usize) {
+fn print_summary(fps: u64, byte_tot: usize, pic_cnt: usize, clk_tot: usize, psnr_tot: &[f64]) {
     eprint!(
         "=======================================================================================\n"
     );
-    eprint!("  PSNR Y(dB)       : {:<5.4}\n", 0.0);
-    eprint!("  PSNR U(dB)       : {:<5.4}\n", 0.0);
-    eprint!("  PSNR V(dB)       : {:<5.4}\n", 0.0);
-    eprint!("  Total bits(bits) : {:<.0}\n", bit_tot);
+    eprint!("  Total bytes   : {:<.0}\n", byte_tot);
     if pic_cnt > 0 {
-        let bitrate = (bit_tot * fps as usize) as f32 / (pic_cnt * 1000) as f32;
-        eprint!("  bitrate(kbps)    : {:<5.4}\n", bitrate);
+        let bitrate = (byte_tot * 8 * fps as usize) as f32 / (pic_cnt * 1000) as f32;
+        eprint!("  Bitrate(kbps) : {:<5.3}\n", bitrate);
+        eprint!("  PSNR Y(dB)    : {:<5.4}\n", psnr_tot[0] / pic_cnt as f64);
+        eprint!("  PSNR U(dB)    : {:<5.4}\n", psnr_tot[1] / pic_cnt as f64);
+        eprint!("  PSNR V(dB)    : {:<5.4}\n", psnr_tot[2] / pic_cnt as f64);
         eprint!(
             "=======================================================================================\n"
         );
-        eprint!("Encoded frame count               = {}\n", pic_cnt);
+        eprint!("Encoded frame count             = {}\n", pic_cnt);
 
-        eprint!("Total encoding time               = {} msec,", clk_tot);
+        eprint!("Total encoding time             = {} msec,", clk_tot);
         eprint!(" {:.3} sec\n", clk_tot as f32 / 1000.0);
 
         eprint!(
-            "Average encoding time for a frame = {} msec\n",
+            "Average encoding time per frame = {} msec\n",
             clk_tot / pic_cnt
         );
         eprint!(
-            "Average encoding speed            = {:.3} frames/sec\n",
+            "Average encoding speed          = {:.3} frames/sec\n",
             pic_cnt as f32 * 1000.0 / (clk_tot as f32)
         );
     }
@@ -636,10 +643,11 @@ fn main() -> std::io::Result<()> {
         };
     }
 
-    let mut bit_tot = 0;
+    let mut byte_tot = 0;
     let mut clk_tot = 0;
     let mut pic_icnt = 0;
     let mut pic_ocnt = 0;
+    let mut psnr_tot = [0.0; 3];
     let mut map_rec = BTreeMap::new();
 
     let mut state = EvceState::STATE_ENCODING;
@@ -700,7 +708,12 @@ fn main() -> std::io::Result<()> {
                         let ts = rec_frame.borrow().ts;
                         map_rec.insert(ts, Some(rec_frame));
                     }
-                    bit_tot += stat.bytes << 3;
+                    byte_tot += stat.bytes;
+                    if let Some(psnr) = &stat.psnr {
+                        psnr_tot[0] += psnr[0];
+                        psnr_tot[1] += psnr[1];
+                        psnr_tot[2] += psnr[2];
+                    }
 
                     cli.muxer.write(
                         data,
@@ -725,7 +738,7 @@ fn main() -> std::io::Result<()> {
     }
 
     if cli.verbose {
-        print_summary(cli.enc.fps, bit_tot, pic_icnt, clk_tot);
+        print_summary(cli.enc.fps, byte_tot, pic_icnt, clk_tot, &psnr_tot);
     }
 
     Ok(())

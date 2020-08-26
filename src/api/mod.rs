@@ -193,6 +193,7 @@ pub struct EvcStat {
     /* quantization parameter used for encoding */
     pub qp: u8,
     pub rec: Option<Rc<RefCell<Frame<pel>>>>,
+    pub psnr: Option<[f64; N_C]>,
 }
 
 pub const MAX_NUM_REF_PICS: usize = 21;

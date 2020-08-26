@@ -32,6 +32,7 @@ use util::*;
 use crate::tracer::{Tracer, OPEN_TRACE};
 use std::cell::RefCell;
 use std::rc::Rc;
+use thiserror::private::DisplayAsDisplay;
 
 /* support RDOQ */
 pub(crate) const SCALE_BITS: usize = 15; /* Inherited from TMuC, pressumably for fractional bit estimates in RDOQ */
@@ -1234,8 +1235,38 @@ impl EvceCtx {
             &self.pic[PIC_IDX_CURR],
         ) {
             let (frame_org, frame_cur) = (&org.borrow().frame, &cur.borrow().frame);
-            pkt.ts = frame_org.borrow().ts;
-            frame_cur.borrow_mut().ts = pkt.ts;
+            {
+                pkt.ts = frame_org.borrow().ts;
+                frame_cur.borrow_mut().ts = pkt.ts;
+            }
+
+            {
+                let (planes_org, planes_cur) =
+                    (&frame_org.borrow().planes, &frame_cur.borrow().planes);
+                stat.psnr = Some([
+                    calc_psnr(
+                        self.w,
+                        self.h,
+                        self.param.bit_depth,
+                        &planes_org[Y_C].as_region(),
+                        &planes_cur[Y_C].as_region(),
+                    ),
+                    calc_psnr(
+                        self.w >> 1,
+                        self.h >> 1,
+                        self.param.bit_depth,
+                        &planes_org[U_C].as_region(),
+                        &planes_cur[U_C].as_region(),
+                    ),
+                    calc_psnr(
+                        self.w >> 1,
+                        self.h >> 1,
+                        self.param.bit_depth,
+                        &planes_org[V_C].as_region(),
+                        &planes_cur[V_C].as_region(),
+                    ),
+                ]);
+            }
         }
 
         Ok(stat)
