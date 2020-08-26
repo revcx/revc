@@ -2,9 +2,46 @@
 
 The fastest and safest EVC encoder and decoder
 
-# Roadmap
+<details>
+<summary><b>Table of Content</b></summary>
 
-- [ ] 0.1 Translation:
+- [Overview](#overview)
+- [Features](#features)
+- [Roadmap](#roadmap)
+- [Usage](#usage)
+  - [Compressing video](#compressing-video)
+  - [Decompressing video](#decompressing-video)
+- [Contributing](#contributing)
+</details>
+
+## Overview
+MPEG-5 Essential Video Coding (EVC) baseline profile is royalty-free, 
+which includes only technologies that are more than 20 years old or that were submitted with a royalty-free declaration. 
+Compared to H.264/AVC (JM19.0), MPEG-5 EVC (ETM baseline) provides about 30% BD-rate reduction with comparable computation complexity.
+
+REVC is a Rust-based EVC (baseline) video codec implementation.
+
+## Features
+* Coding Structure
+  * Quad-tree based coding structure up to 64x64 block size
+* Intra Prediction
+  * DC, horizontal (H), vertical (V), diagonal left (DL), diagonal right (DR) for intra prediction
+* Inter Prediction
+  * Un-directional and Bi-directional inter prediction
+  * Temporal direct mode
+  * Three spatial neighbouring motion vectors and one temporally co-located motion vector
+  * 1/2 and 1/4-pel interpolation
+* Transform and Quantization
+  * 4x4 to 64x64 DCT
+  * QP range: 0 to 51
+  * Run/level symbols with zig-zag scan
+* Loop Filter
+  * Deblocking filter in H.263 Annex J
+* Entropy Coding
+  * Binary arithmetic coding scheme in JPEG Annex D
+
+## Roadmap
+- [x] 0.1 Translation:
   - [x] Translate ETM baseline decoder from C to Rust
   - [x] Translate ETM baseline encoder from C to Rust		 
 - [ ] 0.2 Optimization:
@@ -21,15 +58,22 @@ The fastest and safest EVC encoder and decoder
   - [ ] practical usecases: RTC, Live Streaming, VOD, etc
 
 
-# Usage
+## Usage
+### Compressing video
+Input videos can be in raw yuv (I420) format or [y4m format](https://wiki.multimedia.cx/index.php/YUV4MPEG2). The monochrome color format is not supported yet.
 
-* run encoder without trace
-  * cargo run run --bin revce -- -i tools/foreman_qcif8.yuv -w 176 -h 144 -z 30 -f 8 -q 27 -r tools/tmp/rec.yuv --keyint 8 --ref_pic_gap_length 8 --skip 0 --disable_dbf --inter_slice_type 1 -o tools/tmp/test.evc -v
-* run encoder with trace
-  * cargo run --bin revce --features "trace,trace_coef,trace_resi,trace_reco,trace_cudata" -- -i tools/foreman_qcif8.yuv -w 176 -h 144 -z 30 -f 8 -q 27 -r tools/tmp/rec.yuv --keyint 8 --ref_pic_gap_length 8 --skip 0 --disable_dbf --inter_slice_type 1 -o tools/tmp/test.evc -v
-* run decoder without trace
-  * cargo run --bin revcd -- -i test_ld_p.evc -o test.yuv -v
-* run decoder with trace
-  * cargo run --features "trace,trace_resi,trace_pred,trace_reco,trace_dbf" --bin revcd -- -i test_ld_p.evc -o test.yuv -v
+```sh
+cargo run --release --bin revce -- -i tools/foreman_qcif8.yuv -w 176 -h 144 -z 30 -f 8 -q 27 -r tools/tmp/rec.yuv --keyint 8 --ref_pic_gap_length 8 --skip 0 --disable_dbf --inter_slice_type 1 -o tools/tmp/test_ld_p.evc -v
+cargo run --release --bin revce -- -i tools/foreman_qcif8.y4m                          -q 27 -r tools/tmp/rec.y4m --keyint 8 --ref_pic_gap_length 8 --skip 0               --inter_slice_type 0 -o tools/tmp/test_ld_b.evc -v
+```
 
+### Decompressing video
+Decoder only supports MPEG-5 EVC baseline profile. Output videos can be in raw yuv (I420) format or [y4m format](https://wiki.multimedia.cx/index.php/YUV4MPEG2)
 
+```sh
+cargo run --release --bin revcd -- -i tools/tmp/test_ld_p.evc -o tools/tmp/test.yuv -v
+cargo run --release --bin revcd -- -i tools/tmp/test_ld_b.evc -o tools/tmp/test.y4m -v
+```
+
+## Contributing
+Contributors or Pull Requests are Welcome!!!
