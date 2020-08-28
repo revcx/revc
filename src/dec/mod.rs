@@ -361,13 +361,7 @@ impl EvcdCtx {
         self.map_cu_mode = vec![MCU::default(); self.f_scu as usize];
 
         /* alloc map for CU split flag */
-        self.map_split = vec![
-            LcuSplitMode::default();
-            self.f_lcu as usize
-                * NUM_CU_DEPTH
-                * BlockShape::NUM_BLOCK_SHAPE as usize
-                * MAX_CU_CNT_IN_LCU
-        ];
+        self.map_split = vec![LcuSplitMode::default(); self.f_lcu as usize];
 
         /* alloc map for intra prediction mode */
         self.map_ipm = vec![IntraPredDir::default(); self.f_scu as usize];
