@@ -1,4 +1,5 @@
 use super::def::*;
+use super::hawktracer::*;
 use super::picman::*;
 use super::region::*;
 use super::util::*;
@@ -562,6 +563,7 @@ fn evc_mc_c_nn(
     }
 }
 
+#[hawktracer(evc_mc_l)]
 pub(crate) fn evc_mc_l(
     ori_mv_x: i16,
     ori_mv_y: i16,
@@ -579,6 +581,7 @@ pub(crate) fn evc_mc_l(
     evc_tbl_mc_l[x][y](r, gmv_x, gmv_y, pred, cuw, cuh)
 }
 
+#[hawktracer(evc_mc_c)]
 fn evc_mc_c(
     ori_mv_x: i16,
     ori_mv_y: i16,
@@ -604,6 +607,7 @@ fn evc_mc_c(
     evc_tbl_mc_c[x][y](r, gmv_x, gmv_y, pred, cuw, cuh)
 }
 
+#[hawktracer(evc_mc)]
 pub(crate) fn evc_mc(
     x: i16,
     y: i16,

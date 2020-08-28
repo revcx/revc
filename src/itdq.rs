@@ -1,4 +1,5 @@
 use super::def::*;
+use super::hawktracer::*;
 use super::tbl::*;
 use super::tracer::*;
 use super::util::*;
@@ -37,6 +38,7 @@ fn ITX_CLIP_32(x: i64) -> i32 {
     }
 }
 
+#[hawktracer(evc_sub_block_itdq)]
 pub(crate) fn evc_sub_block_itdq(
     tracer: &mut Option<Tracer>,
     coef: &mut Vec<Vec<i16>>, //[[i16; MAX_CU_DIM]],
@@ -73,6 +75,7 @@ pub(crate) fn evc_sub_block_itdq(
     }
 }
 
+#[hawktracer(evc_dquant)]
 fn evc_dquant(coef: &mut [i16], log2_w: usize, log2_h: usize, scale: i32, offset: i32, shift: u8) {
     let ns_scale: i64 = if (log2_w + log2_h) & 1 != 0 { 181 } else { 1 };
     for i in 0..1 << (log2_w + log2_h) {
@@ -81,6 +84,7 @@ fn evc_dquant(coef: &mut [i16], log2_w: usize, log2_h: usize, scale: i32, offset
     }
 }
 
+#[hawktracer(itx_pb2b0)]
 fn itx_pb2b0(src: &[i16], dst: &mut [i32], shift: usize, line: usize) {
     let add = if shift == 0 {
         0
@@ -97,6 +101,7 @@ fn itx_pb2b0(src: &[i16], dst: &mut [i32], shift: usize, line: usize) {
     }
 }
 
+#[hawktracer(itx_pb4b0)]
 fn itx_pb4b0(src: &[i16], dst: &mut [i32], shift: usize, line: usize) {
     let add = if shift == 0 {
         0
@@ -120,6 +125,8 @@ fn itx_pb4b0(src: &[i16], dst: &mut [i32], shift: usize, line: usize) {
         dst[j * 4 + 3] = ITX_CLIP_32((E0 - O0 + add) >> shift as i64);
     }
 }
+
+#[hawktracer(itx_pb8b0)]
 fn itx_pb8b0(src: &[i16], dst: &mut [i32], shift: usize, line: usize) {
     let add = if shift == 0 {
         0
@@ -159,6 +166,8 @@ fn itx_pb8b0(src: &[i16], dst: &mut [i32], shift: usize, line: usize) {
         }
     }
 }
+
+#[hawktracer(itx_pb16b0)]
 fn itx_pb16b0(src: &[i16], dst: &mut [i32], shift: usize, line: usize) {
     let add = if shift == 0 {
         0
@@ -217,6 +226,8 @@ fn itx_pb16b0(src: &[i16], dst: &mut [i32], shift: usize, line: usize) {
         }
     }
 }
+
+#[hawktracer(itx_pb32b0)]
 fn itx_pb32b0(src: &[i16], dst: &mut [i32], shift: usize, line: usize) {
     let add = if shift == 0 {
         0
@@ -298,6 +309,8 @@ fn itx_pb32b0(src: &[i16], dst: &mut [i32], shift: usize, line: usize) {
         }
     }
 }
+
+#[hawktracer(itx_pb64b0)]
 fn itx_pb64b0(src: &[i16], dst: &mut [i32], shift: usize, line: usize) {
     let add = if shift == 0 {
         0
@@ -419,6 +432,7 @@ fn itx_pb64b0(src: &[i16], dst: &mut [i32], shift: usize, line: usize) {
     }
 }
 
+#[hawktracer(itx_pb2b1)]
 fn itx_pb2b1(src: &[i32], dst: &mut [i16], shift: usize, line: usize) {
     let add = if shift == 0 {
         0
@@ -434,6 +448,8 @@ fn itx_pb2b1(src: &[i32], dst: &mut [i16], shift: usize, line: usize) {
         dst[j * 2 + 1] = ITX_CLIP((evc_tbl_tm2[1][0] as i64 * O + add) >> shift as i64);
     }
 }
+
+#[hawktracer(itx_pb4b1)]
 fn itx_pb4b1(src: &[i32], dst: &mut [i16], shift: usize, line: usize) {
     let add = if shift == 0 {
         0
@@ -457,6 +473,8 @@ fn itx_pb4b1(src: &[i32], dst: &mut [i16], shift: usize, line: usize) {
         dst[j * 4 + 3] = ITX_CLIP((E0 - O0 + add) >> shift as i64);
     }
 }
+
+#[hawktracer(itx_pb8b1)]
 fn itx_pb8b1(src: &[i32], dst: &mut [i16], shift: usize, line: usize) {
     let add = if shift == 0 {
         0
@@ -496,6 +514,8 @@ fn itx_pb8b1(src: &[i32], dst: &mut [i16], shift: usize, line: usize) {
         }
     }
 }
+
+#[hawktracer(itx_pb16b1)]
 fn itx_pb16b1(src: &[i32], dst: &mut [i16], shift: usize, line: usize) {
     let add = if shift == 0 {
         0
@@ -554,6 +574,8 @@ fn itx_pb16b1(src: &[i32], dst: &mut [i16], shift: usize, line: usize) {
         }
     }
 }
+
+#[hawktracer(itx_pb32b1)]
 fn itx_pb32b1(src: &[i32], dst: &mut [i16], shift: usize, line: usize) {
     let add = if shift == 0 {
         0
@@ -635,6 +657,8 @@ fn itx_pb32b1(src: &[i32], dst: &mut [i16], shift: usize, line: usize) {
         }
     }
 }
+
+#[hawktracer(itx_pb64b1)]
 fn itx_pb64b1(src: &[i32], dst: &mut [i16], shift: usize, line: usize) {
     let add = if shift == 0 {
         0
@@ -766,12 +790,14 @@ static tbl_itxb1: [EVC_ITXB1; MAX_TR_LOG2] = [
     itx_pb2b1, itx_pb4b1, itx_pb8b1, itx_pb16b1, itx_pb32b1, itx_pb64b1,
 ];
 
+#[hawktracer(evc_itrans)]
 fn evc_itrans(coef: &mut [i16], log2_cuw: usize, log2_cuh: usize) {
     let mut tb = [0i32; MAX_TR_DIM]; /* temp buffer */
     tbl_itxb0[log2_cuh - 1](coef, &mut tb, 0, 1 << log2_cuw);
     tbl_itxb1[log2_cuw - 1](&tb, coef, (ITX_SHIFT1 + ITX_SHIFT2), 1 << log2_cuh);
 }
 
+#[hawktracer(evc_itdq)]
 fn evc_itdq(coef: &mut [i16], log2_w: usize, log2_h: usize, scale: i32) {
     let log2_size = (log2_w + log2_h) >> 1;
     let ns_shift = if (log2_w + log2_h) & 1 != 0 { 8 } else { 0 };

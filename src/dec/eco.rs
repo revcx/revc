@@ -3,12 +3,14 @@ use super::sbac::EvcdSbac;
 use super::{EvcdCore, EvcdCtx};
 use crate::api::{EvcError, NaluType, SliceType};
 use crate::def::*;
+use crate::hawktracer::*;
 use crate::tbl::*;
 use crate::tracer::*;
 use crate::util::*;
 
 use log::*;
 
+#[hawktracer(evcd_eco_nalu)]
 pub(crate) fn evcd_eco_nalu(bs: &mut EvcdBsr, nalu: &mut EvcNalu) -> Result<(), EvcError> {
     //nalu->nal_unit_size = bs.read(32);
     nalu.forbidden_zero_bit = bs.read(1, Some("nalu->forbidden_zero_bit"))? as u8;
@@ -37,6 +39,7 @@ pub(crate) fn evcd_eco_nalu(bs: &mut EvcdBsr, nalu: &mut EvcNalu) -> Result<(), 
     Ok(())
 }
 
+#[hawktracer(evcd_eco_sps)]
 pub(crate) fn evcd_eco_sps(bs: &mut EvcdBsr, sps: &mut EvcSps) -> Result<(), EvcError> {
     EVC_TRACE(&mut bs.tracer, "***********************************\n");
     EVC_TRACE(&mut bs.tracer, "************ SPS Start ************\n");
@@ -130,6 +133,7 @@ pub(crate) fn evcd_eco_sps(bs: &mut EvcdBsr, sps: &mut EvcSps) -> Result<(), Evc
     Ok(())
 }
 
+#[hawktracer(evcd_eco_pps)]
 pub(crate) fn evcd_eco_pps(
     bs: &mut EvcdBsr,
     sps: &EvcSps,
@@ -175,6 +179,7 @@ pub(crate) fn evcd_eco_pps(
     Ok(())
 }
 
+#[hawktracer(evcd_eco_sh)]
 pub(crate) fn evcd_eco_sh(
     bs: &mut EvcdBsr,
     sps: &EvcSps,

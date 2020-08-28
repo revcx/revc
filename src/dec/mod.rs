@@ -420,6 +420,7 @@ impl EvcdCtx {
         }
     }
 
+    #[hawktracer(update_core_loc_param)]
     fn update_core_loc_param(&mut self) {
         self.core.x_pel = self.core.x_lcu << self.log2_max_cuwh as u16; // entry point's x location in pixel
         self.core.y_pel = self.core.y_lcu << self.log2_max_cuwh as u16; // entry point's y location in pixel
@@ -428,6 +429,7 @@ impl EvcdCtx {
         self.core.lcu_num = self.core.x_lcu + self.core.y_lcu * self.w_lcu; // Init the first lcu_num in tile
     }
 
+    #[hawktracer(evcd_set_dec_info)]
     fn evcd_set_dec_info(&mut self) {
         let w_scu = self.w_scu as usize;
         let scup = self.core.scup as usize;
@@ -484,6 +486,7 @@ impl EvcdCtx {
         }
     }
 
+    #[hawktracer(evcd_eco_coef)]
     fn evcd_eco_coef(&mut self) -> Result<(), EvcError> {
         let core = &mut self.core;
         let bs = &mut self.bs;
@@ -577,6 +580,7 @@ impl EvcdCtx {
         Ok(())
     }
 
+    #[hawktracer(evcd_eco_cu)]
     fn evcd_eco_cu(&mut self) -> Result<(), EvcError> {
         let core = &mut self.core;
         let bs = &mut self.bs;
@@ -724,6 +728,7 @@ impl EvcdCtx {
         Ok(())
     }
 
+    #[hawktracer(evcd_itdq)]
     fn evcd_itdq(&mut self) {
         let mut core = &mut self.core;
         evc_sub_block_itdq(
@@ -738,6 +743,7 @@ impl EvcdCtx {
         );
     }
 
+    #[hawktracer(get_nbr_yuv)]
     fn get_nbr_yuv(&mut self, mut x: u16, mut y: u16, mut cuw: u8, mut cuh: u8) {
         let constrained_intra_flag =
             self.core.pred_mode == PredMode::MODE_INTRA && self.pps.constrained_intra_pred_flag;
@@ -807,6 +813,7 @@ impl EvcdCtx {
         }
     }
 
+    #[hawktracer(evcd_get_skip_motion)]
     fn evcd_get_skip_motion(&mut self, cuw: u8, cuh: u8) {
         let mut srefi = [[0i8; MAX_NUM_MVP]; REFP_NUM];
         let mut smvp = [[[0i16; MV_D]; MAX_NUM_MVP]; REFP_NUM];
@@ -856,6 +863,7 @@ impl EvcdCtx {
         }
     }
 
+    #[hawktracer(evcd_get_inter_motion)]
     fn evcd_get_inter_motion(&mut self, cuw: u8, cuh: u8) {
         let mut mvp = [[0i16; MV_D]; MAX_NUM_MVP];
         let mut refi = [0i8; MAX_NUM_MVP];
@@ -890,6 +898,7 @@ impl EvcdCtx {
         }
     }
 
+    #[hawktracer(evcd_eco_unit)]
     fn evcd_eco_unit(
         &mut self,
         x: u16,
@@ -1097,6 +1106,7 @@ impl EvcdCtx {
         Ok(())
     }
 
+    #[hawktracer(evcd_eco_tree)]
     fn evcd_eco_tree(
         &mut self,
         x0: u16,
@@ -1338,6 +1348,7 @@ impl EvcdCtx {
         Ok(())
     }
 
+    #[hawktracer(make_stat)]
     fn make_stat(&mut self, btype: NaluType) -> EvcStat {
         let mut stat = EvcStat {
             nalu_type: btype,
@@ -1367,6 +1378,7 @@ impl EvcdCtx {
         stat
     }
 
+    #[hawktracer(deblock_tree)]
     fn deblock_tree(
         &mut self,
         x: u16,
@@ -1618,11 +1630,13 @@ impl EvcdCtx {
         Ok(())
     }
 
+    #[hawktracer(push_pkt)]
     pub(crate) fn push_pkt(&mut self, pkt: &mut Option<Packet>) -> Result<(), EvcError> {
         self.pkt = pkt.take();
         Ok(())
     }
 
+    #[hawktracer(decode_nalu)]
     pub(crate) fn decode_nalu(&mut self) -> Result<EvcStat, EvcError> {
         if self.pkt.is_none() {
             return Err(EvcError::EVC_OK_FLUSH);
@@ -1743,6 +1757,7 @@ impl EvcdCtx {
         Ok(stat)
     }
 
+    #[hawktracer(pull_frm)]
     pub(crate) fn pull_frm(&mut self) -> Result<Rc<RefCell<Frame<pel>>>, EvcError> {
         let pic = self.dpm.as_mut().unwrap().evc_picman_out_pic()?;
         if let Some(p) = &pic {
