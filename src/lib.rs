@@ -23,3 +23,13 @@ mod region;
 mod tbl;
 mod tracer;
 mod util;
+
+mod hawktracer {
+    cfg_if::cfg_if! {
+      if #[cfg(feature="profile")] {
+        pub use rust_hawktracer::*;
+      } else {
+        pub use noop_proc_macro::hawktracer;
+      }
+    }
+}

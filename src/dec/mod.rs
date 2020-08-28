@@ -2,6 +2,7 @@ use super::api::frame::*;
 use super::api::*;
 use super::def::*;
 use super::df::*;
+use super::hawktracer::*;
 use super::ipred::*;
 use super::itdq::*;
 use super::mc::*;
@@ -327,6 +328,7 @@ impl EvcdCtx {
         }
     }
 
+    #[hawktracer(sequence_init)]
     fn sequence_init(&mut self) -> Result<(), EvcError> {
         if self.sps.pic_width_in_luma_samples != self.w
             || self.sps.pic_height_in_luma_samples != self.h
@@ -397,6 +399,7 @@ impl EvcdCtx {
         Ok(())
     }
 
+    #[hawktracer(slice_init)]
     fn slice_init(&mut self) {
         self.core.lcu_num = 0;
         self.core.x_lcu = 0;
@@ -1278,6 +1281,7 @@ impl EvcdCtx {
         Ok(())
     }
 
+    #[hawktracer(decode_slice)]
     fn decode_slice(&mut self) -> Result<(), EvcError> {
         // Initialize CABAC at each tile
         self.sbac_dec.reset(
@@ -1548,6 +1552,7 @@ impl EvcdCtx {
         self.core.tree_cons.mode_cons = tree_cons.mode_cons;
     }
 
+    #[hawktracer(evcd_deblock)]
     fn evcd_deblock(&mut self) -> Result<(), EvcError> {
         if let Some(pic) = &self.pic {
             let mut p = pic.borrow_mut();

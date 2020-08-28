@@ -62,17 +62,27 @@ REVC is a Rust-based EVC (baseline) video codec implementation.
 Input videos can be in raw yuv (I420) format or [y4m format](https://wiki.multimedia.cx/index.php/YUV4MPEG2). The monochrome color format is not supported yet.
 
 ```sh
-cargo run --release --bin revce -- -i tools/foreman_qcif8.yuv -w 176 -h 144 -z 30 -f 8 -q 27 -r tools/tmp/rec.yuv --keyint 8 --ref_pic_gap_length 8 --skip 0 --disable_dbf --inter_slice_type 1 -o tools/tmp/test_ld_p.evc -v
-cargo run --release --bin revce -- -i tools/foreman_qcif8.y4m                     -f 8 -q 27 -r tools/tmp/rec.y4m --keyint 8 --ref_pic_gap_length 8 --skip 0               --inter_slice_type 0 -o tools/tmp/test_ld_b.evc -v
+cargo run --release --bin revce -- -i scripts/foreman_qcif8.yuv -w 176 -h 144 -z 30 -f 8 -q 27 -r scripts/tmp/rec.yuv --keyint 8 --ref_pic_gap_length 8 --skip 0 --disable_dbf --inter_slice_type 1 -o scripts/tmp/test_ld_p.evc -v
+cargo run --release --bin revce -- -i scripts/foreman_qcif8.y4m                     -f 8 -q 27 -r scripts/tmp/rec.y4m --keyint 8 --ref_pic_gap_length 8 --skip 0               --inter_slice_type 0 -o scripts/tmp/test_ld_b.evc -v
 ```
 
 ### Decompressing video
 Decoder only supports MPEG-5 EVC baseline profile. Output videos can be in raw yuv (I420) format or [y4m format](https://wiki.multimedia.cx/index.php/YUV4MPEG2)
 
 ```sh
-cargo run --release --bin revcd -- -i tools/tmp/test_ld_p.evc -o tools/tmp/test.yuv -v
-cargo run --release --bin revcd -- -i tools/tmp/test_ld_b.evc -o tools/tmp/test.y4m -v
+cargo run --release --bin revcd -- -i scripts/tmp/test_ld_p.evc -o scripts/tmp/test.yuv -v
+cargo run --release --bin revcd -- -i scripts/tmp/test_ld_b.evc -o scripts/tmp/test.y4m -v
 ```
+
+## Profiling
+
+```sh
+cargo run --features profile --bin revcd -- -i scripts/data/test_ra_b3_q37.evc -o scripts/tmp/output.y4m
+hawktracer-converter-rs --source dec_profile.bin --output-file dec_profile.json
+```
+
+Open Chrome with chrome://tracing/, load dec_profile.json for visualization.
+
 
 ## Contributing
 Contributors or Pull Requests are Welcome!!!
