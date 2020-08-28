@@ -59,8 +59,8 @@ pub(crate) const MAX_CU_LOG2: usize = 6; // baseline: 64x64
 pub(crate) const MIN_CU_LOG2: usize = 2;
 pub(crate) const MAX_CU_SIZE: usize = (1 << MAX_CU_LOG2);
 pub(crate) const MIN_CU_SIZE: usize = (1 << MIN_CU_LOG2);
-pub(crate) const MAX_CU_DIM: usize = (MAX_CU_SIZE * MAX_CU_SIZE);
-pub(crate) const MIN_CU_DIM: usize = (MIN_CU_SIZE * MIN_CU_SIZE);
+pub(crate) const MAX_CU_DIM: usize = (1 << (MAX_CU_LOG2 + MAX_CU_LOG2));
+pub(crate) const MIN_CU_DIM: usize = (1 << (MIN_CU_LOG2 + MIN_CU_LOG2));
 pub(crate) const MAX_CU_DEPTH: usize = 9; /* 64x64 ~ 4x4 */
 pub(crate) const NUM_CU_DEPTH: usize = (MAX_CU_DEPTH + 1);
 
@@ -68,8 +68,8 @@ pub(crate) const MAX_TR_LOG2: usize = 6; /* 64x64 */
 pub(crate) const MIN_TR_LOG2: usize = 1; /* 2x2 */
 pub(crate) const MAX_TR_SIZE: usize = (1 << MAX_TR_LOG2);
 pub(crate) const MIN_TR_SIZE: usize = (1 << MIN_TR_LOG2);
-pub(crate) const MAX_TR_DIM: usize = (MAX_TR_SIZE * MAX_TR_SIZE);
-pub(crate) const MIN_TR_DIM: usize = (MIN_TR_SIZE * MIN_TR_SIZE);
+pub(crate) const MAX_TR_DIM: usize = (1 << (MAX_TR_LOG2 + MAX_TR_LOG2));
+pub(crate) const MIN_TR_DIM: usize = (1 << (MIN_TR_LOG2 + MIN_TR_LOG2));
 
 pub(crate) const MAX_BEF_DATA_NUM: usize = (NUM_NEIB << 1);
 

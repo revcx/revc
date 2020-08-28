@@ -185,7 +185,7 @@ fn main() -> std::io::Result<()> {
 
     let mut ctx = Context::new(&cfg);
 
-    let mut pic_cnt: usize = 0;
+    let mut pic_ocnt: usize = 0;
     let mut clk_tot = 0;
     let mut bs_cnt = 0;
     let mut w = 0;
@@ -194,38 +194,34 @@ fn main() -> std::io::Result<()> {
     let mut state = EvcdState::STATE_DECODING;
 
     loop {
-        if state == EvcdState::STATE_DECODING {
-            if cli.frames != 0 && pic_cnt == cli.frames {
-                if cli.verbose {
-                    eprint!("bumping process starting...\n");
-                }
-                state = EvcdState::STATE_BUMPING;
-                continue;
-            } else {
-                match cli.demuxer.read() {
-                    Ok(mut data) => {
-                        let start = Instant::now();
-                        let ret = ctx.push(&mut data);
-                        let duration = start.elapsed();
-                        clk_tot += duration.as_millis() as usize;
+        if cli.frames != 0 && pic_ocnt == cli.frames {
+            break;
+        }
 
-                        match ret {
-                            Ok(_) => {}
-                            Err(err) => {
-                                eprint!("Decoding error = {:?}\n", err);
-                                break;
-                            }
+        if state == EvcdState::STATE_DECODING {
+            match cli.demuxer.read() {
+                Ok(mut data) => {
+                    let start = Instant::now();
+                    let ret = ctx.push(&mut data);
+                    let duration = start.elapsed();
+                    clk_tot += duration.as_millis() as usize;
+
+                    match ret {
+                        Ok(_) => {}
+                        Err(err) => {
+                            eprint!("Decoding error = {:?}\n", err);
+                            break;
                         }
                     }
-                    _ => {
-                        if cli.verbose {
-                            eprint!("bumping process starting...\n");
-                        }
-                        state = EvcdState::STATE_BUMPING;
-                        continue;
+                }
+                _ => {
+                    if cli.verbose {
+                        eprint!("bumping process starting...\n");
                     }
-                };
-            }
+                    state = EvcdState::STATE_BUMPING;
+                    continue;
+                }
+            };
         }
 
         let mut data = Data::Empty;
@@ -254,7 +250,7 @@ fn main() -> std::io::Result<()> {
 
                 if has_frame {
                     cli.muxer.write(data, cli.bitdepth, Rational::new(30, 1))?;
-                    pic_cnt += 1;
+                    pic_ocnt += 1;
                 }
             }
             Err(err) => {
@@ -271,7 +267,7 @@ fn main() -> std::io::Result<()> {
     }
 
     if cli.verbose {
-        print_summary(w, h, bs_cnt, pic_cnt, clk_tot);
+        print_summary(w, h, bs_cnt, pic_ocnt, clk_tot);
     }
 
     Ok(())
