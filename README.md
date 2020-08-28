@@ -15,9 +15,8 @@ The fastest and safest EVC encoder and decoder
 </details>
 
 ## Overview
-MPEG-5 Essential Video Coding (EVC) baseline profile is royalty-free, 
-which includes only technologies that are more than 20 years old or that were submitted with a royalty-free declaration. 
-Compared to H.264/AVC (JM19.0), MPEG-5 EVC (ETM baseline) provides about 30% BD-rate reduction with comparable computation complexity.
+MPEG-5 Essential Video Coding (EVC) baseline profile is royalty-free. It includes only technologies that are more than 20 years old or that were submitted with a royalty-free declaration. 
+Compared to H.264/AVC High Profile (JM19.0), MPEG-5 EVC Baseline Profile (ETM 6.1) provides about 30% BD-rate reduction with reduced encoding computation complexity and comparable decoding computation complexity.
 
 REVC is a Rust-based EVC (baseline) video codec implementation.
 
@@ -64,7 +63,7 @@ Input videos can be in raw yuv (I420) format or [y4m format](https://wiki.multim
 
 ```sh
 cargo run --release --bin revce -- -i tools/foreman_qcif8.yuv -w 176 -h 144 -z 30 -f 8 -q 27 -r tools/tmp/rec.yuv --keyint 8 --ref_pic_gap_length 8 --skip 0 --disable_dbf --inter_slice_type 1 -o tools/tmp/test_ld_p.evc -v
-cargo run --release --bin revce -- -i tools/foreman_qcif8.y4m                          -q 27 -r tools/tmp/rec.y4m --keyint 8 --ref_pic_gap_length 8 --skip 0               --inter_slice_type 0 -o tools/tmp/test_ld_b.evc -v
+cargo run --release --bin revce -- -i tools/foreman_qcif8.y4m                     -f 8 -q 27 -r tools/tmp/rec.y4m --keyint 8 --ref_pic_gap_length 8 --skip 0               --inter_slice_type 0 -o tools/tmp/test_ld_b.evc -v
 ```
 
 ### Decompressing video
