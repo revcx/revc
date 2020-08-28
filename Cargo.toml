@@ -12,6 +12,7 @@ repository = "https://github.com/revcx/revc"
 [features]
 binaries = ["clap", "y4m"]
 default = ["binaries"]
+profile = ["rust_hawktracer"]
 trace = []
 trace_bin = ["trace"]
 trace_coef = ["trace"]
@@ -19,7 +20,7 @@ trace_resi = ["trace"]
 trace_pred = ["trace"]
 trace_reco = ["trace"]
 trace_dbf = ["trace"]
-trace_cudata = ["trace"]
+trace_cu = ["trace"]
 trace_me = ["trace"]
 
 [dependencies]
@@ -30,6 +31,11 @@ lazy_static = "1.4.0"
 thiserror = "1.0"
 clap = { version = "2", optional = true, default-features = false }
 y4m = { version = "0.6", optional = true }
+
+[dependencies.rust_hawktracer]
+version = "0.7.0"
+features = ["profiling_enabled"]
+optional = true
 
 [[bin]]
 name = "revcd"
