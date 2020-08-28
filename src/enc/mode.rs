@@ -27,9 +27,6 @@ pub(crate) struct EvceCUData {
     pub(crate) depth: Vec<i8>,
     pub(crate) coef: Vec<Vec<i16>>, //[N_C];
     pub(crate) reco: Vec<Vec<pel>>, //[N_C];
-
-    #[cfg(feature = "trace_cudata")]
-    pub(crate) trace_idx: Vec<u64>, // MAX_CU_CNT_IN_LCU],
 }
 
 impl EvceCUData {
@@ -67,9 +64,6 @@ impl EvceCUData {
             depth: vec![0; cu_cnt],
             coef,
             reco,
-
-            #[cfg(feature = "trace_cudata")]
-            trace_idx: vec![0; cu_cnt],
         }
     }
     pub(crate) fn init(&mut self, log2_cuw: u8, log2_cuh: u8, qp_y: u8, qp_u: u8, qp_v: u8) {
@@ -91,13 +85,6 @@ impl EvceCUData {
             self.qp_v[i] = 0;
             self.ipm[0][i] = IntraPredDir::IPD_DC_B;
             self.ipm[1][i] = IntraPredDir::IPD_DC_B;
-        }
-
-        #[cfg(feature = "trace_cudata")]
-        {
-            for v in &mut self.trace_idx[0..cu_cnt] {
-                *v = 0;
-            }
         }
     }
 
@@ -159,12 +146,6 @@ impl EvceCUData {
                     .clone_from_slice(&src.mvd[idx_src..idx_src + size]);
                 self.nnz[Y_C][idx_dst..idx_dst + size]
                     .copy_from_slice(&src.nnz[Y_C][idx_src..idx_src + size]);
-
-                #[cfg(feature = "trace_cudata")]
-                {
-                    self.trace_idx[idx_dst..idx_dst + size]
-                        .copy_from_slice(&src.trace_idx[idx_src..idx_src + size]);
-                }
             }
 
             let size = cuw;
@@ -247,7 +228,7 @@ impl EvceCUData {
                 }
             }
 
-            TRACE_CUDATA(tracer, Y_C, w, h, stride, src)
+            TRACE_CU(tracer, Y_C, w, h, stride, src)
         }
 
         if evc_check_chroma(tree_cons) {
@@ -268,7 +249,7 @@ impl EvceCUData {
                     }
                 }
 
-                TRACE_CUDATA(tracer, U_C, w, h, stride, src)
+                TRACE_CU(tracer, U_C, w, h, stride, src)
             }
 
             {
@@ -281,7 +262,7 @@ impl EvceCUData {
                     }
                 }
 
-                TRACE_CUDATA(tracer, V_C, w, h, stride, src)
+                TRACE_CU(tracer, V_C, w, h, stride, src)
             }
         }
     }
@@ -303,8 +284,6 @@ impl EvceCUData {
         qp_u: u8,
         qp_v: u8,
         nnz: &[u16],
-
-        #[cfg(feature = "trace_cudata")] core_trace_idx: u64,
     ) {
         let log2_cuw = CONV_LOG2(cuw as usize);
         let log2_cuh = CONV_LOG2(cuh as usize);
@@ -318,14 +297,7 @@ impl EvceCUData {
             /* copy reco */
             self.reco[Y_C][0..size].copy_from_slice(&rec_src.data[Y_C][0..size]);
 
-            #[cfg(feature = "trace_cudata")]
-            {
-                assert_eq!(core_trace_idx, mi.trace_cu_idx);
-                assert_ne!(core_trace_idx, 0);
-            }
-
             /* copy mode info */
-
             let mut idx = 0;
             for j in 0..(cuh as usize) >> MIN_CU_LOG2 {
                 for i in 0..(cuw as usize) >> MIN_CU_LOG2 {
@@ -382,26 +354,9 @@ impl EvceCUData {
                         self.mvd[idx + i][REFP_1][MV_X] = mi.mvd[REFP_1][MV_X];
                         self.mvd[idx + i][REFP_1][MV_Y] = mi.mvd[REFP_1][MV_Y];
                     }
-                    #[cfg(feature = "trace_cudata")]
-                    {
-                        self.trace_idx[idx + i] = core_trace_idx;
-                    }
                 }
 
                 idx += (cuw as usize) >> MIN_CU_LOG2;
-            }
-
-            #[cfg(feature = "trace_cudata")]
-            {
-                let w = PEL2SCU(cuw as usize);
-                let h = PEL2SCU(cuh as usize);
-                let mut idx = 0;
-                for j in 0..h {
-                    for i in 0..w {
-                        assert_eq!(self.trace_idx[idx + i], core_trace_idx);
-                    }
-                    idx += w;
-                }
             }
         }
         if evc_check_chroma(tree_cons) {
@@ -458,9 +413,6 @@ pub(crate) struct EvceMode {
     pub(crate) inter_best_idx: usize, //pel  *pred_y_best;
 
     cu_mode: MCU,
-
-    #[cfg(feature = "trace_cudata")]
-    pub(crate) trace_cu_idx: u64,
 }
 
 impl EvceMode {
@@ -495,12 +447,6 @@ impl EvceMode {
 
         self.refi[REFP_0] = src.refi[idx_src][REFP_0];
         self.refi[REFP_1] = src.refi[idx_src][REFP_1];
-
-        #[cfg(feature = "trace_cudata")]
-        {
-            self.trace_cu_idx = src.trace_idx[idx_src];
-            assert_ne!(self.trace_cu_idx, 0);
-        }
     }
 }
 
@@ -571,26 +517,6 @@ impl EvceCtx {
             evc_get_default_tree_cons(),
         );
 
-        #[cfg(feature = "trace_cudata")]
-        {
-            let h = 1usize << (self.log2_max_cuwh - MIN_CU_LOG2 as u8);
-            let w = 1usize << (self.log2_max_cuwh - MIN_CU_LOG2 as u8);
-            for j in 0..h {
-                let y_pos = self.core.y_pel as usize + (j << MIN_CU_LOG2);
-                for i in 0..w {
-                    let x_pos = self.core.x_pel as usize + (i << MIN_CU_LOG2);
-                    if x_pos < self.w as usize && y_pos < self.h as usize {
-                        assert_ne!(
-                            self.core.cu_data_best[self.log2_max_cuwh as usize - 2]
-                                [self.log2_max_cuwh as usize - 2]
-                                .trace_idx[i + h * j],
-                            0
-                        );
-                    }
-                }
-            }
-        }
-
         self.update_to_ctx_map();
         self.map_cu_data[self.core.lcu_num as usize].copy(
             &self.core.cu_data_best[self.log2_max_cuwh as usize - 2]
@@ -603,30 +529,6 @@ impl EvceCtx {
             0,
             &evc_get_default_tree_cons(),
         );
-
-        #[cfg(feature = "trace_cudata")]
-        {
-            let h = 1usize << (self.log2_max_cuwh - MIN_CU_LOG2 as u8);
-            let w = 1usize << (self.log2_max_cuwh - MIN_CU_LOG2 as u8);
-            for j in 0..h {
-                let y_pos = self.core.y_pel as usize + (j << MIN_CU_LOG2);
-                for i in 0..w {
-                    let x_pos = self.core.x_pel as usize + (i << MIN_CU_LOG2);
-                    if x_pos < self.w as usize && y_pos < self.h as usize {
-                        assert_ne!(
-                            self.core.cu_data_best[self.log2_max_cuwh as usize - 2]
-                                [self.log2_max_cuwh as usize - 2]
-                                .trace_idx[i + h * j],
-                            0
-                        );
-                        assert_ne!(
-                            self.map_cu_data[self.core.lcu_num as usize].trace_idx[i + h * j],
-                            0
-                        );
-                    }
-                }
-            }
-        }
 
         /* Reset all coded flag for the current lcu */
         self.core.x_scu = PEL2SCU(self.core.x_pel as usize) as u16;
@@ -1722,12 +1624,6 @@ impl EvceCtx {
             if cost < cost_best {
                 cost_best = cost;
 
-                #[cfg(feature = "trace_cudata")]
-                {
-                    self.mode.trace_cu_idx = self.core.trace_idx;
-                    assert_ne!(self.core.trace_idx, 0);
-                }
-
                 if self.pps.cu_qp_delta_enabled_flag {
                     self.evce_set_qp(self.core.dqp_next_best[log2_cuw - 2][log2_cuh - 2].prev_QP);
                 }
@@ -1749,8 +1645,6 @@ impl EvceCtx {
                     self.core.qp_u,
                     self.core.qp_v,
                     &self.core.nnz,
-                    #[cfg(feature = "trace_cudata")]
-                    self.core.trace_idx,
                 );
             }
         }
@@ -1806,12 +1700,6 @@ impl EvceCtx {
             if cost < cost_best {
                 cost_best = cost;
 
-                #[cfg(feature = "trace_cudata")]
-                {
-                    self.mode.trace_cu_idx = self.core.trace_idx;
-                    assert_ne!(self.core.trace_idx, 0);
-                }
-
                 self.core.cu_mode = PredMode::MODE_INTRA;
 
                 self.core.s_next_best[log2_cuw - 2][log2_cuh - 2] = self.core.s_temp_best;
@@ -1837,8 +1725,6 @@ impl EvceCtx {
                     self.core.qp_u,
                     self.core.qp_v,
                     &self.core.nnz,
-                    #[cfg(feature = "trace_cudata")]
-                    self.core.trace_idx,
                 );
             }
         }
@@ -1847,11 +1733,6 @@ impl EvceCtx {
     }
 
     fn mode_cu_init(&mut self, x: u16, y: u16, log2_cuw: u8, log2_cuh: u8, cud: u16) {
-        #[cfg(feature = "trace_cudata")]
-        {
-            self.core.trace_idx += 1;
-        }
-
         self.core.cuw = 1 << log2_cuw;
         self.core.cuh = 1 << log2_cuh;
         self.core.log2_cuw = log2_cuw;

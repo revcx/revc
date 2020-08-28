@@ -10,7 +10,7 @@ pub(crate) struct EvceBsw {
     leftbits: isize,
     /* buffer */
     pub(crate) pkt: Option<Packet>,
-    /* trace */
+    /* tracer */
     pub(crate) tracer: Option<Tracer>,
 }
 

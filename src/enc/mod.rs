@@ -272,9 +272,6 @@ pub(crate) struct EvceCore {
     rdoq_est: EvceRdoqEst,
 
     evc_tbl_qp_chroma_dynamic_ext: Vec<Vec<i8>>, // [[i8; MAX_QP_TABLE_SIZE_EXT]; 2],
-
-    #[cfg(feature = "trace_cudata")]
-    trace_idx: u64,
 }
 impl EvceCore {
     pub(crate) fn new() -> Self {
@@ -988,11 +985,6 @@ impl EvceCtx {
         self.bs.init();
         self.bs.tracer = self.tracer.take();
 
-        #[cfg(feature = "trace_cudata")]
-        {
-            self.core.trace_idx = 0;
-        }
-
         for slice_num in 0..num_slice_in_pic {
             self.slice_num = slice_num;
 
@@ -1684,12 +1676,6 @@ impl EvceCtx {
         let enc_dqp = 0;
         let slice_type = self.slice_type;
 
-        #[cfg(feature = "trace_cudata")]
-        {
-            self.core.trace_idx = self.map_cu_data[self.core.lcu_num as usize].trace_idx[cup];
-            assert_ne!(self.core.trace_idx, 0);
-        }
-
         self.cu_init(x, y, cup, cuw, cuh);
 
         EVC_TRACE_COUNTER(&mut self.bs.tracer);
@@ -1891,15 +1877,6 @@ impl EvceCtx {
         }
 
         self.evce_set_enc_info();
-
-        #[cfg(feature = "trace_cudata")]
-        {
-            EVC_TRACE_COUNTER(&mut self.bs.tracer);
-            EVC_TRACE(&mut self.bs.tracer, "RDO check id ");
-            EVC_TRACE(&mut self.bs.tracer, self.core.trace_idx);
-            EVC_TRACE(&mut self.bs.tracer, " \n");
-            assert_ne!(self.core.trace_idx, 0);
-        }
     }
 
     fn cu_init(&mut self, x: u16, y: u16, cup: usize, cuw: u16, cuh: u16) {

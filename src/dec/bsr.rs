@@ -19,7 +19,7 @@ pub(crate) struct EvcdBsr {
     cur: usize,
     /* buffer */
     pkt: Packet,
-    /* trace */
+    /* tracer */
     pub(crate) tracer: Option<Tracer>,
 }
 
