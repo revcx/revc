@@ -22,13 +22,13 @@ jobs:
       run: cargo test --verbose
     - name: Run decoder test
       run: |
-        mkdir -p tools/tmp
-        cd tools
-        cargo run --bin revcd --release -- -i ./data/test_ra_b_q37.evc -o ./tmp/test_ra_b_q37_revc.yuv -v
-        md5sum -c ./data/test_ra_b_q37.txt
+        mkdir -p scripts/tmp
+        cd scripts
+        cargo run --bin revcd --release -- -i ./data/test_ra_b3_q37.evc -o ./tmp/test_ra_b3_q37_revc.yuv -v
+        md5sum -c ./data/test_ra_b3_q37_yuv.txt
     - name: Run encoder test
       run: |
-        mkdir -p tools/tmp
-        cd tools
-        cargo run --bin revce --release -- -i ./foreman_qcif8.yuv -w 176 -h 144 -z 30 -f 8 -q 27 -r ./tmp/rec.yuv --keyint 1 --ref_pic_gap_length 8 --disable_dbf -o ./tmp/foreman_qcif8_nodb.evc -v
-        md5sum -c ./data/foreman_qcif8_nodb.txt
+        mkdir -p scripts/tmp
+        cd scripts
+        cargo run --bin revce --release -- -i foreman_qcif8.yuv -w 176 -h 144 -z 30 -f 8 -q 37 -r ./tmp/test_ra_b3_q37_revc.yuv -o ./tmp/test_ra_b3_q37_revc.evc --max_b_frames 3 --inter_slice_type 0 -v
+        md5sum -c ./data/test_ra_b3_q37_evc.txt
