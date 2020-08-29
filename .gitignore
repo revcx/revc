@@ -17,3 +17,5 @@ Cargo.lock
 *_profile.json
 
 
+scripts/tmp/test_ra_b3_q37_revc.evc
+scripts/tmp/test_ra_b3_q37_revc.yuv
