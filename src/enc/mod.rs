@@ -14,6 +14,7 @@ use super::api::frame::*;
 use super::api::*;
 use super::def::*;
 use super::df::*;
+use super::hawktracer::*;
 use super::ipred::*;
 use super::picman::*;
 use super::tbl::*;
@@ -274,6 +275,7 @@ pub(crate) struct EvceCore {
     evc_tbl_qp_chroma_dynamic_ext: Vec<Vec<i8>>, // [[i8; MAX_QP_TABLE_SIZE_EXT]; 2],
 }
 impl EvceCore {
+    #[hawktracer(evcecore_new)]
     pub(crate) fn new() -> Self {
         let mut evc_tbl_qp_chroma_dynamic_ext = vec![];
         /*if sps.chroma_qp_table_struct.chroma_qp_table_present_flag {
@@ -423,6 +425,7 @@ impl EvceCore {
         }
     }
 
+    #[hawktracer(update_core_loc_param)]
     fn update_core_loc_param(&mut self, log2_max_cuwh: u8, w_lcu: u16) {
         self.x_pel = self.x_lcu << log2_max_cuwh; // entry point's x location in pixel
         self.y_pel = self.y_lcu << log2_max_cuwh; // entry point's y location in pixel
@@ -596,6 +599,7 @@ pub(crate) struct EvceCtx {
 }
 
 impl EvceCtx {
+    #[hawktracer(evcectx_new)]
     pub(crate) fn new(cfg: &Config) -> Self {
         let mut refp = Vec::with_capacity(MAX_NUM_REF_PICS);
         for j in 0..MAX_NUM_REF_PICS {
@@ -814,11 +818,13 @@ impl EvceCtx {
         }
     }
 
+    #[hawktracer(push_frm)]
     pub(crate) fn push_frm(&mut self, frm: &mut Option<Frame<pel>>) -> Result<(), EvcError> {
         self.frm = frm.take();
         Ok(())
     }
 
+    #[hawktracer(encode_frm)]
     pub(crate) fn encode_frm(&mut self) -> Result<EvcStat, EvcError> {
         if self.frm.is_none() && !self.flush {
             self.flush = true;
@@ -864,6 +870,7 @@ impl EvceCtx {
         self.evce_enc_pic_finish()
     }
 
+    #[hawktracer(pull_pkt)]
     pub(crate) fn pull_pkt(&mut self) -> Result<Rc<RefCell<Packet>>, EvcError> {
         let pkt = self.pkt.take();
         self.pkt = Some(Packet::default());
@@ -874,6 +881,7 @@ impl EvceCtx {
         }
     }
 
+    #[hawktracer(check_frame_delay)]
     fn check_frame_delay(&self) -> Result<(), EvcError> {
         if self.pic_icnt < self.frm_rnum {
             Err(EvcError::EVC_OK_OUTPUT_NOT_AVAILABLE)
@@ -882,6 +890,7 @@ impl EvceCtx {
         }
     }
 
+    #[hawktracer(check_more_frames)]
     fn check_more_frames(&mut self) -> Result<(), EvcError> {
         if self.flush {
             /* pseudo evce_push() for bumping process ****************/
@@ -900,6 +909,7 @@ impl EvceCtx {
         Ok(())
     }
 
+    #[hawktracer(evce_enc_pic_prepare)]
     fn evce_enc_pic_prepare(&mut self) -> Result<(), EvcError> {
         //evc_assert_rv(PIC_ORIG(ctx) != NULL, EVC_ERR_UNEXPECTED);
 
@@ -977,6 +987,8 @@ impl EvceCtx {
 
         Ok(())
     }
+
+    #[hawktracer(evce_enc_pic)]
     fn evce_enc_pic(&mut self) -> Result<(), EvcError> {
         let split_allow: [bool; 6] = [false, false, false, false, false, true];
         let num_slice_in_pic = self.param.num_slices_in_pic;
@@ -1166,6 +1178,8 @@ impl EvceCtx {
 
         Ok(())
     }
+
+    #[hawktracer(evce_enc_pic_finish)]
     fn evce_enc_pic_finish(&mut self) -> Result<EvcStat, EvcError> {
         let mut stat = EvcStat::default();
 
@@ -1264,7 +1278,7 @@ impl EvceCtx {
         Ok(stat)
     }
 
-    /* slice_type / slice_depth / poc / PIC_ORIG setting */
+    #[hawktracer(decide_slice_type)]
     fn decide_slice_type(&mut self) {
         let mut force_cnt = 0;
         let i_period = self.param.max_key_frame_interval as usize;
@@ -1353,6 +1367,7 @@ impl EvceCtx {
         }
     }
 
+    #[hawktracer(decide_normal_gop)]
     fn decide_normal_gop(&mut self, pic_imcnt: usize) {
         let i_period = self.param.max_key_frame_interval;
         let gop_size = self.gop_size;
@@ -1415,6 +1430,7 @@ impl EvceCtx {
         }
     }
 
+    #[hawktracer(set_sps)]
     fn set_sps(&mut self) {
         let sps = &mut self.sps;
         sps.profile_idc = 0; // baseline profile only
@@ -1474,6 +1490,7 @@ impl EvceCtx {
                                            }*/
     }
 
+    #[hawktracer(set_pps)]
     fn set_pps(&mut self) {
         let pps = &mut self.pps;
 
@@ -1488,6 +1505,7 @@ impl EvceCtx {
         pps.num_ref_idx_default_active_minus1[REFP_1] = 0; /* To be checked */
     }
 
+    #[hawktracer(set_sh)]
     fn set_sh(&mut self) {
         let sh = &mut self.sh;
 
@@ -1540,6 +1558,7 @@ impl EvceCtx {
         self.sqrt_lambda[2] = self.lambda[2].sqrt();
     }
 
+    #[hawktracer(evce_eco_tree)]
     fn evce_eco_tree(
         &mut self,
         x0: u16,
@@ -1664,6 +1683,7 @@ impl EvceCtx {
         }
     }
 
+    #[hawktracer(evce_eco_unit)]
     fn evce_eco_unit(
         &mut self,
         x: u16,
@@ -1879,6 +1899,7 @@ impl EvceCtx {
         self.evce_set_enc_info();
     }
 
+    #[hawktracer(cu_init)]
     fn cu_init(&mut self, x: u16, y: u16, cup: usize, cuw: u16, cuh: u16) {
         let core = &mut self.core;
         let cu_data = &mut self.map_cu_data[core.lcu_num as usize];
@@ -1934,6 +1955,7 @@ impl EvceCtx {
         core.avail_lr = evc_check_nev_avail(core.x_scu, core.y_scu, cuw, self.w_scu, &self.map_scu);
     }
 
+    #[hawktracer(evce_set_enc_info)]
     fn evce_set_enc_info(&mut self) {
         let w_scu = self.w_scu as usize;
         let scup = self.core.scup as usize;
@@ -1971,6 +1993,7 @@ impl EvceCtx {
         }
     }
 
+    #[hawktracer(evce_encode_sps)]
     fn evce_encode_sps(&mut self) {
         /* bitsteam initialize for sequence */
         self.bs.init();
@@ -2000,6 +2023,7 @@ impl EvceCtx {
         }
     }
 
+    #[hawktracer(evce_encode_pps)]
     fn evce_encode_pps(&mut self) {
         /* bitsteam initialize for sequence */
         self.bs.init();
@@ -2030,6 +2054,7 @@ impl EvceCtx {
         }
     }
 
+    #[hawktracer(deblock_tree)]
     fn deblock_tree(
         &mut self,
         x: u16,
@@ -2209,6 +2234,7 @@ impl EvceCtx {
         self.core.tree_cons.mode_cons = tree_cons.mode_cons;
     }
 
+    #[hawktracer(evce_deblock)]
     fn evce_deblock(&mut self) {
         if let Some(pic) = &self.pic[PIC_IDX_MODE] {
             let mut p = pic.borrow_mut();

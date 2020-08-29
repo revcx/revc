@@ -245,6 +245,7 @@ impl EvceCtx {
 
     pub(crate) fn pinter_analyze_lcu(&mut self) {}
 
+    #[hawktracer(pinter_analyze_cu)]
     pub(crate) fn pinter_analyze_cu(
         &mut self,
         x: usize,

@@ -4,6 +4,7 @@ use super::util::*;
 use super::*;
 use crate::api::*;
 use crate::def::*;
+use crate::hawktracer::*;
 use crate::plane::*;
 use crate::tracer::*;
 
@@ -267,6 +268,7 @@ impl EvceCUData {
         }
     }
 
+    #[hawktracer(copy_to_cu_data)]
     pub(crate) fn copy_to_cu_data(
         &mut self,
         cu_mode: PredMode,
@@ -470,6 +472,7 @@ impl EvceCtx {
         self.pinter_init_lcu();
     }
 
+    #[hawktracer(mode_analyze_lcu)]
     pub(crate) fn mode_analyze_lcu(&mut self) {
         let mut split_mode_child = [false, false, false, false]; //&mut self.core.split_mode_child;
         let mut parent_split_allow = [false, false, false, false, false, true]; //&mut self.core.parent_split_allow;
@@ -555,6 +558,7 @@ impl EvceCtx {
         }
     }
 
+    #[hawktracer(mode_coding_tree)]
     fn mode_coding_tree(
         &mut self,
         x0: u16,
@@ -1568,6 +1572,7 @@ impl EvceCtx {
         }
     }
 
+    #[hawktracer(mode_coding_unit)]
     fn mode_coding_unit(
         &mut self,
         x: u16,
