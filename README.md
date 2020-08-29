@@ -74,15 +74,6 @@ cargo run --release --bin revcd -- -i scripts/tmp/test_ld_p.evc -o scripts/tmp/t
 cargo run --release --bin revcd -- -i scripts/tmp/test_ld_b.evc -o scripts/tmp/test.y4m -v
 ```
 
-## Profiling
-
-```sh
-cargo run --features profile --bin revcd -- -i scripts/data/test_ra_b3_q37.evc -o scripts/tmp/output.y4m -v
-hawktracer-converter-rs --source dec_profile.bin --output-file dec_profile.json
-```
-
-Open Chrome with chrome://tracing/, load dec_profile.json for visualization.
-
 
 ## Contributing
 Contributors or Pull Requests are Welcome!!!
