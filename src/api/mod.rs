@@ -13,7 +13,6 @@ pub mod frame;
 use crate::dec::*;
 use crate::def::*;
 use crate::enc::*;
-use crate::hawktracer::*;
 use frame::*;
 
 /*****************************************************************************
@@ -572,7 +571,6 @@ pub enum Context {
 }
 
 impl Context {
-    #[hawktracer(context_new)]
     pub fn new(cfg: &Config) -> Self {
         if let Some(cfg_enc) = &cfg.enc {
             match cfg_enc.validate() {
@@ -584,7 +582,6 @@ impl Context {
         }
     }
 
-    #[hawktracer(context_push)]
     pub fn push(&mut self, data: &mut Data) -> Result<(), EvcError> {
         match self {
             Context::Decoder(ctx) => {
@@ -605,7 +602,6 @@ impl Context {
         }
     }
 
-    #[hawktracer(context_pull)]
     pub fn pull(&mut self, data: &mut Data) -> Result<Option<EvcStat>, EvcError> {
         *data = Data::Empty;
 

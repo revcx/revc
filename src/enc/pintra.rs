@@ -5,7 +5,6 @@ use super::*;
 use crate::api::frame::*;
 use crate::api::*;
 use crate::def::*;
-use crate::hawktracer::*;
 use crate::ipred::*;
 use crate::itdq::*;
 use crate::picman::*;
@@ -105,7 +104,6 @@ impl EvceCtx {
 
     pub(crate) fn pintra_analyze_lcu(&mut self) {}
 
-    #[hawktracer(pintra_analyze_cu)]
     pub(crate) fn pintra_analyze_cu(
         &mut self,
         x: usize,

@@ -1,9 +1,7 @@
 use super::def::*;
-use super::hawktracer::*;
 use super::region::*;
 use super::tbl::*;
 
-#[hawktracer(evc_get_mpm_b)]
 pub(crate) fn evc_get_mpm_b(
     x_scu: u16,
     y_scu: u16,
@@ -31,7 +29,6 @@ pub(crate) fn evc_get_mpm_b(
     &evey_tbl_mpm[ipm_l as usize][ipm_u as usize]
 }
 
-#[hawktracer(evc_get_nbr_b)]
 pub(crate) fn evc_get_nbr_b(
     x: usize,
     y: usize,
@@ -121,7 +118,6 @@ pub(crate) fn evc_get_nbr_b(
 }
 
 /* intra prediction for baseline profile */
-#[hawktracer(evc_ipred_b)]
 pub(crate) fn evc_ipred_b(
     src_le: &[pel],
     src_up: &[pel],

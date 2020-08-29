@@ -1,8 +1,6 @@
 use crate::def::*;
-use crate::hawktracer::*;
 use crate::region::*;
 
-#[hawktracer(evc_had_8x8)]
 fn evc_had_8x8(
     x: usize,
     y: usize,
@@ -100,7 +98,6 @@ fn evc_had_8x8(
     satd
 }
 
-#[hawktracer(evc_had_4x4)]
 fn evc_had_4x4(
     x: usize,
     y: usize,
@@ -199,7 +196,6 @@ fn evc_had_4x4(
     satd
 }
 
-#[hawktracer(evc_had_2x2)]
 fn evc_had_2x2(
     x: usize,
     y: usize,
@@ -231,7 +227,6 @@ fn evc_had_2x2(
     satd
 }
 
-#[hawktracer(pinter_analyze_cu)]
 pub(crate) fn evce_satd_16b(
     x: usize,
     y: usize,
@@ -269,7 +264,6 @@ pub(crate) fn evce_satd_16b(
 }
 
 /* DIFF **********************************************************************/
-#[hawktracer(evce_diff_16b)]
 pub(crate) fn evce_diff_16b(
     x: usize,
     y: usize,
@@ -289,7 +283,6 @@ pub(crate) fn evce_diff_16b(
 }
 
 /* SSD ***********************************************************************/
-#[hawktracer(evce_ssd_16b)]
 pub(crate) fn evce_ssd_16b(
     x: usize,
     y: usize,
@@ -313,7 +306,6 @@ pub(crate) fn evce_ssd_16b(
     ssd
 }
 
-#[hawktracer(evce_ssd_16i)]
 pub(crate) fn evce_ssd_16i(
     x: i16,
     y: i16,
@@ -340,7 +332,6 @@ pub(crate) fn evce_ssd_16i(
 }
 
 /* SAD for 16bit **************************************************************/
-#[hawktracer(evce_sad_16b)]
 pub(crate) fn evce_sad_16b(
     x: usize,
     y: usize,
@@ -365,7 +356,6 @@ pub(crate) fn evce_sad_16b(
     sad >> (BIT_DEPTH - 8)
 }
 
-#[hawktracer(evce_sad_bi_16b)]
 pub(crate) fn evce_sad_bi_16b(
     mv_x: i16,
     mv_y: i16,
@@ -388,7 +378,6 @@ pub(crate) fn evce_sad_bi_16b(
     sad >> (BIT_DEPTH - 8)
 }
 
-#[hawktracer(evce_sad_16i)]
 pub(crate) fn evce_sad_16i(
     x: usize,
     y: usize,
@@ -408,7 +397,6 @@ pub(crate) fn evce_sad_16i(
     sad >> (BIT_DEPTH - 8)
 }
 
-#[hawktracer(evce_sad_bi_16i)]
 pub(crate) fn evce_sad_bi_16i(cuw: usize, cuh: usize, org_bi: &[i16], pred: &[pel]) -> u32 {
     let mut sad = 0;
 

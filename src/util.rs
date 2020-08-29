@@ -1,5 +1,4 @@
 use super::def::*;
-use super::hawktracer::*;
 use super::picman::*;
 use super::tbl::*;
 use crate::api::*;
@@ -236,7 +235,6 @@ pub(crate) fn evc_get_avail_inter(
     return avail;
 }
 
-#[hawktracer(evc_get_avail_intra)]
 pub(crate) fn evc_get_avail_intra(
     x_scu: usize,
     y_scu: usize,

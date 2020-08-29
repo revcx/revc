@@ -167,16 +167,6 @@ enum EvcdState {
 }
 
 fn main() -> std::io::Result<()> {
-    #[cfg(feature = "profile")]
-    use rust_hawktracer::*;
-    #[cfg(feature = "profile")]
-    let instance = HawktracerInstance::new();
-    #[cfg(feature = "profile")]
-    let _listener = instance.create_listener(HawktracerListenerType::ToFile {
-        file_path: "dec_profile.bin".into(),
-        buffer_size: 4096,
-    });
-
     let mut cli = parse_cli()?;
     let cfg = Config {
         threads: cli.threads,
