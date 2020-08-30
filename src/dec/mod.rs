@@ -570,7 +570,7 @@ impl EvcdCtx {
         Ok(())
     }
 
-    fn evcd_eco_cu(&mut self, mode_cons: MODE_CONS) -> Result<(), EvcError> {
+    fn evcd_eco_cu(&mut self) -> Result<(), EvcError> {
         let core = &mut self.core;
         let bs = &mut self.bs;
         let sbac = &mut self.sbac_dec;
@@ -605,7 +605,7 @@ impl EvcdCtx {
             &self.map_scu,
         );
 
-        if !evc_check_only_intra(mode_cons) {
+        if self.sh.slice_type != SliceType::EVC_ST_I {
             /* CU skip flag */
             let cu_skip_flag = evcd_eco_cu_skip_flag(bs, sbac, sbac_ctx, &core.ctx_flags)?;
             if cu_skip_flag != 0 {
@@ -644,7 +644,8 @@ impl EvcdCtx {
                 [(EVC_TBL_CHROMA_QP_OFFSET + qp_i_cr) as usize]
                 + (6 * (BIT_DEPTH - 8)) as i8) as u8;
         } else {
-            core.pred_mode = evcd_eco_pred_mode(bs, sbac, sbac_ctx, &core.ctx_flags, mode_cons)?;
+            core.pred_mode =
+                evcd_eco_pred_mode(bs, sbac, sbac_ctx, &core.ctx_flags, self.sh.slice_type)?;
 
             if core.pred_mode == PredMode::MODE_INTER {
                 //TODO: bugfix? missing SLICE_TYPE==B for direct_mode_flag?
@@ -878,7 +879,6 @@ impl EvcdCtx {
         y: u16,
         log2_cuw: u8,
         log2_cuh: u8,
-        mode_cons: MODE_CONS,
     ) -> Result<(), EvcError> {
         let cuw = 1 << log2_cuw;
         let cuh = 1 << log2_cuh;
@@ -909,7 +909,7 @@ impl EvcdCtx {
             EVC_TRACE(&mut bs.tracer, " \n");
 
             /* parse CU info */
-            self.evcd_eco_cu(mode_cons)?;
+            self.evcd_eco_cu()?;
         }
 
         /* inverse transform and dequantization */
@@ -1080,7 +1080,6 @@ impl EvcdCtx {
         next_split: bool,
         qt_depth: u8,
         mut cu_qp_delta_code: u8,
-        mut mode_cons: MODE_CONS,
     ) -> Result<(), EvcError> {
         let core = &mut self.core;
         let bs = &mut self.bs;
@@ -1215,18 +1214,12 @@ impl EvcdCtx {
                         true,
                         split_mode.inc_qt_depth(qt_depth),
                         cu_qp_delta_code,
-                        mode_cons,
                     )?;
                 }
             }
         } else {
             core.cu_qp_delta_code = cu_qp_delta_code;
-
-            if self.sh.slice_type == SliceType::EVC_ST_I {
-                mode_cons = MODE_CONS::eOnlyIntra;
-            }
-
-            self.evcd_eco_unit(x0, y0, log2_cuw, log2_cuh, mode_cons)?;
+            self.evcd_eco_unit(x0, y0, log2_cuw, log2_cuh)?;
         }
 
         Ok(())
@@ -1272,7 +1265,6 @@ impl EvcdCtx {
                 true,
                 0,
                 0,
-                MODE_CONS::eAll,
             )?;
             // set split flags to map
             self.map_split[self.core.lcu_num as usize].clone_from(&self.core.split_mode);

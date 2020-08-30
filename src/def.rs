@@ -730,19 +730,6 @@ pub(crate) struct EvcSbacCtx {
 pub(crate) const QUANT_SHIFT: usize = 14;
 pub(crate) const QUANT_IQUANT_SHIFT: usize = 20;
 
-#[derive(Clone, Copy, PartialEq)]
-pub(crate) enum MODE_CONS {
-    eOnlyIntra,
-    eOnlyInter,
-    eAll,
-}
-
-impl Default for MODE_CONS {
-    fn default() -> Self {
-        MODE_CONS::eAll
-    }
-}
-
 #[derive(Clone)]
 pub(crate) struct LcuSplitMode {
     pub(crate) data: Vec<Vec<Vec<SplitMode>>>,

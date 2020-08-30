@@ -288,21 +288,6 @@ pub(crate) fn evc_get_avail_intra(
     return avail;
 }
 
-#[inline]
-pub(crate) fn evc_check_only_intra(mode_cons: MODE_CONS) -> bool {
-    mode_cons == MODE_CONS::eOnlyIntra
-}
-
-#[inline]
-pub(crate) fn evc_check_only_inter(mode_cons: MODE_CONS) -> bool {
-    mode_cons == MODE_CONS::eOnlyInter
-}
-
-#[inline]
-pub(crate) fn evc_check_all_preds(mode_cons: MODE_CONS) -> bool {
-    mode_cons == MODE_CONS::eAll
-}
-
 pub(crate) fn evc_block_copy(
     src: &[i16],
     src_stride: usize,

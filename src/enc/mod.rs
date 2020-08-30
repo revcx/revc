@@ -404,7 +404,6 @@ impl EvceCore {
             /* temporal pixel buffer for inter prediction */
             //pel            eif_tmp_buffer[(MAX_CU_SIZE + 2) * (MAX_CU_SIZE + 2)];
             //u8             au8_eval_mvp_idx[MAX_NUM_MVP];
-            //tree_cons: TREE_CONS,
             //ctx_flags: [u8; CtxNevIdx::NUM_CNID as usize],
             //int            split_mode_child:[4];
             //int            parent_split_allow[6];

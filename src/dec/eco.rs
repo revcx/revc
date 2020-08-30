@@ -287,40 +287,25 @@ pub(crate) fn evcd_eco_pred_mode(
     sbac: &mut EvcdSbac,
     sbac_ctx: &mut EvcSbacCtx,
     ctx_flags: &[u8],
-    mode_cons: MODE_CONS,
+    slice_type: SliceType,
 ) -> Result<PredMode, EvcError> {
-    let mut pred_mode_flag = false;
-
-    if mode_cons == MODE_CONS::eAll {
+    if slice_type != SliceType::EVC_ST_I {
         let ctx_flag = ctx_flags[CNID_PRED_MODE] as usize;
-        pred_mode_flag = sbac.decode_bin(bs, &mut sbac_ctx.pred_mode[ctx_flag])? != 0;
-
-        EVC_TRACE_COUNTER(&mut bs.tracer);
-        EVC_TRACE(&mut bs.tracer, "pred mode ");
-        EVC_TRACE(
-            &mut bs.tracer,
-            if pred_mode_flag {
-                PredMode::MODE_INTRA
-            } else {
-                PredMode::MODE_INTER
-            } as u8,
-        );
-        EVC_TRACE(&mut bs.tracer, " \n");
-    }
-
-    let pred_mode = if mode_cons == MODE_CONS::eOnlyInter {
-        PredMode::MODE_INTER
-    } else if mode_cons == MODE_CONS::eOnlyIntra {
-        PredMode::MODE_INTRA
-    } else {
-        if pred_mode_flag {
+        let pred_mode = if sbac.decode_bin(bs, &mut sbac_ctx.pred_mode[ctx_flag])? != 0 {
             PredMode::MODE_INTRA
         } else {
             PredMode::MODE_INTER
-        }
-    };
+        };
 
-    Ok(pred_mode)
+        EVC_TRACE_COUNTER(&mut bs.tracer);
+        EVC_TRACE(&mut bs.tracer, "pred mode ");
+        EVC_TRACE(&mut bs.tracer, pred_mode as u8);
+        EVC_TRACE(&mut bs.tracer, " \n");
+
+        Ok(pred_mode)
+    } else {
+        Ok(PredMode::MODE_INTRA)
+    }
 }
 
 pub(crate) fn evcd_eco_mvp_idx(

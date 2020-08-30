@@ -656,11 +656,7 @@ impl EvceCtx {
                 true,
                 true,
                 0,
-                //if !evc_check_luma(&self.core.tree_cons) {
-                //self.core.cu_data_temp[log2_cuw - 2][log2_cuh - 2].nnz[Y_C] != 0
-                //} else {
                 self.core.nnz[Y_C] != 0,
-                //},
                 &[],
                 &[],
             );

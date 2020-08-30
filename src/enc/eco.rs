@@ -872,26 +872,6 @@ pub(crate) fn evce_eco_coef(
     core_cu_qp_delta_is_coded: &mut bool,
     core_qp_prev_eco: &mut u8,
 ) {
-    /*let bs = if bsc_temp {
-        &mut self.core.bs_temp
-    } else {
-        &mut self.bs
-    };
-    let sbac = if bsc_temp {
-        &mut self.core.s_temp_run
-    } else {
-        &mut self.sbac_enc
-    };
-    let sbac_ctx = if bsc_temp {
-        &mut self.core.c_temp_run
-    } else {
-        &mut self.sbac_ctx
-    };
-    let tree_cons = &self.core.tree_cons;
-    let nnz = &self.core.nnz;
-    let coef = &self.core.ctmp;
-     */
-
     let run_stats = evc_get_run(run_stats);
     let run = [
         run_stats & 1 != 0,
