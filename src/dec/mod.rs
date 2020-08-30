@@ -110,10 +110,38 @@ pub(crate) struct EvcdCtx {
     /* input packet */
     pkt: Option<Packet>,
 
-    /* EVCD identifier */
-    //EVCD                    id;
+    /************** LCU-based processing **************/
+    top_mcu: Vec<MCU>,                         //[Width/MIN_CU_SIZE]
+    lft_mcu: [MCU; MAX_CU_SIZE / MIN_CU_SIZE], //[MAX_CU_SIZE/MIN_CU_SIZE]
+    // intra prediction pixel line buffer
+    top_pel: Vec<Vec<pel>>, //[N_C][Width]
+    lft_pel: Vec<Vec<pel>>, //[N_C][MAX_CU_SIZE]
+    /* coefficient buffer of current CU */
+    coef: Vec<Vec<i16>>, //[N_C][MAX_CU_DIM]
+    /* pred buffer of current CU */
+    /* [1] is used for bi-pred. */
+    pred: Vec<Vec<Vec<pel>>>, //[2][N_C][MAX_CU_DIM]
+    // deblocking line buffer
+    //TODO:
+
+    /************** Frame-based processing **************/
     /* CORE information used for fast operation */
     core: EvcdCore,
+    /* MAPS *******************************************************************/
+    /* SCU map for CU information */
+    map_scu: Vec<MCU>,
+    /* LCU split information */
+    map_split: Vec<LcuSplitMode>,
+    /* decoded motion vector for every blocks */
+    map_mv: Option<Rc<RefCell<Vec<[[i16; MV_D]; REFP_NUM]>>>>,
+    /* reference frame indices */
+    map_refi: Option<Rc<RefCell<Vec<[i8; REFP_NUM]>>>>,
+    /* intra prediction modes */
+    map_ipm: Vec<IntraPredDir>,
+    /* new coding tool flag*/
+    map_cu_mode: Vec<MCU>,
+
+    /* *******************************************************************/
     /* current decoding bitstream */
     bs: EvcdBsr,
     /* current nalu header */
@@ -139,28 +167,7 @@ pub(crate) struct EvcdCtx {
     h: u16,
     /* decoding chroma sampling */
     cs: ChromaSampling,
-    /* maximum CU width and height */
-    max_cuwh: u16,
-    /* log2 of maximum CU width and height */
-    log2_max_cuwh: u8,
 
-    /* minimum CU width and height */
-    min_cuwh: u16,
-    /* log2 of minimum CU width and height */
-    log2_min_cuwh: u8,
-    /* MAPS *******************************************************************/
-    /* SCU map for CU information */
-    map_scu: Vec<MCU>,
-    /* LCU split information */
-    map_split: Vec<LcuSplitMode>,
-    /* decoded motion vector for every blocks */
-    map_mv: Option<Rc<RefCell<Vec<[[i16; MV_D]; REFP_NUM]>>>>,
-    /* reference frame indices */
-    map_refi: Option<Rc<RefCell<Vec<[i8; REFP_NUM]>>>>,
-    /* intra prediction modes */
-    map_ipm: Vec<IntraPredDir>,
-    /* new coding tool flag*/
-    map_cu_mode: Vec<MCU>,
     /**************************************************************************/
     /* current slice number, which is increased whenever decoding a slice.
     when receiving a slice for new picture, this value is set to zero.
@@ -209,9 +216,53 @@ impl EvcdCtx {
             pkt: None,
 
             /* EVCD identifier */
-            //EVCD                    id;
+            /************** LCU-based processing **************/
+            top_mcu: vec![],
+            lft_mcu: [MCU::default(); MAX_CU_SIZE / MIN_CU_SIZE],
+            // intra prediction line buffer
+            top_pel: vec![],
+            lft_pel: vec![
+                vec![0; MAX_CU_SIZE],
+                vec![0; MAX_CU_SIZE >> 1],
+                vec![0; MAX_CU_SIZE >> 1],
+            ],
+            coef: vec![
+                vec![0; MAX_CU_DIM],
+                vec![0; MAX_CU_DIM >> 2],
+                vec![0; MAX_CU_DIM >> 2],
+            ],
+            pred: vec![
+                vec![
+                    vec![0; MAX_CU_DIM],
+                    vec![0; MAX_CU_DIM >> 2],
+                    vec![0; MAX_CU_DIM >> 2],
+                ],
+                vec![
+                    vec![0; MAX_CU_DIM],
+                    vec![0; MAX_CU_DIM >> 2],
+                    vec![0; MAX_CU_DIM >> 2],
+                ],
+            ],
+            // deblocking line buffer
+            //TODO:
+
             /* CORE information used for fast operation */
             core: EvcdCore::default(),
+            /* MAPS *******************************************************************/
+            /* SCU map for CU information */
+            map_scu: vec![],
+            /* LCU split information */
+            map_split: vec![],
+            /* decoded motion vector for every blocks */
+            map_mv: None,
+            /* reference frame indices */
+            map_refi: None,
+            /* intra prediction modes */
+            map_ipm: vec![],
+            /* new coding tool flag*/
+            map_cu_mode: vec![],
+
+            /**************************************************************************/
             /* current decoding bitstream */
             bs: EvcdBsr::default(),
             /* current nalu header */
@@ -236,28 +287,7 @@ impl EvcdCtx {
             /* decoding picture height */
             h: 0,
             cs: ChromaSampling::Cs400,
-            /* maximum CU width and height */
-            max_cuwh: 0,
-            /* log2 of maximum CU width and height */
-            log2_max_cuwh: 0,
 
-            /* minimum CU width and height */
-            min_cuwh: 0,
-            /* log2 of minimum CU width and height */
-            log2_min_cuwh: 0,
-            /* MAPS *******************************************************************/
-            /* SCU map for CU information */
-            map_scu: vec![],
-            /* LCU split information */
-            map_split: vec![],
-            /* decoded motion vector for every blocks */
-            map_mv: None,
-            /* reference frame indices */
-            map_refi: None,
-            /* intra prediction modes */
-            map_ipm: vec![],
-            /* new coding tool flag*/
-            map_cu_mode: vec![],
             /**************************************************************************/
             /* current slice number, which is increased whenever decoding a slice.
             when receiving a slice for new picture, this value is set to zero.
@@ -301,21 +331,22 @@ impl EvcdCtx {
             self.h = self.sps.pic_height_in_luma_samples;
             self.cs = self.sps.chroma_format_idc.into();
             assert_eq!(self.sps.sps_btt_flag, false);
-
-            self.max_cuwh = 1 << 6;
-            self.min_cuwh = 1 << 2;
-
-            self.log2_max_cuwh = CONV_LOG2(self.max_cuwh as usize);
-            self.log2_min_cuwh = CONV_LOG2(self.min_cuwh as usize);
         }
 
-        let size = self.max_cuwh;
-        self.w_lcu = (self.w + (size - 1)) / size;
-        self.h_lcu = (self.h + (size - 1)) / size;
+        self.w_lcu = (self.w + (MAX_CU_SIZE as u16 - 1)) / MAX_CU_SIZE as u16;
+        self.h_lcu = (self.h + (MAX_CU_SIZE as u16 - 1)) / MAX_CU_SIZE as u16;
         self.f_lcu = (self.w_lcu * self.h_lcu) as u32;
         self.w_scu = (self.w + ((1 << MIN_CU_LOG2) - 1) as u16) >> MIN_CU_LOG2 as u16;
         self.h_scu = (self.h + ((1 << MIN_CU_LOG2) - 1) as u16) >> MIN_CU_LOG2 as u16;
         self.f_scu = (self.w_scu * self.h_scu) as u32;
+
+        // TOP LINE BUFFERS
+        self.top_mcu = vec![MCU::default(); self.w_scu as usize];
+        self.top_pel = vec![
+            vec![0; self.w as usize],
+            vec![0; (self.w >> 1) as usize],
+            vec![0; (self.w >> 1) as usize],
+        ];
 
         /* alloc SCU map */
         self.map_scu = vec![MCU::default(); self.f_scu as usize];
@@ -334,11 +365,7 @@ impl EvcdCtx {
 
         /* initialize decode picture manager */
         let mut dpm = EvcPm::new(self.w as usize, self.h as usize, self.cs);
-        dpm.evc_picman_init(
-            MAX_PB_SIZE as u8,
-            MAX_NUM_REF_PICS as u8,
-            //PICBUF_ALLOCATOR * pa
-        )?;
+        dpm.evc_picman_init(MAX_PB_SIZE as u8, MAX_NUM_REF_PICS as u8)?;
         self.dpm = Some(dpm);
 
         if self.sps.chroma_qp_table_struct.chroma_qp_table_present_flag {
@@ -383,8 +410,8 @@ impl EvcdCtx {
     }
 
     fn update_core_loc_param(&mut self) {
-        self.core.x_pel = self.core.x_lcu << self.log2_max_cuwh as u16; // entry point's x location in pixel
-        self.core.y_pel = self.core.y_lcu << self.log2_max_cuwh as u16; // entry point's y location in pixel
+        self.core.x_pel = self.core.x_lcu << MAX_CU_LOG2 as u16; // entry point's x location in pixel
+        self.core.y_pel = self.core.y_lcu << MAX_CU_LOG2 as u16; // entry point's y location in pixel
         self.core.x_scu = self.core.x_lcu << (MAX_CU_LOG2 - MIN_CU_LOG2) as u16; // set x_scu location
         self.core.y_scu = self.core.y_lcu << (MAX_CU_LOG2 - MIN_CU_LOG2) as u16; // set y_scu location
         self.core.lcu_num = self.core.x_lcu + self.core.y_lcu * self.w_lcu; // Init the first lcu_num in tile
@@ -1052,10 +1079,10 @@ impl EvcdCtx {
         let sbac = &mut self.sbac_dec;
         let sbac_ctx = &mut self.sbac_ctx;
 
-        let cuw = 1 << log2_cuw as u16;
-        let cuh = 1 << log2_cuh as u16;
+        let cuw = 1u16 << log2_cuw;
+        let cuh = 1u16 << log2_cuh;
         let mut split_mode = SplitMode::NO_SPLIT;
-        if cuw > self.min_cuwh || cuh > self.min_cuwh {
+        if cuw > MIN_CU_SIZE as u16 || cuh > MIN_CU_SIZE as u16 {
             if x0 + cuw <= self.w && y0 + cuh <= self.h {
                 if next_split {
                     split_mode = evcd_eco_split_mode(bs, sbac, sbac_ctx, cuw, cuh)?;
@@ -1064,13 +1091,13 @@ impl EvcdCtx {
                     EVC_TRACE(
                         &mut bs.tracer,
                         core.x_pel
-                            + (cup % (self.max_cuwh >> MIN_CU_LOG2 as u16) << MIN_CU_LOG2 as u16),
+                            + (cup % (MAX_CU_SIZE as u16 >> MIN_CU_LOG2) << MIN_CU_LOG2 as u16),
                     );
                     EVC_TRACE(&mut bs.tracer, " y pos ");
                     EVC_TRACE(
                         &mut bs.tracer,
                         core.y_pel
-                            + (cup / (self.max_cuwh >> MIN_CU_LOG2 as u16) << MIN_CU_LOG2 as u16),
+                            + (cup / (MAX_CU_SIZE as u16 >> MIN_CU_LOG2) << MIN_CU_LOG2 as u16),
                     );
                     EVC_TRACE(&mut bs.tracer, " width ");
                     EVC_TRACE(&mut bs.tracer, cuw);
@@ -1097,14 +1124,12 @@ impl EvcdCtx {
                 EVC_TRACE(&mut bs.tracer, "x pos ");
                 EVC_TRACE(
                     &mut bs.tracer,
-                    core.x_pel
-                        + (cup % (self.max_cuwh >> MIN_CU_LOG2 as u16) << MIN_CU_LOG2 as u16),
+                    core.x_pel + (cup % (MAX_CU_SIZE as u16 >> MIN_CU_LOG2) << MIN_CU_LOG2 as u16),
                 );
                 EVC_TRACE(&mut bs.tracer, " y pos ");
                 EVC_TRACE(
                     &mut bs.tracer,
-                    core.y_pel
-                        + (cup / (self.max_cuwh >> MIN_CU_LOG2 as u16) << MIN_CU_LOG2 as u16),
+                    core.y_pel + (cup / (MAX_CU_SIZE as u16 >> MIN_CU_LOG2) << MIN_CU_LOG2 as u16),
                 );
                 EVC_TRACE(&mut bs.tracer, " width ");
                 EVC_TRACE(&mut bs.tracer, cuw);
@@ -1148,7 +1173,7 @@ impl EvcdCtx {
             cup,
             cuw,
             cuh,
-            self.max_cuwh,
+            MAX_CU_SIZE as u16,
         );
 
         if split_mode != SplitMode::NO_SPLIT {
@@ -1160,7 +1185,7 @@ impl EvcdCtx {
                 cuh,
                 cup,
                 cud,
-                self.log2_max_cuwh - MIN_CU_LOG2 as u8,
+                (MAX_CU_LOG2 - MIN_CU_LOG2) as u8,
             );
 
             for cur_part_num in 0..split_struct.part_count {
@@ -1224,8 +1249,8 @@ impl EvcdCtx {
             self.evcd_eco_tree(
                 self.core.x_pel,
                 self.core.y_pel,
-                self.log2_max_cuwh,
-                self.log2_max_cuwh,
+                MAX_CU_LOG2 as u8,
+                MAX_CU_LOG2 as u8,
                 0,
                 0,
                 true,
@@ -1291,13 +1316,13 @@ impl EvcdCtx {
         cup: u16,
         is_hor_edge: bool,
     ) {
-        let lcu_num = (x >> self.log2_max_cuwh) + (y >> self.log2_max_cuwh) * self.w_lcu;
+        let lcu_num = (x >> MAX_CU_LOG2) + (y >> MAX_CU_LOG2) * self.w_lcu;
         let split_mode = evc_get_split_mode(
             cud,
             cup,
             cuw,
             cuh,
-            self.max_cuwh,
+            MAX_CU_SIZE as u16,
             &self.map_split[lcu_num as usize],
         );
 
@@ -1315,7 +1340,7 @@ impl EvcdCtx {
                 cuh,
                 cup,
                 cud,
-                self.log2_max_cuwh - MIN_CU_LOG2 as u8,
+                (MAX_CU_LOG2 - MIN_CU_LOG2) as u8,
             );
 
             // In base profile we have small chroma blocks
@@ -1443,7 +1468,7 @@ impl EvcdCtx {
             p.pic_qp_v_offset = self.sh.qp_v_offset;
         }
 
-        let scu_in_lcu_wh = 1 << (self.log2_max_cuwh - MIN_CU_LOG2 as u8);
+        let scu_in_lcu_wh = 1 << (MAX_CU_LOG2 - MIN_CU_LOG2);
 
         let x_l = 0; //entry point lcu's x location
         let y_l = 0; // entry point lcu's y location
@@ -1464,10 +1489,10 @@ impl EvcdCtx {
         for j in y_l..y_r {
             for i in x_l..x_r {
                 self.deblock_tree(
-                    (i << self.log2_max_cuwh),
-                    (j << self.log2_max_cuwh),
-                    self.max_cuwh,
-                    self.max_cuwh,
+                    (i << MAX_CU_LOG2),
+                    (j << MAX_CU_LOG2),
+                    MAX_CU_SIZE as u16,
+                    MAX_CU_SIZE as u16,
                     0,
                     0,
                     false, /*horizontal filtering of vertical edge*/
@@ -1485,10 +1510,10 @@ impl EvcdCtx {
         for j in y_l..y_r {
             for i in x_l..x_r {
                 self.deblock_tree(
-                    (i << self.log2_max_cuwh),
-                    (j << self.log2_max_cuwh),
-                    self.max_cuwh,
-                    self.max_cuwh,
+                    (i << MAX_CU_LOG2),
+                    (j << MAX_CU_LOG2),
+                    MAX_CU_SIZE as u16,
+                    MAX_CU_SIZE as u16,
                     0,
                     0,
                     true, /*vertical filtering of horizontal edge*/
