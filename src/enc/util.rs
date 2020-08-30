@@ -54,7 +54,6 @@ pub(crate) fn evc_check_split_mode(split_allow: &mut [bool]) {
 
 pub(crate) fn evc_get_default_tree_cons() -> TREE_CONS {
     TREE_CONS {
-        changed: false,
         tree_type: TREE_TYPE::TREE_LC,
         mode_cons: MODE_CONS::eAll,
     }

@@ -2040,9 +2040,8 @@ impl EvceCtx {
         cud: u16,
         cup: u16,
         is_hor_edge: bool,
-        tree_cons: &TREE_CONS_NEW,
+        tree_cons: &TREE_CONS,
     ) {
-        self.core.tree_cons.changed = false;
         self.core.tree_cons.tree_type = tree_cons.tree_type;
         self.core.tree_cons.mode_cons = tree_cons.mode_cons;
         let lcu_num = (x >> self.log2_max_cuwh) + (y >> self.log2_max_cuwh) * self.w_lcu;
@@ -2073,7 +2072,7 @@ impl EvceCtx {
             );
 
             // In base profile we have small chroma blocks
-            let tree_constrain_for_child = TREE_CONS_NEW {
+            let tree_constrain_for_child = TREE_CONS {
                 tree_type: TREE_TYPE::TREE_LC,
                 mode_cons: MODE_CONS::eAll,
             };
@@ -2099,7 +2098,6 @@ impl EvceCtx {
                 }
             }
 
-            self.core.tree_cons.changed = false;
             self.core.tree_cons.tree_type = tree_cons.tree_type;
             self.core.tree_cons.mode_cons = tree_cons.mode_cons;
         } else if let (Some(pic), Some(map_refi), Some(map_mv)) =
@@ -2205,7 +2203,6 @@ impl EvceCtx {
             }
         }
 
-        self.core.tree_cons.changed = false;
         self.core.tree_cons.tree_type = tree_cons.tree_type;
         self.core.tree_cons.mode_cons = tree_cons.mode_cons;
     }
@@ -2245,7 +2242,7 @@ impl EvceCtx {
                     0,
                     0,
                     false, /*horizontal filtering of vertical edge*/
-                    &TREE_CONS_NEW {
+                    &TREE_CONS {
                         tree_type: TREE_TYPE::TREE_LC,
                         mode_cons: MODE_CONS::eAll,
                     },
@@ -2270,7 +2267,7 @@ impl EvceCtx {
                     0,
                     0,
                     true, /*vertical filtering of horizontal edge*/
-                    &TREE_CONS_NEW {
+                    &TREE_CONS {
                         tree_type: TREE_TYPE::TREE_LC,
                         mode_cons: MODE_CONS::eAll,
                     },

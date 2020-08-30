@@ -893,7 +893,7 @@ impl EvcdCtx {
         y: u16,
         log2_cuw: u8,
         log2_cuh: u8,
-        tree_cons: TREE_CONS_NEW,
+        tree_cons: TREE_CONS,
     ) -> Result<(), EvcError> {
         let cuw = 1 << log2_cuw;
         let cuh = 1 << log2_cuh;
@@ -905,7 +905,6 @@ impl EvcdCtx {
             let sbac = &mut self.sbac_dec;
 
             core.tree_cons = TREE_CONS {
-                changed: false,
                 tree_type: tree_cons.tree_type,
                 mode_cons: tree_cons.mode_cons,
             };
@@ -1262,7 +1261,7 @@ impl EvcdCtx {
                 y0,
                 log2_cuw,
                 log2_cuh,
-                TREE_CONS_NEW {
+                TREE_CONS {
                     tree_type,
                     mode_cons,
                 },
@@ -1372,9 +1371,8 @@ impl EvcdCtx {
         cud: u16,
         cup: u16,
         is_hor_edge: bool,
-        tree_cons: &TREE_CONS_NEW,
+        tree_cons: &TREE_CONS,
     ) {
-        self.core.tree_cons.changed = false;
         self.core.tree_cons.tree_type = tree_cons.tree_type;
         self.core.tree_cons.mode_cons = tree_cons.mode_cons;
         let lcu_num = (x >> self.log2_max_cuwh) + (y >> self.log2_max_cuwh) * self.w_lcu;
@@ -1405,7 +1403,7 @@ impl EvcdCtx {
             );
 
             // In base profile we have small chroma blocks
-            let tree_constrain_for_child = TREE_CONS_NEW {
+            let tree_constrain_for_child = TREE_CONS {
                 tree_type: TREE_TYPE::TREE_LC,
                 mode_cons: MODE_CONS::eAll,
             };
@@ -1431,7 +1429,6 @@ impl EvcdCtx {
                 }
             }
 
-            self.core.tree_cons.changed = false;
             self.core.tree_cons.tree_type = tree_cons.tree_type;
             self.core.tree_cons.mode_cons = tree_cons.mode_cons;
         } else if let (Some(pic), Some(map_refi), Some(map_mv)) =
@@ -1537,7 +1534,6 @@ impl EvcdCtx {
             }
         }
 
-        self.core.tree_cons.changed = false;
         self.core.tree_cons.tree_type = tree_cons.tree_type;
         self.core.tree_cons.mode_cons = tree_cons.mode_cons;
     }
@@ -1577,7 +1573,7 @@ impl EvcdCtx {
                     0,
                     0,
                     false, /*horizontal filtering of vertical edge*/
-                    &TREE_CONS_NEW {
+                    &TREE_CONS {
                         tree_type: TREE_TYPE::TREE_LC,
                         mode_cons: MODE_CONS::eAll,
                     },
@@ -1602,7 +1598,7 @@ impl EvcdCtx {
                     0,
                     0,
                     true, /*vertical filtering of horizontal edge*/
-                    &TREE_CONS_NEW {
+                    &TREE_CONS {
                         tree_type: TREE_TYPE::TREE_LC,
                         mode_cons: MODE_CONS::eAll,
                     },

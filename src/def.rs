@@ -763,13 +763,6 @@ impl Default for MODE_CONS {
 
 #[derive(Clone, Copy, Default)]
 pub(crate) struct TREE_CONS {
-    pub(crate) changed: bool,
-    pub(crate) tree_type: TREE_TYPE,
-    pub(crate) mode_cons: MODE_CONS,
-}
-
-#[derive(Clone, Copy, Default)]
-pub(crate) struct TREE_CONS_NEW {
     pub(crate) tree_type: TREE_TYPE,
     pub(crate) mode_cons: MODE_CONS,
 }
