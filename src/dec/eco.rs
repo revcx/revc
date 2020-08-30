@@ -269,7 +269,7 @@ pub(crate) fn evcd_eco_cu_skip_flag(
     sbac_ctx: &mut EvcSbacCtx,
     ctx_flags: &[u8],
 ) -> Result<u32, EvcError> {
-    let ctx_flag = ctx_flags[CtxNevIdx::CNID_SKIP_FLAG as usize] as usize;
+    let ctx_flag = ctx_flags[CNID_SKIP_FLAG] as usize;
     let cu_skip_flag = sbac.decode_bin(bs, &mut sbac_ctx.skip_flag[ctx_flag])?; /* cu_skip_flag */
 
     EVC_TRACE_COUNTER(&mut bs.tracer);
@@ -292,7 +292,7 @@ pub(crate) fn evcd_eco_pred_mode(
     let mut pred_mode_flag = false;
 
     if mode_cons == MODE_CONS::eAll {
-        let ctx_flag = ctx_flags[CtxNevIdx::CNID_PRED_MODE as usize] as usize;
+        let ctx_flag = ctx_flags[CNID_PRED_MODE] as usize;
         pred_mode_flag = sbac.decode_bin(bs, &mut sbac_ctx.pred_mode[ctx_flag])? != 0;
 
         EVC_TRACE_COUNTER(&mut bs.tracer);

@@ -431,10 +431,9 @@ pub(crate) fn evce_eco_cbf(
     b_no_cbf: bool,
     cbf_all: u16,
     run: &[bool],
-    mode_cons: MODE_CONS,
 ) {
     /* code allcbf */
-    if pred_mode != PredMode::MODE_INTRA && !evc_check_only_intra(mode_cons) {
+    if pred_mode != PredMode::MODE_INTRA {
         if b_no_cbf {
             assert!(cbf_all != 0);
         } else if (run[Y_C] as u8 + run[U_C] as u8 + run[V_C] as u8) == 3 {
@@ -867,7 +866,6 @@ pub(crate) fn evce_eco_coef(
     run_stats: u8,
     enc_dqp: bool,
     cur_qp: u8,
-    mode_cons: MODE_CONS,
     sps_dquant_flag: bool,
     pps_cu_qp_delta_enabled_flag: bool,
     core_cu_qp_delta_code: u8,
@@ -904,8 +902,6 @@ pub(crate) fn evce_eco_coef(
     assert!(run_stats != 0);
 
     let mut cbf_all = 0;
-    let is_intra = pred_mode == PredMode::MODE_INTRA;
-
     for c in 0..N_C {
         if run[c] {
             cbf_all += if nnz[c] != 0 { 1 } else { 0 };
@@ -923,7 +919,6 @@ pub(crate) fn evce_eco_coef(
         b_no_cbf,
         cbf_all,
         &run,
-        mode_cons,
     );
     if pps_cu_qp_delta_enabled_flag && enc_dqp {
         let cbf_for_dqp = nnz[Y_C] != 0 || nnz[U_C] != 0 || nnz[V_C] != 0;

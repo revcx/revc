@@ -1285,12 +1285,7 @@ impl EvceCtx {
                         self.core.s_temp_run = self.core.s_temp_prev_comp_run;
                         self.core.c_temp_run = self.core.c_temp_prev_comp_run;
                         self.core.s_temp_run.bit_reset();
-                        self.evce_rdo_bit_cnt_cu_inter_comp(
-                            self.sh.slice_type,
-                            i,
-                            pidx,
-                            pred_coef_idx,
-                        );
+                        self.evce_rdo_bit_cnt_cu_inter_comp(i, pidx, pred_coef_idx);
 
                         let bit_cnt = self.core.s_temp_run.get_bit_number();
                         cost += (self.lambda[i] * bit_cnt as f64);

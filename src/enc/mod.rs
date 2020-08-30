@@ -254,11 +254,8 @@ pub(crate) struct EvceCore {
     inter_satd: u32,
     dist_cu: i32,
     dist_cu_best: i32, //dist of the best intra mode (note: only updated in intra coding now)
-    /* temporal pixel buffer for inter prediction */
-    //pel            eif_tmp_buffer[(MAX_CU_SIZE + 2) * (MAX_CU_SIZE + 2)];
-    //u8             au8_eval_mvp_idx[MAX_NUM_MVP];
-    //tree_cons: TREE_CONS,
-    ctx_flags: [u8; CtxNevIdx::NUM_CNID as usize],
+
+    ctx_flags: [u8; NUM_CNID],
     split_mode_child: [bool; 4],
     parent_split_allow: [bool; 6],
 
@@ -1122,7 +1119,6 @@ impl EvceCtx {
                     true,
                     0,
                     0,
-                    MODE_CONS::eAll,
                 );
 
                 /* prepare next step *********************************************/
@@ -1551,7 +1547,6 @@ impl EvceCtx {
         next_split: bool,
         qt_depth: u8,
         mut cu_qp_delta_code: u8,
-        mode_cons: MODE_CONS,
     ) {
         let core = &mut self.core;
         let bs = &mut self.bs;
@@ -1631,7 +1626,6 @@ impl EvceCtx {
                         true,
                         split_mode.inc_qt_depth(qt_depth),
                         cu_qp_delta_code,
-                        mode_cons,
                     );
                 }
             }
@@ -1655,19 +1649,11 @@ impl EvceCtx {
             }
 
             core.cu_qp_delta_code = cu_qp_delta_code;
-            self.evce_eco_unit(x0, y0, cup as usize, cuw, cuh, mode_cons);
+            self.evce_eco_unit(x0, y0, cup as usize, cuw, cuh);
         }
     }
 
-    fn evce_eco_unit(
-        &mut self,
-        x: u16,
-        y: u16,
-        cup: usize,
-        cuw: u16,
-        cuh: u16,
-        mode_cons: MODE_CONS,
-    ) {
+    fn evce_eco_unit(&mut self, x: u16, y: u16, cup: usize, cuw: u16, cuh: u16) {
         let enc_dqp = 0;
         let slice_type = self.slice_type;
 
@@ -1721,13 +1707,13 @@ impl EvceCtx {
             }
 
             /* entropy coding a CU */
-            if slice_type != SliceType::EVC_ST_I && !evc_check_only_intra(mode_cons) {
+            if slice_type != SliceType::EVC_ST_I {
                 evce_eco_skip_flag(
                     bs,
                     sbac,
                     sbac_ctx,
                     core.skip_flag as u32,
-                    core.ctx_flags[CtxNevIdx::CNID_SKIP_FLAG as usize] as usize,
+                    core.ctx_flags[CNID_SKIP_FLAG] as usize,
                 );
 
                 if core.skip_flag {
@@ -1747,15 +1733,13 @@ impl EvceCtx {
                         );
                     }
                 } else {
-                    if evc_check_all_preds(mode_cons) {
-                        evce_eco_pred_mode(
-                            bs,
-                            sbac,
-                            sbac_ctx,
-                            core.cu_mode,
-                            core.ctx_flags[CtxNevIdx::CNID_PRED_MODE as usize] as usize,
-                        );
-                    }
+                    evce_eco_pred_mode(
+                        bs,
+                        sbac,
+                        sbac_ctx,
+                        core.cu_mode,
+                        core.ctx_flags[CNID_PRED_MODE] as usize,
+                    );
 
                     if core.cu_mode != PredMode::MODE_INTRA {
                         evce_eco_direct_mode_flag(
@@ -1859,7 +1843,6 @@ impl EvceCtx {
                 TQC_RUN::RUN_L as u8 | TQC_RUN::RUN_CB as u8 | TQC_RUN::RUN_CR as u8,
                 true,
                 self.map_cu_data[self.core.lcu_num as usize].qp_y[cup] - 6 * (BIT_DEPTH as u8 - 8),
-                mode_cons,
                 self.sps.dquant_flag,
                 self.pps.cu_qp_delta_enabled_flag,
                 self.core.cu_qp_delta_code,

@@ -241,14 +241,9 @@ impl From<u8> for IntraPredDir {
     }
 }
 
-pub(crate) enum CtxNevIdx {
-    CNID_SKIP_FLAG = 0,
-    CNID_PRED_MODE = 1,
-    CNID_MODE_CONS = 2,
-    CNID_AFFN_FLAG = 3,
-    CNID_IBC_FLAG = 4,
-    NUM_CNID = 5,
-}
+pub(crate) const CNID_SKIP_FLAG: usize = 0;
+pub(crate) const CNID_PRED_MODE: usize = 1;
+pub(crate) const NUM_CNID: usize = 2;
 
 /*************************************************
 

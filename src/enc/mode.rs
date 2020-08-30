@@ -493,7 +493,6 @@ impl EvceCtx {
             true,
             0,
             self.qp,
-            MODE_CONS::eAll,
         );
 
         self.update_to_ctx_map();
@@ -544,7 +543,6 @@ impl EvceCtx {
         mut next_split: bool,
         qt_depth: u8,
         qp: u8,
-        mode_cons: MODE_CONS,
     ) -> f64 {
         // x0 = CU's left up corner horizontal index in entrie frame
         // y0 = CU's left up corner vertical index in entire frame
@@ -738,8 +736,7 @@ impl EvceCtx {
                     );
 
                     self.clear_map_scu(x0, y0, cuw, cuh);
-                    cost_temp_dqp +=
-                        self.mode_coding_unit(x0, y0, log2_cuw, log2_cuh, cud, mode_cons);
+                    cost_temp_dqp += self.mode_coding_unit(x0, y0, log2_cuw, log2_cuh, cud);
 
                     if cost_best > cost_temp_dqp {
                         cu_mode_dqp = self.core.cu_mode;
@@ -999,7 +996,6 @@ impl EvceCtx {
                                 true,
                                 split_mode.inc_qt_depth(qt_depth),
                                 self.core.qp,
-                                mode_cons,
                             );
 
                             self.core.qp = GET_QP(qp as i8, dqp - qp as i8) as u8;
@@ -1540,7 +1536,6 @@ impl EvceCtx {
         log2_cuw: usize,
         log2_cuh: usize,
         cud: u16,
-        mode_cons: MODE_CONS,
     ) -> f64 {
         assert!((log2_cuw as i8 - log2_cuh as i8).abs() <= 2);
         self.mode_cu_init(x, y, log2_cuw as u8, log2_cuh as u8, cud);
@@ -1604,12 +1599,11 @@ impl EvceCtx {
         }
 
         /* intra *************************************************************/
-        if (self.slice_type == SliceType::EVC_ST_I
+        if self.slice_type == SliceType::EVC_ST_I
             || self.core.nnz[Y_C] != 0
             || self.core.nnz[U_C] != 0
             || self.core.nnz[V_C] != 0
-            || cost_best == MAX_COST)
-            && !evc_check_only_inter(mode_cons)
+            || cost_best == MAX_COST
         {
             self.core.cost_best = cost_best;
             self.core.dist_cu_best = i32::MAX;
@@ -1766,8 +1760,7 @@ impl EvceCtx {
         if slice_type != SliceType::EVC_ST_I {
             self.core.s_temp_run.encode_bin(
                 &mut self.core.bs_temp,
-                &mut self.core.c_temp_run.skip_flag
-                    [self.core.ctx_flags[CtxNevIdx::CNID_SKIP_FLAG as usize] as usize],
+                &mut self.core.c_temp_run.skip_flag[self.core.ctx_flags[CNID_SKIP_FLAG] as usize],
                 0,
             ); /* skip_flag */
             evce_eco_pred_mode(
@@ -1775,7 +1768,7 @@ impl EvceCtx {
                 &mut self.core.s_temp_run,
                 &mut self.core.c_temp_run,
                 PredMode::MODE_INTRA,
-                self.core.ctx_flags[CtxNevIdx::CNID_PRED_MODE as usize] as usize,
+                self.core.ctx_flags[CNID_PRED_MODE] as usize,
             );
         }
 
@@ -1806,11 +1799,6 @@ impl EvceCtx {
             TQC_RUN::RUN_L as u8,
             false,
             self.core.qp,
-            if slice_type == SliceType::EVC_ST_I {
-                MODE_CONS::eOnlyIntra
-            } else {
-                MODE_CONS::eAll
-            },
             self.sps.dquant_flag,
             self.pps.cu_qp_delta_enabled_flag,
             self.core.cu_qp_delta_code,
@@ -1843,11 +1831,6 @@ impl EvceCtx {
             TQC_RUN::RUN_CB as u8 | TQC_RUN::RUN_CR as u8,
             false,
             0,
-            if slice_type == SliceType::EVC_ST_I {
-                MODE_CONS::eOnlyIntra
-            } else {
-                MODE_CONS::eAll
-            },
             self.sps.dquant_flag,
             self.pps.cu_qp_delta_enabled_flag,
             self.core.cu_qp_delta_code,
@@ -1863,8 +1846,7 @@ impl EvceCtx {
         if slice_type != SliceType::EVC_ST_I {
             self.core.s_temp_run.encode_bin(
                 &mut self.core.bs_temp,
-                &mut self.core.c_temp_run.skip_flag
-                    [self.core.ctx_flags[CtxNevIdx::CNID_SKIP_FLAG as usize] as usize],
+                &mut self.core.c_temp_run.skip_flag[self.core.ctx_flags[CNID_SKIP_FLAG] as usize],
                 0,
             ); /* skip_flag */
             evce_eco_pred_mode(
@@ -1872,7 +1854,7 @@ impl EvceCtx {
                 &mut self.core.s_temp_run,
                 &mut self.core.c_temp_run,
                 PredMode::MODE_INTRA,
-                self.core.ctx_flags[CtxNevIdx::CNID_PRED_MODE as usize] as usize,
+                self.core.ctx_flags[CNID_PRED_MODE] as usize,
             );
         }
 
@@ -1903,11 +1885,6 @@ impl EvceCtx {
             TQC_RUN::RUN_L as u8 | TQC_RUN::RUN_CB as u8 | TQC_RUN::RUN_CR as u8,
             self.pps.cu_qp_delta_enabled_flag,
             self.core.qp,
-            if slice_type == SliceType::EVC_ST_I {
-                MODE_CONS::eOnlyIntra
-            } else {
-                MODE_CONS::eAll
-            },
             self.sps.dquant_flag,
             self.pps.cu_qp_delta_enabled_flag,
             self.core.cu_qp_delta_code,
@@ -1938,8 +1915,7 @@ impl EvceCtx {
         if slice_type != SliceType::EVC_ST_I {
             self.core.s_temp_run.encode_bin(
                 &mut self.core.bs_temp,
-                &mut self.core.c_temp_run.skip_flag
-                    [self.core.ctx_flags[CtxNevIdx::CNID_SKIP_FLAG as usize] as usize],
+                &mut self.core.c_temp_run.skip_flag[self.core.ctx_flags[CNID_SKIP_FLAG] as usize],
                 0,
             ); /* skip_flag */
 
@@ -1948,7 +1924,7 @@ impl EvceCtx {
                 &mut self.core.s_temp_run,
                 &mut self.core.c_temp_run,
                 PredMode::MODE_INTER,
-                self.core.ctx_flags[CtxNevIdx::CNID_PRED_MODE as usize] as usize,
+                self.core.ctx_flags[CNID_PRED_MODE] as usize,
             );
 
             let dir_flag = pidx == InterPredDir::PRED_DIR as usize;
@@ -2034,11 +2010,6 @@ impl EvceCtx {
             TQC_RUN::RUN_L as u8 | TQC_RUN::RUN_CB as u8 | TQC_RUN::RUN_CR as u8,
             self.pps.cu_qp_delta_enabled_flag,
             self.core.qp,
-            if slice_type == SliceType::EVC_ST_I {
-                MODE_CONS::eOnlyIntra
-            } else {
-                MODE_CONS::eAll
-            },
             self.sps.dquant_flag,
             self.pps.cu_qp_delta_enabled_flag,
             self.core.cu_qp_delta_code,
@@ -2056,7 +2027,6 @@ impl EvceCtx {
 
     pub(crate) fn evce_rdo_bit_cnt_cu_inter_comp(
         &mut self,
-        slice_type: SliceType,
         ch_type: usize,
         pidx: usize,
         coef_idx: usize,
@@ -2086,11 +2056,6 @@ impl EvceCtx {
             run_stats,
             false,
             if ch_type == Y_C { self.core.qp } else { 0 },
-            if slice_type == SliceType::EVC_ST_I {
-                MODE_CONS::eOnlyIntra
-            } else {
-                MODE_CONS::eAll
-            },
             self.sps.dquant_flag,
             self.pps.cu_qp_delta_enabled_flag,
             self.core.cu_qp_delta_code,
@@ -2108,8 +2073,7 @@ impl EvceCtx {
         if slice_type != SliceType::EVC_ST_I {
             self.core.s_temp_run.encode_bin(
                 &mut self.core.bs_temp,
-                &mut self.core.c_temp_run.skip_flag
-                    [self.core.ctx_flags[CtxNevIdx::CNID_SKIP_FLAG as usize] as usize],
+                &mut self.core.c_temp_run.skip_flag[self.core.ctx_flags[CNID_SKIP_FLAG] as usize],
                 1,
             ); /* skip_flag */
 
