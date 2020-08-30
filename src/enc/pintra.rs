@@ -440,7 +440,6 @@ impl EvceCtx {
                 self.lambda[1],
                 self.lambda[2],
                 TQC_RUN::RUN_L as u8,
-                &self.core.tree_cons,
                 &self.core.rdoq_est,
             );
 
@@ -574,7 +573,6 @@ impl EvceCtx {
                 self.lambda[1],
                 self.lambda[2],
                 TQC_RUN::RUN_CB as u8 | TQC_RUN::RUN_CR as u8,
-                &self.core.tree_cons,
                 &self.core.rdoq_est,
             );
 

@@ -431,10 +431,10 @@ pub(crate) fn evce_eco_cbf(
     b_no_cbf: bool,
     cbf_all: u16,
     run: &[bool],
-    tree_cons: &TREE_CONS,
+    mode_cons: MODE_CONS,
 ) {
     /* code allcbf */
-    if pred_mode != PredMode::MODE_INTRA && !evc_check_only_intra(tree_cons) {
+    if pred_mode != PredMode::MODE_INTRA && !evc_check_only_intra(mode_cons) {
         if b_no_cbf {
             assert!(cbf_all != 0);
         } else if (run[Y_C] as u8 + run[U_C] as u8 + run[V_C] as u8) == 3 {
@@ -627,7 +627,6 @@ pub(crate) fn coef_rect_to_series(
     mut y: u16,
     mut cuw: u16,
     mut cuh: u16,
-    tree_cons: &TREE_CONS,
 ) {
     let max_cuwh = 1u16 << log2_max_cuwh;
 
@@ -868,7 +867,7 @@ pub(crate) fn evce_eco_coef(
     run_stats: u8,
     enc_dqp: bool,
     cur_qp: u8,
-    tree_cons: &TREE_CONS,
+    mode_cons: MODE_CONS,
     sps_dquant_flag: bool,
     pps_cu_qp_delta_enabled_flag: bool,
     core_cu_qp_delta_code: u8,
@@ -895,7 +894,7 @@ pub(crate) fn evce_eco_coef(
     let coef = &self.core.ctmp;
      */
 
-    let run_stats = evc_get_run(run_stats, tree_cons);
+    let run_stats = evc_get_run(run_stats);
     let run = [
         run_stats & 1 != 0,
         (run_stats >> 1) & 1 != 0,
@@ -924,7 +923,7 @@ pub(crate) fn evce_eco_coef(
         b_no_cbf,
         cbf_all,
         &run,
-        tree_cons,
+        mode_cons,
     );
     if pps_cu_qp_delta_enabled_flag && enc_dqp {
         let cbf_for_dqp = nnz[Y_C] != 0 || nnz[U_C] != 0 || nnz[V_C] != 0;

@@ -287,12 +287,11 @@ pub(crate) fn evcd_eco_pred_mode(
     sbac: &mut EvcdSbac,
     sbac_ctx: &mut EvcSbacCtx,
     ctx_flags: &[u8],
-    tree_cons: &TREE_CONS,
+    mode_cons: MODE_CONS,
 ) -> Result<PredMode, EvcError> {
     let mut pred_mode_flag = false;
-    let pred_mode_constraint = tree_cons.mode_cons;
 
-    if pred_mode_constraint == MODE_CONS::eAll {
+    if mode_cons == MODE_CONS::eAll {
         let ctx_flag = ctx_flags[CtxNevIdx::CNID_PRED_MODE as usize] as usize;
         pred_mode_flag = sbac.decode_bin(bs, &mut sbac_ctx.pred_mode[ctx_flag])? != 0;
 
@@ -309,9 +308,9 @@ pub(crate) fn evcd_eco_pred_mode(
         EVC_TRACE(&mut bs.tracer, " \n");
     }
 
-    let pred_mode = if pred_mode_constraint == MODE_CONS::eOnlyInter {
+    let pred_mode = if mode_cons == MODE_CONS::eOnlyInter {
         PredMode::MODE_INTER
-    } else if pred_mode_constraint == MODE_CONS::eOnlyIntra {
+    } else if mode_cons == MODE_CONS::eOnlyIntra {
         PredMode::MODE_INTRA
     } else {
         if pred_mode_flag {
@@ -544,7 +543,6 @@ pub(crate) fn eco_cbf(
     is_sub: bool,
     sub_pos: u8,
     cbf_all: &mut bool,
-    tree_cons: &TREE_CONS,
 ) -> Result<(), EvcError> {
     /* decode allcbf */
     if pred_mode != PredMode::MODE_INTRA {

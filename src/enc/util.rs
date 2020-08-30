@@ -52,12 +52,6 @@ pub(crate) fn evc_check_split_mode(split_allow: &mut [bool]) {
     split_allow[SplitMode::SPLIT_QUAD as usize] = true;
 }
 
-pub(crate) fn evc_get_default_tree_cons() -> TREE_CONS {
-    TREE_CONS {
-        mode_cons: MODE_CONS::eAll,
-    }
-}
-
 pub(crate) fn evc_get_avail_block(
     x_scu: u16,
     y_scu: u16,
@@ -127,10 +121,9 @@ pub(crate) enum TQC_RUN {
     RUN_CR = 4,
 }
 
-pub(crate) fn evc_get_run(run_list: u8, tree_cons: &TREE_CONS) -> u8 {
+pub(crate) fn evc_get_run(run_list: u8) -> u8 {
     let mut ans = 0;
     ans |= run_list & TQC_RUN::RUN_L as u8;
-
     ans |= run_list & TQC_RUN::RUN_CB as u8;
     ans |= run_list & TQC_RUN::RUN_CR as u8;
     return ans;

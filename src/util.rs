@@ -85,7 +85,6 @@ pub(crate) struct EvcSplitStruct {
     pub(crate) x_pos: [u16; SPLIT_MAX_PART_COUNT],
     pub(crate) y_pos: [u16; SPLIT_MAX_PART_COUNT],
     pub(crate) cup: [u16; SPLIT_MAX_PART_COUNT],
-    pub(crate) tree_cons: TREE_CONS,
 }
 
 pub(crate) fn evc_split_get_part_structure(
@@ -290,18 +289,18 @@ pub(crate) fn evc_get_avail_intra(
 }
 
 #[inline]
-pub(crate) fn evc_check_only_intra(tree_cons: &TREE_CONS) -> bool {
-    tree_cons.mode_cons == MODE_CONS::eOnlyIntra
+pub(crate) fn evc_check_only_intra(mode_cons: MODE_CONS) -> bool {
+    mode_cons == MODE_CONS::eOnlyIntra
 }
 
 #[inline]
-pub(crate) fn evc_check_only_inter(tree_cons: &TREE_CONS) -> bool {
-    tree_cons.mode_cons == MODE_CONS::eOnlyInter
+pub(crate) fn evc_check_only_inter(mode_cons: MODE_CONS) -> bool {
+    mode_cons == MODE_CONS::eOnlyInter
 }
 
 #[inline]
-pub(crate) fn evc_check_all_preds(tree_cons: &TREE_CONS) -> bool {
-    tree_cons.mode_cons == MODE_CONS::eAll
+pub(crate) fn evc_check_all_preds(mode_cons: MODE_CONS) -> bool {
+    mode_cons == MODE_CONS::eAll
 }
 
 pub(crate) fn evc_block_copy(

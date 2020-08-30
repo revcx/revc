@@ -257,8 +257,7 @@ pub(crate) struct EvceCore {
     /* temporal pixel buffer for inter prediction */
     //pel            eif_tmp_buffer[(MAX_CU_SIZE + 2) * (MAX_CU_SIZE + 2)];
     //u8             au8_eval_mvp_idx[MAX_NUM_MVP];
-    tree_cons: TREE_CONS,
-
+    //tree_cons: TREE_CONS,
     ctx_flags: [u8; CtxNevIdx::NUM_CNID as usize],
     split_mode_child: [bool; 4],
     parent_split_allow: [bool; 6],
@@ -1123,7 +1122,7 @@ impl EvceCtx {
                     true,
                     0,
                     0,
-                    evc_get_default_tree_cons(),
+                    MODE_CONS::eAll,
                 );
 
                 /* prepare next step *********************************************/
@@ -1552,14 +1551,12 @@ impl EvceCtx {
         next_split: bool,
         qt_depth: u8,
         mut cu_qp_delta_code: u8,
-        tree_cons: TREE_CONS,
+        mode_cons: MODE_CONS,
     ) {
         let core = &mut self.core;
         let bs = &mut self.bs;
         let sbac = &mut self.sbac_enc;
         let sbac_ctx = &mut self.sbac_ctx;
-
-        core.tree_cons = tree_cons;
 
         let split_mode = evc_get_split_mode(
             cud,
@@ -1634,7 +1631,7 @@ impl EvceCtx {
                         true,
                         split_mode.inc_qt_depth(qt_depth),
                         cu_qp_delta_code,
-                        split_struct.tree_cons,
+                        mode_cons,
                     );
                 }
             }
@@ -1658,7 +1655,7 @@ impl EvceCtx {
             }
 
             core.cu_qp_delta_code = cu_qp_delta_code;
-            self.evce_eco_unit(x0, y0, cup as usize, cuw, cuh, tree_cons);
+            self.evce_eco_unit(x0, y0, cup as usize, cuw, cuh, mode_cons);
         }
     }
 
@@ -1669,7 +1666,7 @@ impl EvceCtx {
         cup: usize,
         cuw: u16,
         cuh: u16,
-        tree_cons: TREE_CONS,
+        mode_cons: MODE_CONS,
     ) {
         let enc_dqp = 0;
         let slice_type = self.slice_type;
@@ -1712,7 +1709,6 @@ impl EvceCtx {
                     y,
                     cuw,
                     cuh,
-                    &core.tree_cons,
                 );
 
                 for i in 0..N_C {
@@ -1725,7 +1721,7 @@ impl EvceCtx {
             }
 
             /* entropy coding a CU */
-            if slice_type != SliceType::EVC_ST_I && !evc_check_only_intra(&core.tree_cons) {
+            if slice_type != SliceType::EVC_ST_I && !evc_check_only_intra(mode_cons) {
                 evce_eco_skip_flag(
                     bs,
                     sbac,
@@ -1751,7 +1747,7 @@ impl EvceCtx {
                         );
                     }
                 } else {
-                    if evc_check_all_preds(&core.tree_cons) {
+                    if evc_check_all_preds(mode_cons) {
                         evce_eco_pred_mode(
                             bs,
                             sbac,
@@ -1863,7 +1859,7 @@ impl EvceCtx {
                 TQC_RUN::RUN_L as u8 | TQC_RUN::RUN_CB as u8 | TQC_RUN::RUN_CR as u8,
                 true,
                 self.map_cu_data[self.core.lcu_num as usize].qp_y[cup] - 6 * (BIT_DEPTH as u8 - 8),
-                &self.core.tree_cons,
+                mode_cons,
                 self.sps.dquant_flag,
                 self.pps.cu_qp_delta_enabled_flag,
                 self.core.cu_qp_delta_code,
@@ -2027,9 +2023,7 @@ impl EvceCtx {
         cud: u16,
         cup: u16,
         is_hor_edge: bool,
-        tree_cons: &TREE_CONS,
     ) {
-        self.core.tree_cons.mode_cons = tree_cons.mode_cons;
         let lcu_num = (x >> self.log2_max_cuwh) + (y >> self.log2_max_cuwh) * self.w_lcu;
         let split_mode = evc_get_split_mode(
             cud,
@@ -2058,10 +2052,6 @@ impl EvceCtx {
             );
 
             // In base profile we have small chroma blocks
-            let tree_constrain_for_child = TREE_CONS {
-                mode_cons: MODE_CONS::eAll,
-            };
-
             for part_num in 0..split_struct.part_count {
                 let cur_part_num = part_num;
                 let sub_cuw = split_struct.width[cur_part_num];
@@ -2078,12 +2068,9 @@ impl EvceCtx {
                         split_struct.cud[cur_part_num],
                         split_struct.cup[cur_part_num],
                         is_hor_edge,
-                        &tree_constrain_for_child,
                     );
                 }
             }
-
-            self.core.tree_cons.mode_cons = tree_cons.mode_cons;
         } else if let (Some(pic), Some(map_refi), Some(map_mv)) =
             (&self.pic[PIC_IDX_MODE], &self.map_refi, &self.map_mv)
         {
@@ -2101,7 +2088,6 @@ impl EvceCtx {
                         &*map_refi.borrow(),
                         &*map_mv.borrow(),
                         self.w_scu as usize,
-                        &self.core.tree_cons,
                         &self.core.evc_tbl_qp_chroma_dynamic_ext,
                     );
 
@@ -2116,7 +2102,6 @@ impl EvceCtx {
                         &*map_refi.borrow(),
                         &*map_mv.borrow(),
                         self.w_scu as usize,
-                        &self.core.tree_cons,
                         &self.core.evc_tbl_qp_chroma_dynamic_ext,
                     );
                 } else {
@@ -2131,7 +2116,6 @@ impl EvceCtx {
                         &*map_refi.borrow(),
                         &*map_mv.borrow(),
                         self.w_scu as usize,
-                        &self.core.tree_cons,
                         &self.core.evc_tbl_qp_chroma_dynamic_ext,
                     );
                 }
@@ -2148,7 +2132,6 @@ impl EvceCtx {
                         &*map_refi.borrow(),
                         &*map_mv.borrow(),
                         self.w_scu as usize,
-                        &self.core.tree_cons,
                         &self.core.evc_tbl_qp_chroma_dynamic_ext,
                         self.w as usize,
                     );
@@ -2163,7 +2146,6 @@ impl EvceCtx {
                         &*map_refi.borrow(),
                         &*map_mv.borrow(),
                         self.w_scu as usize,
-                        &self.core.tree_cons,
                         &self.core.evc_tbl_qp_chroma_dynamic_ext,
                         self.w as usize,
                     );
@@ -2179,15 +2161,12 @@ impl EvceCtx {
                         &*map_refi.borrow(),
                         &*map_mv.borrow(),
                         self.w_scu as usize,
-                        &self.core.tree_cons,
                         &self.core.evc_tbl_qp_chroma_dynamic_ext,
                         self.w as usize,
                     );
                 }
             }
         }
-
-        self.core.tree_cons.mode_cons = tree_cons.mode_cons;
     }
 
     fn evce_deblock(&mut self) {
@@ -2225,9 +2204,6 @@ impl EvceCtx {
                     0,
                     0,
                     false, /*horizontal filtering of vertical edge*/
-                    &TREE_CONS {
-                        mode_cons: MODE_CONS::eAll,
-                    },
                 );
             }
         }
@@ -2249,9 +2225,6 @@ impl EvceCtx {
                     0,
                     0,
                     true, /*vertical filtering of horizontal edge*/
-                    &TREE_CONS {
-                        mode_cons: MODE_CONS::eAll,
-                    },
                 );
             }
         }

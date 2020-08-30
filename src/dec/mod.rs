@@ -101,7 +101,6 @@ pub(crate) struct EvcdCore {
     mvd: [[i16; MV_D]; REFP_NUM],
     inter_dir: InterPredDir,
     ctx_flags: [u8; CtxNevIdx::NUM_CNID as usize],
-    tree_cons: TREE_CONS,
 
     evc_tbl_qp_chroma_dynamic_ext: Vec<Vec<i8>>, // [[i8; MAX_QP_TABLE_SIZE_EXT]; 2],
 }
@@ -506,7 +505,6 @@ impl EvcdCtx {
                 is_sub,
                 0,
                 &mut cbf_all,
-                &core.tree_cons,
             )?;
         } else {
             cbf[Y_C] = false;
@@ -572,7 +570,7 @@ impl EvcdCtx {
         Ok(())
     }
 
-    fn evcd_eco_cu(&mut self) -> Result<(), EvcError> {
+    fn evcd_eco_cu(&mut self, mode_cons: MODE_CONS) -> Result<(), EvcError> {
         let core = &mut self.core;
         let bs = &mut self.bs;
         let sbac = &mut self.sbac_dec;
@@ -607,7 +605,7 @@ impl EvcdCtx {
             &self.map_scu,
         );
 
-        if !evc_check_only_intra(&core.tree_cons) {
+        if !evc_check_only_intra(mode_cons) {
             /* CU skip flag */
             let cu_skip_flag = evcd_eco_cu_skip_flag(bs, sbac, sbac_ctx, &core.ctx_flags)?;
             if cu_skip_flag != 0 {
@@ -646,8 +644,7 @@ impl EvcdCtx {
                 [(EVC_TBL_CHROMA_QP_OFFSET + qp_i_cr) as usize]
                 + (6 * (BIT_DEPTH - 8)) as i8) as u8;
         } else {
-            core.pred_mode =
-                evcd_eco_pred_mode(bs, sbac, sbac_ctx, &core.ctx_flags, &core.tree_cons)?;
+            core.pred_mode = evcd_eco_pred_mode(bs, sbac, sbac_ctx, &core.ctx_flags, mode_cons)?;
 
             if core.pred_mode == PredMode::MODE_INTER {
                 //TODO: bugfix? missing SLICE_TYPE==B for direct_mode_flag?
@@ -881,7 +878,7 @@ impl EvcdCtx {
         y: u16,
         log2_cuw: u8,
         log2_cuh: u8,
-        tree_cons: TREE_CONS,
+        mode_cons: MODE_CONS,
     ) -> Result<(), EvcError> {
         let cuw = 1 << log2_cuw;
         let cuh = 1 << log2_cuh;
@@ -891,10 +888,6 @@ impl EvcdCtx {
             let core = &mut self.core;
             let bs = &mut self.bs;
             let sbac = &mut self.sbac_dec;
-
-            core.tree_cons = TREE_CONS {
-                mode_cons: tree_cons.mode_cons,
-            };
 
             core.log2_cuw = log2_cuw;
             core.log2_cuh = log2_cuh;
@@ -916,7 +909,7 @@ impl EvcdCtx {
             EVC_TRACE(&mut bs.tracer, " \n");
 
             /* parse CU info */
-            self.evcd_eco_cu()?;
+            self.evcd_eco_cu(mode_cons)?;
         }
 
         /* inverse transform and dequantization */
@@ -1070,7 +1063,6 @@ impl EvcdCtx {
                 &self.core.pred[0].data,
                 &self.core.is_coef,
                 &mut pic.borrow().frame.borrow_mut().planes,
-                &self.core.tree_cons,
             );
         }
 
@@ -1234,7 +1226,7 @@ impl EvcdCtx {
                 mode_cons = MODE_CONS::eOnlyIntra;
             }
 
-            self.evcd_eco_unit(x0, y0, log2_cuw, log2_cuh, TREE_CONS { mode_cons })?;
+            self.evcd_eco_unit(x0, y0, log2_cuw, log2_cuh, mode_cons)?;
         }
 
         Ok(())
@@ -1340,9 +1332,7 @@ impl EvcdCtx {
         cud: u16,
         cup: u16,
         is_hor_edge: bool,
-        tree_cons: &TREE_CONS,
     ) {
-        self.core.tree_cons.mode_cons = tree_cons.mode_cons;
         let lcu_num = (x >> self.log2_max_cuwh) + (y >> self.log2_max_cuwh) * self.w_lcu;
         let split_mode = evc_get_split_mode(
             cud,
@@ -1371,10 +1361,6 @@ impl EvcdCtx {
             );
 
             // In base profile we have small chroma blocks
-            let tree_constrain_for_child = TREE_CONS {
-                mode_cons: MODE_CONS::eAll,
-            };
-
             for part_num in 0..split_struct.part_count {
                 let cur_part_num = part_num;
                 let sub_cuw = split_struct.width[cur_part_num];
@@ -1391,12 +1377,9 @@ impl EvcdCtx {
                         split_struct.cud[cur_part_num],
                         split_struct.cup[cur_part_num],
                         is_hor_edge,
-                        &tree_constrain_for_child,
                     );
                 }
             }
-
-            self.core.tree_cons.mode_cons = tree_cons.mode_cons;
         } else if let (Some(pic), Some(map_refi), Some(map_mv)) =
             (&self.pic, &self.map_refi, &self.map_mv)
         {
@@ -1414,7 +1397,6 @@ impl EvcdCtx {
                         &*map_refi.borrow(),
                         &*map_mv.borrow(),
                         self.w_scu as usize,
-                        &self.core.tree_cons,
                         &self.core.evc_tbl_qp_chroma_dynamic_ext,
                     );
 
@@ -1429,7 +1411,6 @@ impl EvcdCtx {
                         &*map_refi.borrow(),
                         &*map_mv.borrow(),
                         self.w_scu as usize,
-                        &self.core.tree_cons,
                         &self.core.evc_tbl_qp_chroma_dynamic_ext,
                     );
                 } else {
@@ -1444,7 +1425,6 @@ impl EvcdCtx {
                         &*map_refi.borrow(),
                         &*map_mv.borrow(),
                         self.w_scu as usize,
-                        &self.core.tree_cons,
                         &self.core.evc_tbl_qp_chroma_dynamic_ext,
                     );
                 }
@@ -1461,7 +1441,6 @@ impl EvcdCtx {
                         &*map_refi.borrow(),
                         &*map_mv.borrow(),
                         self.w_scu as usize,
-                        &self.core.tree_cons,
                         &self.core.evc_tbl_qp_chroma_dynamic_ext,
                         self.w as usize,
                     );
@@ -1476,7 +1455,6 @@ impl EvcdCtx {
                         &*map_refi.borrow(),
                         &*map_mv.borrow(),
                         self.w_scu as usize,
-                        &self.core.tree_cons,
                         &self.core.evc_tbl_qp_chroma_dynamic_ext,
                         self.w as usize,
                     );
@@ -1492,15 +1470,12 @@ impl EvcdCtx {
                         &*map_refi.borrow(),
                         &*map_mv.borrow(),
                         self.w_scu as usize,
-                        &self.core.tree_cons,
                         &self.core.evc_tbl_qp_chroma_dynamic_ext,
                         self.w as usize,
                     );
                 }
             }
         }
-
-        self.core.tree_cons.mode_cons = tree_cons.mode_cons;
     }
 
     fn evcd_deblock(&mut self) -> Result<(), EvcError> {
@@ -1538,9 +1513,6 @@ impl EvcdCtx {
                     0,
                     0,
                     false, /*horizontal filtering of vertical edge*/
-                    &TREE_CONS {
-                        mode_cons: MODE_CONS::eAll,
-                    },
                 );
             }
         }
@@ -1562,9 +1534,6 @@ impl EvcdCtx {
                     0,
                     0,
                     true, /*vertical filtering of horizontal edge*/
-                    &TREE_CONS {
-                        mode_cons: MODE_CONS::eAll,
-                    },
                 );
             }
         }

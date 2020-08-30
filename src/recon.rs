@@ -90,7 +90,6 @@ pub(crate) fn evc_recon_yuv(
     pred: &Vec<Vec<pel>>, //[[pel; MAX_CU_DIM]; N_C],
     nnz: &[bool; N_C],
     planes: &mut [Plane<pel>; N_C],
-    tree_cons: &TREE_CONS,
 ) {
     /* Y */
     let rec = &mut planes[Y_C].as_region_mut();

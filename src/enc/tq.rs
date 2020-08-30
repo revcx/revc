@@ -1188,10 +1188,9 @@ pub(crate) fn evce_sub_block_tq(
     lambda_u: f64,
     lambda_v: f64,
     mut run_stats: u8,
-    tree_cons: &TREE_CONS,
     rdqo_est: &EvceRdoqEst,
 ) -> u16 {
-    run_stats = evc_get_run(run_stats, tree_cons);
+    run_stats = evc_get_run(run_stats);
     let run = [run_stats & 1, (run_stats >> 1) & 1, (run_stats >> 2) & 1];
 
     let qp = [qp_y, qp_u, qp_v];

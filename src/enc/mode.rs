@@ -95,7 +95,6 @@ impl EvceCUData {
         log2_cuh: u8,
         log2_cus: u8,
         cud: u16,
-        tree_cons: &TREE_CONS,
     ) {
         let cx = x as usize >> MIN_CU_LOG2; //x = position in LCU, cx = 4x4 CU horizontal index
         let cy = y as usize >> MIN_CU_LOG2; //y = position in LCU, cy = 4x4 CU vertical index
@@ -195,7 +194,6 @@ impl EvceCUData {
         mut w: usize,
         mut h: usize,
         planes: &mut [Plane<pel>; N_C],
-        tree_cons: &TREE_CONS,
     ) {
         let mut stride = w;
         if x + w > planes[Y_C].cfg.width {
@@ -260,7 +258,6 @@ impl EvceCUData {
         cud: u16,
         coef_src: &CUBuffer<i16>,
         rec_src: &CUBuffer<pel>,
-        tree_cons: &TREE_CONS,
         slice_num: usize,
         ipm: &[IntraPredDir],
         mi: &EvceMode,
@@ -496,7 +493,7 @@ impl EvceCtx {
             true,
             0,
             self.qp,
-            evc_get_default_tree_cons(),
+            MODE_CONS::eAll,
         );
 
         self.update_to_ctx_map();
@@ -509,7 +506,6 @@ impl EvceCtx {
             self.log2_max_cuwh,
             self.log2_max_cuwh,
             0,
-            &evc_get_default_tree_cons(),
         );
 
         /* Reset all coded flag for the current lcu */
@@ -548,7 +544,7 @@ impl EvceCtx {
         mut next_split: bool,
         qt_depth: u8,
         qp: u8,
-        tree_cons: TREE_CONS,
+        mode_cons: MODE_CONS,
     ) -> f64 {
         // x0 = CU's left up corner horizontal index in entrie frame
         // y0 = CU's left up corner vertical index in entire frame
@@ -598,7 +594,6 @@ impl EvceCtx {
         let mut cu_mode_dqp = PredMode::MODE_INTRA;
         let mut dist_cu_best_dqp = 0;
 
-        self.core.tree_cons = tree_cons;
         self.core.avail_lr = avail_lr;
 
         self.core.s_curr_before_split[log2_cuw - 2][log2_cuh - 2] =
@@ -646,7 +641,6 @@ impl EvceCtx {
                 do_split,
                 &mut split_allow,
                 boundary,
-                &tree_cons,
             );
         } else {
             split_allow[0] = true;
@@ -744,7 +738,8 @@ impl EvceCtx {
                     );
 
                     self.clear_map_scu(x0, y0, cuw, cuh);
-                    cost_temp_dqp += self.mode_coding_unit(x0, y0, log2_cuw, log2_cuh, cud);
+                    cost_temp_dqp +=
+                        self.mode_coding_unit(x0, y0, log2_cuw, log2_cuh, cud, mode_cons);
 
                     if cost_best > cost_temp_dqp {
                         cu_mode_dqp = self.core.cu_mode;
@@ -758,7 +753,6 @@ impl EvceCtx {
                             log2_cuh as u8,
                             log2_cuw as u8,
                             cud,
-                            &self.core.tree_cons,
                         );
                         cost_best = cost_temp_dqp;
                         best_split_mode = SplitMode::NO_SPLIT;
@@ -778,7 +772,6 @@ impl EvceCtx {
                                 cuw as usize,
                                 cuh as usize,
                                 &mut pic.borrow().frame.borrow_mut().planes,
-                                &self.core.tree_cons,
                             );
                         }
 
@@ -1006,7 +999,7 @@ impl EvceCtx {
                                 true,
                                 split_mode.inc_qt_depth(qt_depth),
                                 self.core.qp,
-                                split_struct.tree_cons,
+                                mode_cons,
                             );
 
                             self.core.qp = GET_QP(qp as i8, dqp - qp as i8) as u8;
@@ -1019,14 +1012,12 @@ impl EvceCtx {
                                 log2_sub_cuh as u8,
                                 log2_cuw as u8,
                                 cud,
-                                &split_struct.tree_cons,
                             );
 
                             self.update_map_scu(x_pos, y_pos, cur_cuw, cur_cuh);
                             prev_log2_sub_cuw = log2_sub_cuw;
                             prev_log2_sub_cuh = log2_sub_cuh;
                         }
-                        self.core.tree_cons = tree_cons;
                     }
 
                     EVC_TRACE_COUNTER(&mut self.core.bs_temp.tracer);
@@ -1065,7 +1056,6 @@ impl EvceCtx {
                             log2_cuh as u8,
                             log2_cuw as u8,
                             cud,
-                            &self.core.tree_cons,
                         );
                         cost_best = cost_temp_dqp;
                         best_dqp = self.core.dqp_data[prev_log2_sub_cuw - 2][prev_log2_sub_cuh - 2]
@@ -1103,7 +1093,6 @@ impl EvceCtx {
                 cuw as usize,
                 cuh as usize,
                 &mut pic.borrow().frame.borrow_mut().planes,
-                &self.core.tree_cons,
             );
         }
 
@@ -1292,7 +1281,6 @@ impl EvceCtx {
         do_split: bool,
         split_allow: &mut [bool],
         boundary: bool,
-        tree_cons: &TREE_CONS,
     ) {
         let min_cost = MAX_COST;
         let mut run_list = vec![false; MAX_SPLIT_NUM]; //a smaller set of allowed split modes based on a save & load technique
@@ -1552,6 +1540,7 @@ impl EvceCtx {
         log2_cuw: usize,
         log2_cuh: usize,
         cud: u16,
+        mode_cons: MODE_CONS,
     ) -> f64 {
         assert!((log2_cuw as i8 - log2_cuh as i8).abs() <= 2);
         self.mode_cu_init(x, y, log2_cuw as u8, log2_cuh as u8, cud);
@@ -1602,7 +1591,6 @@ impl EvceCtx {
                     self.core.cud,
                     &self.core.ctmp,
                     &self.pinter.rec[self.mode.inter_best_idx],
-                    &self.core.tree_cons,
                     self.slice_num,
                     &self.core.ipm,
                     &self.mode,
@@ -1621,7 +1609,7 @@ impl EvceCtx {
             || self.core.nnz[U_C] != 0
             || self.core.nnz[V_C] != 0
             || cost_best == MAX_COST)
-            && !evc_check_only_inter(&self.core.tree_cons)
+            && !evc_check_only_inter(mode_cons)
         {
             self.core.cost_best = cost_best;
             self.core.dist_cu_best = i32::MAX;
@@ -1682,7 +1670,6 @@ impl EvceCtx {
                     self.core.cud,
                     &self.core.ctmp,
                     &self.pintra.rec,
-                    &self.core.tree_cons,
                     self.slice_num,
                     &self.core.ipm,
                     &self.mode,
@@ -1776,7 +1763,7 @@ impl EvceCtx {
         let log2_cuw = self.core.log2_cuw;
         let log2_cuh = self.core.log2_cuh;
 
-        if slice_type != SliceType::EVC_ST_I && evc_check_all_preds(&self.core.tree_cons) {
+        if slice_type != SliceType::EVC_ST_I {
             self.core.s_temp_run.encode_bin(
                 &mut self.core.bs_temp,
                 &mut self.core.c_temp_run.skip_flag
@@ -1819,7 +1806,11 @@ impl EvceCtx {
             TQC_RUN::RUN_L as u8,
             false,
             self.core.qp,
-            &self.core.tree_cons,
+            if slice_type == SliceType::EVC_ST_I {
+                MODE_CONS::eOnlyIntra
+            } else {
+                MODE_CONS::eAll
+            },
             self.sps.dquant_flag,
             self.pps.cu_qp_delta_enabled_flag,
             self.core.cu_qp_delta_code,
@@ -1852,7 +1843,11 @@ impl EvceCtx {
             TQC_RUN::RUN_CB as u8 | TQC_RUN::RUN_CR as u8,
             false,
             0,
-            &self.core.tree_cons,
+            if slice_type == SliceType::EVC_ST_I {
+                MODE_CONS::eOnlyIntra
+            } else {
+                MODE_CONS::eAll
+            },
             self.sps.dquant_flag,
             self.pps.cu_qp_delta_enabled_flag,
             self.core.cu_qp_delta_code,
@@ -1865,7 +1860,7 @@ impl EvceCtx {
         let log2_cuw = self.core.log2_cuw;
         let log2_cuh = self.core.log2_cuh;
 
-        if slice_type != SliceType::EVC_ST_I && evc_check_all_preds(&self.core.tree_cons) {
+        if slice_type != SliceType::EVC_ST_I {
             self.core.s_temp_run.encode_bin(
                 &mut self.core.bs_temp,
                 &mut self.core.c_temp_run.skip_flag
@@ -1908,7 +1903,11 @@ impl EvceCtx {
             TQC_RUN::RUN_L as u8 | TQC_RUN::RUN_CB as u8 | TQC_RUN::RUN_CR as u8,
             self.pps.cu_qp_delta_enabled_flag,
             self.core.qp,
-            &self.core.tree_cons,
+            if slice_type == SliceType::EVC_ST_I {
+                MODE_CONS::eOnlyIntra
+            } else {
+                MODE_CONS::eAll
+            },
             self.sps.dquant_flag,
             self.pps.cu_qp_delta_enabled_flag,
             self.core.cu_qp_delta_code,
@@ -1944,15 +1943,13 @@ impl EvceCtx {
                 0,
             ); /* skip_flag */
 
-            if evc_check_all_preds(&self.core.tree_cons) {
-                evce_eco_pred_mode(
-                    &mut self.core.bs_temp,
-                    &mut self.core.s_temp_run,
-                    &mut self.core.c_temp_run,
-                    PredMode::MODE_INTER,
-                    self.core.ctx_flags[CtxNevIdx::CNID_PRED_MODE as usize] as usize,
-                );
-            }
+            evce_eco_pred_mode(
+                &mut self.core.bs_temp,
+                &mut self.core.s_temp_run,
+                &mut self.core.c_temp_run,
+                PredMode::MODE_INTER,
+                self.core.ctx_flags[CtxNevIdx::CNID_PRED_MODE as usize] as usize,
+            );
 
             let dir_flag = pidx == InterPredDir::PRED_DIR as usize;
 
@@ -2037,7 +2034,11 @@ impl EvceCtx {
             TQC_RUN::RUN_L as u8 | TQC_RUN::RUN_CB as u8 | TQC_RUN::RUN_CR as u8,
             self.pps.cu_qp_delta_enabled_flag,
             self.core.qp,
-            &self.core.tree_cons,
+            if slice_type == SliceType::EVC_ST_I {
+                MODE_CONS::eOnlyIntra
+            } else {
+                MODE_CONS::eAll
+            },
             self.sps.dquant_flag,
             self.pps.cu_qp_delta_enabled_flag,
             self.core.cu_qp_delta_code,
@@ -2055,6 +2056,7 @@ impl EvceCtx {
 
     pub(crate) fn evce_rdo_bit_cnt_cu_inter_comp(
         &mut self,
+        slice_type: SliceType,
         ch_type: usize,
         pidx: usize,
         coef_idx: usize,
@@ -2084,7 +2086,11 @@ impl EvceCtx {
             run_stats,
             false,
             if ch_type == Y_C { self.core.qp } else { 0 },
-            &self.core.tree_cons,
+            if slice_type == SliceType::EVC_ST_I {
+                MODE_CONS::eOnlyIntra
+            } else {
+                MODE_CONS::eAll
+            },
             self.sps.dquant_flag,
             self.pps.cu_qp_delta_enabled_flag,
             self.core.cu_qp_delta_code,
@@ -2377,7 +2383,6 @@ impl EvceCtx {
                 &*map_refi.borrow(),
                 &*map_mv.borrow(),
                 self.w_scu as usize,
-                &self.core.tree_cons,
                 &self.core.evc_tbl_qp_chroma_dynamic_ext,
             );
 
@@ -2402,7 +2407,6 @@ impl EvceCtx {
                 &*map_refi.borrow(),
                 &*map_mv.borrow(),
                 self.w_scu as usize,
-                &self.core.tree_cons,
                 &self.core.evc_tbl_qp_chroma_dynamic_ext,
                 self.w as usize,
             );

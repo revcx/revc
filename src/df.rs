@@ -18,7 +18,6 @@ pub(crate) fn evc_deblock_cu_hor(
     map_refi: &Vec<[i8; REFP_NUM]>,
     map_mv: &Vec<[[i16; MV_D]; REFP_NUM]>,
     w_scu: usize,
-    tree_cons: &TREE_CONS,
     evc_tbl_qp_chroma_dynamic_ext: &Vec<Vec<i8>>,
 ) {
     let w = cuw >> MIN_CU_LOG2;
@@ -104,7 +103,6 @@ pub(crate) fn evc_deblock_cu_ver(
     map_refi: &Vec<[i8; REFP_NUM]>,
     map_mv: &Vec<[[i16; MV_D]; REFP_NUM]>,
     w_scu: usize,
-    tree_cons: &TREE_CONS,
     evc_tbl_qp_chroma_dynamic_ext: &Vec<Vec<i8>>,
     pic_w: usize,
 ) {

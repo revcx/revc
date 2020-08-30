@@ -748,11 +748,6 @@ impl Default for MODE_CONS {
     }
 }
 
-#[derive(Clone, Copy, Default)]
-pub(crate) struct TREE_CONS {
-    pub(crate) mode_cons: MODE_CONS,
-}
-
 #[derive(Clone)]
 pub(crate) struct LcuSplitMode {
     pub(crate) data: Vec<Vec<Vec<SplitMode>>>,
