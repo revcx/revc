@@ -54,7 +54,6 @@ pub(crate) fn evc_check_split_mode(split_allow: &mut [bool]) {
 
 pub(crate) fn evc_get_default_tree_cons() -> TREE_CONS {
     TREE_CONS {
-        tree_type: TREE_TYPE::TREE_LC,
         mode_cons: MODE_CONS::eAll,
     }
 }
@@ -130,14 +129,10 @@ pub(crate) enum TQC_RUN {
 
 pub(crate) fn evc_get_run(run_list: u8, tree_cons: &TREE_CONS) -> u8 {
     let mut ans = 0;
-    if evc_check_luma(tree_cons) {
-        ans |= run_list & TQC_RUN::RUN_L as u8;
-    }
+    ans |= run_list & TQC_RUN::RUN_L as u8;
 
-    if evc_check_chroma(tree_cons) {
-        ans |= run_list & TQC_RUN::RUN_CB as u8;
-        ans |= run_list & TQC_RUN::RUN_CR as u8;
-    }
+    ans |= run_list & TQC_RUN::RUN_CB as u8;
+    ans |= run_list & TQC_RUN::RUN_CR as u8;
     return ans;
 }
 

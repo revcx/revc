@@ -547,7 +547,7 @@ pub(crate) fn eco_cbf(
     tree_cons: &TREE_CONS,
 ) -> Result<(), EvcError> {
     /* decode allcbf */
-    if pred_mode != PredMode::MODE_INTRA && tree_cons.tree_type == TREE_TYPE::TREE_LC {
+    if pred_mode != PredMode::MODE_INTRA {
         if b_no_cbf == false && sub_pos == 0 {
             if sbac.decode_bin(bs, &mut sbac_ctx.cbf_all[0])? == 0 {
                 *cbf_all = false;
@@ -591,31 +591,23 @@ pub(crate) fn eco_cbf(
             EVC_TRACE(&mut bs.tracer, " \n");
         }
     } else {
-        if evc_check_chroma(tree_cons) {
-            cbf[U_C] = sbac.decode_bin(bs, &mut sbac_ctx.cbf_cb[0])? != 0;
-            EVC_TRACE_COUNTER(&mut bs.tracer);
-            EVC_TRACE(&mut bs.tracer, "cbf U ");
-            EVC_TRACE(&mut bs.tracer, cbf[U_C] as u8);
-            EVC_TRACE(&mut bs.tracer, " \n");
+        cbf[U_C] = sbac.decode_bin(bs, &mut sbac_ctx.cbf_cb[0])? != 0;
+        EVC_TRACE_COUNTER(&mut bs.tracer);
+        EVC_TRACE(&mut bs.tracer, "cbf U ");
+        EVC_TRACE(&mut bs.tracer, cbf[U_C] as u8);
+        EVC_TRACE(&mut bs.tracer, " \n");
 
-            cbf[V_C] = sbac.decode_bin(bs, &mut sbac_ctx.cbf_cr[0])? != 0;
-            EVC_TRACE_COUNTER(&mut bs.tracer);
-            EVC_TRACE(&mut bs.tracer, "cbf V ");
-            EVC_TRACE(&mut bs.tracer, cbf[V_C] as u8);
-            EVC_TRACE(&mut bs.tracer, " \n");
-        } else {
-            cbf[U_C] = false;
-            cbf[V_C] = false;
-        }
-        if evc_check_luma(tree_cons) {
-            cbf[Y_C] = sbac.decode_bin(bs, &mut sbac_ctx.cbf_luma[0])? != 0;
-            EVC_TRACE_COUNTER(&mut bs.tracer);
-            EVC_TRACE(&mut bs.tracer, "cbf Y ");
-            EVC_TRACE(&mut bs.tracer, cbf[Y_C] as u8);
-            EVC_TRACE(&mut bs.tracer, " \n");
-        } else {
-            cbf[Y_C] = false;
-        }
+        cbf[V_C] = sbac.decode_bin(bs, &mut sbac_ctx.cbf_cr[0])? != 0;
+        EVC_TRACE_COUNTER(&mut bs.tracer);
+        EVC_TRACE(&mut bs.tracer, "cbf V ");
+        EVC_TRACE(&mut bs.tracer, cbf[V_C] as u8);
+        EVC_TRACE(&mut bs.tracer, " \n");
+
+        cbf[Y_C] = sbac.decode_bin(bs, &mut sbac_ctx.cbf_luma[0])? != 0;
+        EVC_TRACE_COUNTER(&mut bs.tracer);
+        EVC_TRACE(&mut bs.tracer, "cbf Y ");
+        EVC_TRACE(&mut bs.tracer, cbf[Y_C] as u8);
+        EVC_TRACE(&mut bs.tracer, " \n");
     }
 
     Ok(())

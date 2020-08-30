@@ -736,19 +736,6 @@ pub(crate) const QUANT_SHIFT: usize = 14;
 pub(crate) const QUANT_IQUANT_SHIFT: usize = 20;
 
 #[derive(Clone, Copy, PartialEq)]
-pub(crate) enum TREE_TYPE {
-    TREE_LC = 0,
-    TREE_L = 1,
-    TREE_C = 2,
-}
-
-impl Default for TREE_TYPE {
-    fn default() -> Self {
-        TREE_TYPE::TREE_LC
-    }
-}
-
-#[derive(Clone, Copy, PartialEq)]
 pub(crate) enum MODE_CONS {
     eOnlyIntra,
     eOnlyInter,
@@ -763,7 +750,6 @@ impl Default for MODE_CONS {
 
 #[derive(Clone, Copy, Default)]
 pub(crate) struct TREE_CONS {
-    pub(crate) tree_type: TREE_TYPE,
     pub(crate) mode_cons: MODE_CONS,
 }
 

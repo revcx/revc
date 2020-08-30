@@ -439,43 +439,41 @@ impl EvcdCtx {
         if let (Some(map_refi), Some(map_mv)) = (&mut self.map_refi, &mut self.map_mv) {
             let (mut refis, mut mvs) = (map_refi.borrow_mut(), map_mv.borrow_mut());
 
-            if evc_check_luma(&self.core.tree_cons) {
-                for i in 0..h_cu {
-                    let map_scu = &mut self.map_scu[scup + i * w_scu..];
-                    let map_ipm = &mut self.map_ipm[scup + i * w_scu..];
-                    let map_cu_mode = &mut self.map_cu_mode[scup + i * w_scu..];
-                    let refi = &mut refis[scup + i * w_scu..];
-                    let mv = &mut mvs[scup + i * w_scu..];
+            for i in 0..h_cu {
+                let map_scu = &mut self.map_scu[scup + i * w_scu..];
+                let map_ipm = &mut self.map_ipm[scup + i * w_scu..];
+                let map_cu_mode = &mut self.map_cu_mode[scup + i * w_scu..];
+                let refi = &mut refis[scup + i * w_scu..];
+                let mv = &mut mvs[scup + i * w_scu..];
 
-                    for j in 0..w_cu {
-                        if self.core.pred_mode == PredMode::MODE_SKIP {
-                            map_scu[j].SET_SF();
-                        } else {
-                            map_scu[j].CLR_SF();
-                        }
-                        if self.core.is_coef[Y_C] {
-                            map_scu[j].SET_CBFL();
-                        } else {
-                            map_scu[j].CLR_CBFL();
-                        }
-
-                        map_cu_mode[j].SET_LOGW(self.core.log2_cuw as u32);
-                        map_cu_mode[j].SET_LOGH(self.core.log2_cuh as u32);
-
-                        if self.pps.cu_qp_delta_enabled_flag {
-                            map_scu[j].RESET_QP();
-                        }
-                        map_scu[j].SET_IF_COD_SN_QP(flag, self.slice_num as u32, self.core.qp);
-
-                        map_ipm[j] = self.core.ipm[0];
-
-                        refi[j][REFP_0] = self.core.refi[REFP_0];
-                        refi[j][REFP_1] = self.core.refi[REFP_1];
-                        mv[j][REFP_0][MV_X] = self.core.mv[REFP_0][MV_X];
-                        mv[j][REFP_0][MV_Y] = self.core.mv[REFP_0][MV_Y];
-                        mv[j][REFP_1][MV_X] = self.core.mv[REFP_1][MV_X];
-                        mv[j][REFP_1][MV_Y] = self.core.mv[REFP_1][MV_Y];
+                for j in 0..w_cu {
+                    if self.core.pred_mode == PredMode::MODE_SKIP {
+                        map_scu[j].SET_SF();
+                    } else {
+                        map_scu[j].CLR_SF();
                     }
+                    if self.core.is_coef[Y_C] {
+                        map_scu[j].SET_CBFL();
+                    } else {
+                        map_scu[j].CLR_CBFL();
+                    }
+
+                    map_cu_mode[j].SET_LOGW(self.core.log2_cuw as u32);
+                    map_cu_mode[j].SET_LOGH(self.core.log2_cuh as u32);
+
+                    if self.pps.cu_qp_delta_enabled_flag {
+                        map_scu[j].RESET_QP();
+                    }
+                    map_scu[j].SET_IF_COD_SN_QP(flag, self.slice_num as u32, self.core.qp);
+
+                    map_ipm[j] = self.core.ipm[0];
+
+                    refi[j][REFP_0] = self.core.refi[REFP_0];
+                    refi[j][REFP_1] = self.core.refi[REFP_1];
+                    mv[j][REFP_0][MV_X] = self.core.mv[REFP_0][MV_X];
+                    mv[j][REFP_0][MV_Y] = self.core.mv[REFP_0][MV_Y];
+                    mv[j][REFP_1][MV_X] = self.core.mv[REFP_1][MV_X];
+                    mv[j][REFP_1][MV_Y] = self.core.mv[REFP_1][MV_Y];
                 }
             }
         }
@@ -685,15 +683,9 @@ impl EvcdCtx {
                 );
 
                 let mut luma_ipm = IntraPredDir::IPD_DC_B;
-                if evc_check_luma(&core.tree_cons) {
-                    core.ipm[0] = evcd_eco_intra_dir_b(bs, sbac, sbac_ctx, core.mpm_b_list)?.into();
-                    luma_ipm = core.ipm[0];
-                } else {
-                    assert!(false);
-                }
-                if evc_check_chroma(&core.tree_cons) {
-                    core.ipm[1] = luma_ipm;
-                }
+                core.ipm[0] = evcd_eco_intra_dir_b(bs, sbac, sbac_ctx, core.mpm_b_list)?.into();
+                luma_ipm = core.ipm[0];
+                core.ipm[1] = luma_ipm;
 
                 core.refi[REFP_0] = REFI_INVALID;
                 core.refi[REFP_1] = REFI_INVALID;
@@ -742,65 +734,61 @@ impl EvcdCtx {
         if let Some(pic) = &self.pic {
             let frame = &pic.borrow().frame;
             let planes = &frame.borrow().planes;
-            if evc_check_luma(&self.core.tree_cons) {
-                /* Y */
-                evc_get_nbr_b(
-                    x as usize,
-                    y as usize,
-                    cuw as usize,
-                    cuh as usize,
-                    &planes[Y_C].as_region(),
-                    self.core.avail_cu,
-                    &mut self.core.nb.data[Y_C],
-                    self.core.scup as usize,
-                    &self.map_scu,
-                    self.w_scu as usize,
-                    self.h_scu as usize,
-                    Y_C,
-                    constrained_intra_flag,
-                );
-            }
+            /* Y */
+            evc_get_nbr_b(
+                x as usize,
+                y as usize,
+                cuw as usize,
+                cuh as usize,
+                &planes[Y_C].as_region(),
+                self.core.avail_cu,
+                &mut self.core.nb.data[Y_C],
+                self.core.scup as usize,
+                &self.map_scu,
+                self.w_scu as usize,
+                self.h_scu as usize,
+                Y_C,
+                constrained_intra_flag,
+            );
 
-            if evc_check_chroma(&self.core.tree_cons) {
-                cuw >>= 1;
-                cuh >>= 1;
-                x >>= 1;
-                y >>= 1;
+            cuw >>= 1;
+            cuh >>= 1;
+            x >>= 1;
+            y >>= 1;
 
-                /* U */
-                evc_get_nbr_b(
-                    x as usize,
-                    y as usize,
-                    cuw as usize,
-                    cuh as usize,
-                    &planes[U_C].as_region(),
-                    self.core.avail_cu,
-                    &mut self.core.nb.data[U_C],
-                    self.core.scup as usize,
-                    &self.map_scu,
-                    self.w_scu as usize,
-                    self.h_scu as usize,
-                    U_C,
-                    constrained_intra_flag,
-                );
+            /* U */
+            evc_get_nbr_b(
+                x as usize,
+                y as usize,
+                cuw as usize,
+                cuh as usize,
+                &planes[U_C].as_region(),
+                self.core.avail_cu,
+                &mut self.core.nb.data[U_C],
+                self.core.scup as usize,
+                &self.map_scu,
+                self.w_scu as usize,
+                self.h_scu as usize,
+                U_C,
+                constrained_intra_flag,
+            );
 
-                /* V */
-                evc_get_nbr_b(
-                    x as usize,
-                    y as usize,
-                    cuw as usize,
-                    cuh as usize,
-                    &planes[V_C].as_region(),
-                    self.core.avail_cu,
-                    &mut self.core.nb.data[V_C],
-                    self.core.scup as usize,
-                    &self.map_scu,
-                    self.w_scu as usize,
-                    self.h_scu as usize,
-                    V_C,
-                    constrained_intra_flag,
-                );
-            }
+            /* V */
+            evc_get_nbr_b(
+                x as usize,
+                y as usize,
+                cuw as usize,
+                cuh as usize,
+                &planes[V_C].as_region(),
+                self.core.avail_cu,
+                &mut self.core.nb.data[V_C],
+                self.core.scup as usize,
+                &self.map_scu,
+                self.w_scu as usize,
+                self.h_scu as usize,
+                V_C,
+                constrained_intra_flag,
+            );
         }
     }
 
@@ -905,7 +893,6 @@ impl EvcdCtx {
             let sbac = &mut self.sbac_dec;
 
             core.tree_cons = TREE_CONS {
-                tree_type: tree_cons.tree_type,
                 mode_cons: tree_cons.mode_cons,
             };
 
@@ -1018,37 +1005,34 @@ impl EvcdCtx {
             EVC_TRACE(&mut self.bs.tracer, self.core.ipm[1] as isize);
             EVC_TRACE(&mut self.bs.tracer, " \n");
 
-            if evc_check_luma(&self.core.tree_cons) {
-                evc_ipred_b(
-                    &self.core.nb.data[Y_C][0][2..],
-                    &self.core.nb.data[Y_C][1][cuh as usize..],
-                    self.core.nb.data[Y_C][1][cuh as usize - 1],
-                    &mut self.core.pred[0].data[Y_C],
-                    self.core.ipm[0],
-                    cuw as usize,
-                    cuh as usize,
-                );
-            }
-            if evc_check_chroma(&self.core.tree_cons) {
-                evc_ipred_b(
-                    &self.core.nb.data[U_C][0][2..],
-                    &self.core.nb.data[U_C][1][(cuh >> 1) as usize..],
-                    self.core.nb.data[U_C][1][(cuh >> 1) as usize - 1],
-                    &mut self.core.pred[0].data[U_C],
-                    self.core.ipm[1],
-                    cuw as usize >> 1,
-                    cuh as usize >> 1,
-                );
-                evc_ipred_b(
-                    &self.core.nb.data[V_C][0][2..],
-                    &self.core.nb.data[V_C][1][(cuh >> 1) as usize..],
-                    self.core.nb.data[V_C][1][(cuh >> 1) as usize - 1],
-                    &mut self.core.pred[0].data[V_C],
-                    self.core.ipm[1],
-                    cuw as usize >> 1,
-                    cuh as usize >> 1,
-                );
-            }
+            evc_ipred_b(
+                &self.core.nb.data[Y_C][0][2..],
+                &self.core.nb.data[Y_C][1][cuh as usize..],
+                self.core.nb.data[Y_C][1][cuh as usize - 1],
+                &mut self.core.pred[0].data[Y_C],
+                self.core.ipm[0],
+                cuw as usize,
+                cuh as usize,
+            );
+
+            evc_ipred_b(
+                &self.core.nb.data[U_C][0][2..],
+                &self.core.nb.data[U_C][1][(cuh >> 1) as usize..],
+                self.core.nb.data[U_C][1][(cuh >> 1) as usize - 1],
+                &mut self.core.pred[0].data[U_C],
+                self.core.ipm[1],
+                cuw as usize >> 1,
+                cuh as usize >> 1,
+            );
+            evc_ipred_b(
+                &self.core.nb.data[V_C][0][2..],
+                &self.core.nb.data[V_C][1][(cuh >> 1) as usize..],
+                self.core.nb.data[V_C][1][(cuh >> 1) as usize - 1],
+                &mut self.core.pred[0].data[V_C],
+                self.core.ipm[1],
+                cuw as usize >> 1,
+                cuh as usize >> 1,
+            );
         }
         self.evcd_set_dec_info();
 
@@ -1246,26 +1230,11 @@ impl EvcdCtx {
         } else {
             core.cu_qp_delta_code = cu_qp_delta_code;
 
-            let tree_type = if mode_cons == MODE_CONS::eOnlyIntra {
-                TREE_TYPE::TREE_L
-            } else {
-                TREE_TYPE::TREE_LC
-            };
-
             if self.sh.slice_type == SliceType::EVC_ST_I {
                 mode_cons = MODE_CONS::eOnlyIntra;
             }
 
-            self.evcd_eco_unit(
-                x0,
-                y0,
-                log2_cuw,
-                log2_cuh,
-                TREE_CONS {
-                    tree_type,
-                    mode_cons,
-                },
-            )?;
+            self.evcd_eco_unit(x0, y0, log2_cuw, log2_cuh, TREE_CONS { mode_cons })?;
         }
 
         Ok(())
@@ -1373,7 +1342,6 @@ impl EvcdCtx {
         is_hor_edge: bool,
         tree_cons: &TREE_CONS,
     ) {
-        self.core.tree_cons.tree_type = tree_cons.tree_type;
         self.core.tree_cons.mode_cons = tree_cons.mode_cons;
         let lcu_num = (x >> self.log2_max_cuwh) + (y >> self.log2_max_cuwh) * self.w_lcu;
         let split_mode = evc_get_split_mode(
@@ -1404,7 +1372,6 @@ impl EvcdCtx {
 
             // In base profile we have small chroma blocks
             let tree_constrain_for_child = TREE_CONS {
-                tree_type: TREE_TYPE::TREE_LC,
                 mode_cons: MODE_CONS::eAll,
             };
 
@@ -1429,7 +1396,6 @@ impl EvcdCtx {
                 }
             }
 
-            self.core.tree_cons.tree_type = tree_cons.tree_type;
             self.core.tree_cons.mode_cons = tree_cons.mode_cons;
         } else if let (Some(pic), Some(map_refi), Some(map_mv)) =
             (&self.pic, &self.map_refi, &self.map_mv)
@@ -1534,7 +1500,6 @@ impl EvcdCtx {
             }
         }
 
-        self.core.tree_cons.tree_type = tree_cons.tree_type;
         self.core.tree_cons.mode_cons = tree_cons.mode_cons;
     }
 
@@ -1574,7 +1539,6 @@ impl EvcdCtx {
                     0,
                     false, /*horizontal filtering of vertical edge*/
                     &TREE_CONS {
-                        tree_type: TREE_TYPE::TREE_LC,
                         mode_cons: MODE_CONS::eAll,
                     },
                 );
@@ -1599,7 +1563,6 @@ impl EvcdCtx {
                     0,
                     true, /*vertical filtering of horizontal edge*/
                     &TREE_CONS {
-                        tree_type: TREE_TYPE::TREE_LC,
                         mode_cons: MODE_CONS::eAll,
                     },
                 );

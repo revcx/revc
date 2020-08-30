@@ -304,16 +304,6 @@ pub(crate) fn evc_check_all_preds(tree_cons: &TREE_CONS) -> bool {
     tree_cons.mode_cons == MODE_CONS::eAll
 }
 
-#[inline]
-pub(crate) fn evc_check_luma(tree_cons: &TREE_CONS) -> bool {
-    tree_cons.tree_type != TREE_TYPE::TREE_C
-}
-
-#[inline]
-pub(crate) fn evc_check_chroma(tree_cons: &TREE_CONS) -> bool {
-    tree_cons.tree_type != TREE_TYPE::TREE_L
-}
-
 pub(crate) fn evc_block_copy(
     src: &[i16],
     src_stride: usize,

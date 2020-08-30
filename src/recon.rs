@@ -92,31 +92,28 @@ pub(crate) fn evc_recon_yuv(
     planes: &mut [Plane<pel>; N_C],
     tree_cons: &TREE_CONS,
 ) {
-    if evc_check_luma(tree_cons) {
-        /* Y */
-        let rec = &mut planes[Y_C].as_region_mut();
+    /* Y */
+    let rec = &mut planes[Y_C].as_region_mut();
+    evc_recon_plane_region(
+        tracer, &coef[Y_C], &pred[Y_C], nnz[Y_C], x, y, cuw, cuh, rec, Y_C,
+    );
+
+    /* chroma */
+    x >>= 1;
+    y >>= 1;
+    cuw >>= 1;
+    cuh >>= 1;
+
+    {
+        let rec = &mut planes[U_C].as_region_mut();
         evc_recon_plane_region(
-            tracer, &coef[Y_C], &pred[Y_C], nnz[Y_C], x, y, cuw, cuh, rec, Y_C,
+            tracer, &coef[U_C], &pred[U_C], nnz[U_C], x, y, cuw, cuh, rec, U_C,
         );
     }
-    if evc_check_chroma(tree_cons) {
-        /* chroma */
-        x >>= 1;
-        y >>= 1;
-        cuw >>= 1;
-        cuh >>= 1;
-
-        {
-            let rec = &mut planes[U_C].as_region_mut();
-            evc_recon_plane_region(
-                tracer, &coef[U_C], &pred[U_C], nnz[U_C], x, y, cuw, cuh, rec, U_C,
-            );
-        }
-        {
-            let rec = &mut planes[V_C].as_region_mut();
-            evc_recon_plane_region(
-                tracer, &coef[V_C], &pred[V_C], nnz[V_C], x, y, cuw, cuh, rec, V_C,
-            );
-        }
+    {
+        let rec = &mut planes[V_C].as_region_mut();
+        evc_recon_plane_region(
+            tracer, &coef[V_C], &pred[V_C], nnz[V_C], x, y, cuw, cuh, rec, V_C,
+        );
     }
 }

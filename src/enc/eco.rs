@@ -483,7 +483,6 @@ pub(crate) fn evce_eco_cbf(
         }
     } else {
         if run[U_C] {
-            assert!(evc_check_chroma(tree_cons));
             sbac.encode_bin(bs, &mut sbac_ctx.cbf_cb[0], cbf_u as u32);
             EVC_TRACE_COUNTER(&mut bs.tracer);
             EVC_TRACE(&mut bs.tracer, "cbf U ");
@@ -491,7 +490,6 @@ pub(crate) fn evce_eco_cbf(
             EVC_TRACE(&mut bs.tracer, " \n");
         }
         if run[V_C] {
-            assert!(evc_check_chroma(tree_cons));
             sbac.encode_bin(bs, &mut sbac_ctx.cbf_cr[0], cbf_v as u32);
             EVC_TRACE_COUNTER(&mut bs.tracer);
             EVC_TRACE(&mut bs.tracer, "cbf V ");
@@ -499,7 +497,6 @@ pub(crate) fn evce_eco_cbf(
             EVC_TRACE(&mut bs.tracer, " \n");
         }
         if run[Y_C] {
-            assert!(evc_check_luma(tree_cons));
             sbac.encode_bin(bs, &mut sbac_ctx.cbf_luma[0], cbf_y as u32);
             EVC_TRACE_COUNTER(&mut bs.tracer);
             EVC_TRACE(&mut bs.tracer, "cbf Y ");
@@ -637,34 +634,30 @@ pub(crate) fn coef_rect_to_series(
     let mut sidx = ((x & (max_cuwh - 1)) + ((y & (max_cuwh - 1)) << log2_max_cuwh)) as usize;
     let mut didx = 0;
 
-    if evc_check_luma(tree_cons) {
-        for j in 0..cuh as usize {
-            for i in 0..cuw as usize {
-                coef_dst.data[Y_C][didx] = coef_src[Y_C][sidx + i];
-                didx += 1;
-            }
-            sidx += max_cuwh as usize;
+    for j in 0..cuh as usize {
+        for i in 0..cuw as usize {
+            coef_dst.data[Y_C][didx] = coef_src[Y_C][sidx + i];
+            didx += 1;
         }
+        sidx += max_cuwh as usize;
     }
 
-    if evc_check_chroma(tree_cons) {
-        x >>= 1;
-        y >>= 1;
-        cuw >>= 1;
-        cuh >>= 1;
+    x >>= 1;
+    y >>= 1;
+    cuw >>= 1;
+    cuh >>= 1;
 
-        sidx = ((x & ((max_cuwh >> 1) - 1)) + ((y & ((max_cuwh >> 1) - 1)) << (log2_max_cuwh - 1)))
-            as usize;
-        didx = 0;
+    sidx = ((x & ((max_cuwh >> 1) - 1)) + ((y & ((max_cuwh >> 1) - 1)) << (log2_max_cuwh - 1)))
+        as usize;
+    didx = 0;
 
-        for j in 0..cuh as usize {
-            for i in 0..cuw as usize {
-                coef_dst.data[U_C][didx] = coef_src[U_C][sidx + i];
-                coef_dst.data[V_C][didx] = coef_src[V_C][sidx + i];
-                didx += 1;
-            }
-            sidx += (max_cuwh >> 1) as usize;
+    for j in 0..cuh as usize {
+        for i in 0..cuw as usize {
+            coef_dst.data[U_C][didx] = coef_src[U_C][sidx + i];
+            coef_dst.data[V_C][didx] = coef_src[V_C][sidx + i];
+            didx += 1;
         }
+        sidx += (max_cuwh >> 1) as usize;
     }
 }
 
@@ -909,12 +902,6 @@ pub(crate) fn evce_eco_coef(
         (run_stats >> 2) & 1 != 0,
     ];
 
-    if !evc_check_luma(tree_cons) {
-        assert!(!run[0]);
-    }
-    if !evc_check_chroma(tree_cons) {
-        assert!(!run[1] && !run[2]);
-    }
     assert!(run_stats != 0);
 
     let mut cbf_all = 0;

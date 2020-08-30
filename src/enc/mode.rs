@@ -14,7 +14,6 @@ pub(crate) struct EvceCUData {
     pub(crate) qp_u: Vec<u8>,
     pub(crate) qp_v: Vec<u8>,
     pub(crate) pred_mode: Vec<PredMode>,
-    pub(crate) pred_mode_chroma: Vec<PredMode>,
     pub(crate) ipm: Vec<Vec<IntraPredDir>>,
     pub(crate) skip_flag: Vec<bool>,
     pub(crate) refi: Vec<[i8; REFP_NUM]>,
@@ -51,7 +50,6 @@ impl EvceCUData {
             qp_u: vec![0; cu_cnt],
             qp_v: vec![0; cu_cnt],
             pred_mode: vec![PredMode::MODE_INTRA; cu_cnt],
-            pred_mode_chroma: vec![PredMode::MODE_INTRA; cu_cnt],
             ipm: vec![vec![IntraPredDir::IPD_DC_B; cu_cnt]; 2],
             skip_flag: vec![false; cu_cnt],
             refi: vec![[0; REFP_NUM]; cu_cnt],
@@ -110,91 +108,82 @@ impl EvceCUData {
         let cus_scu = 1 << (log2_cus as usize - MIN_CU_LOG2); //4x4 CU number in stride
 
         // only copy src's first row of 4x4 CUs to dis's all 4x4 CUs
-        if evc_check_luma(tree_cons) {
-            let size = cuw_scu;
-            for j in 0..cuh_scu {
-                let idx_dst = (cy + j) * cus_scu + cx;
-                let idx_src = j * cuw_scu;
+        let size = cuw_scu;
+        for j in 0..cuh_scu {
+            let idx_dst = (cy + j) * cus_scu + cx;
+            let idx_src = j * cuw_scu;
 
-                for k in cud as usize..NUM_CU_DEPTH {
-                    for i in 0..BlockShape::NUM_BLOCK_SHAPE as usize {
-                        self.split_mode.data[k][i][idx_dst..idx_dst + size]
-                            .copy_from_slice(&src.split_mode.data[k][i][idx_src..idx_src + size]);
-                    }
+            for k in cud as usize..NUM_CU_DEPTH {
+                for i in 0..BlockShape::NUM_BLOCK_SHAPE as usize {
+                    self.split_mode.data[k][i][idx_dst..idx_dst + size]
+                        .copy_from_slice(&src.split_mode.data[k][i][idx_src..idx_src + size]);
                 }
-
-                self.qp_y[idx_dst..idx_dst + size]
-                    .copy_from_slice(&src.qp_y[idx_src..idx_src + size]);
-                self.pred_mode[idx_dst..idx_dst + size]
-                    .copy_from_slice(&src.pred_mode[idx_src..idx_src + size]);
-                self.ipm[0][idx_dst..idx_dst + size]
-                    .copy_from_slice(&src.ipm[0][idx_src..idx_src + size]);
-                self.skip_flag[idx_dst..idx_dst + size]
-                    .copy_from_slice(&src.skip_flag[idx_src..idx_src + size]);
-                self.depth[idx_dst..idx_dst + size]
-                    .copy_from_slice(&src.depth[idx_src..idx_src + size]);
-                self.map_scu[idx_dst..idx_dst + size]
-                    .copy_from_slice(&src.map_scu[idx_src..idx_src + size]);
-                self.map_cu_mode[idx_dst..idx_dst + size]
-                    .copy_from_slice(&src.map_cu_mode[idx_src..idx_src + size]);
-                self.refi[idx_dst..idx_dst + size]
-                    .clone_from_slice(&src.refi[idx_src..idx_src + size]);
-                self.mvp_idx[idx_dst..idx_dst + size]
-                    .clone_from_slice(&src.mvp_idx[idx_src..idx_src + size]);
-                self.mv[idx_dst..idx_dst + size].clone_from_slice(&src.mv[idx_src..idx_src + size]);
-                self.mvd[idx_dst..idx_dst + size]
-                    .clone_from_slice(&src.mvd[idx_src..idx_src + size]);
-                self.nnz[Y_C][idx_dst..idx_dst + size]
-                    .copy_from_slice(&src.nnz[Y_C][idx_src..idx_src + size]);
             }
 
-            let size = cuw;
-            for j in 0..cuh {
-                let idx_dst = (y as usize + j) * cus + x as usize;
-                let idx_src = j * cuw;
-
-                self.coef[Y_C][idx_dst..idx_dst + size]
-                    .copy_from_slice(&src.coef[Y_C][idx_src..idx_src + size]);
-                self.reco[Y_C][idx_dst..idx_dst + size]
-                    .copy_from_slice(&src.reco[Y_C][idx_src..idx_src + size]);
-            }
+            self.qp_y[idx_dst..idx_dst + size].copy_from_slice(&src.qp_y[idx_src..idx_src + size]);
+            self.pred_mode[idx_dst..idx_dst + size]
+                .copy_from_slice(&src.pred_mode[idx_src..idx_src + size]);
+            self.ipm[0][idx_dst..idx_dst + size]
+                .copy_from_slice(&src.ipm[0][idx_src..idx_src + size]);
+            self.skip_flag[idx_dst..idx_dst + size]
+                .copy_from_slice(&src.skip_flag[idx_src..idx_src + size]);
+            self.depth[idx_dst..idx_dst + size]
+                .copy_from_slice(&src.depth[idx_src..idx_src + size]);
+            self.map_scu[idx_dst..idx_dst + size]
+                .copy_from_slice(&src.map_scu[idx_src..idx_src + size]);
+            self.map_cu_mode[idx_dst..idx_dst + size]
+                .copy_from_slice(&src.map_cu_mode[idx_src..idx_src + size]);
+            self.refi[idx_dst..idx_dst + size].clone_from_slice(&src.refi[idx_src..idx_src + size]);
+            self.mvp_idx[idx_dst..idx_dst + size]
+                .clone_from_slice(&src.mvp_idx[idx_src..idx_src + size]);
+            self.mv[idx_dst..idx_dst + size].clone_from_slice(&src.mv[idx_src..idx_src + size]);
+            self.mvd[idx_dst..idx_dst + size].clone_from_slice(&src.mvd[idx_src..idx_src + size]);
+            self.nnz[Y_C][idx_dst..idx_dst + size]
+                .copy_from_slice(&src.nnz[Y_C][idx_src..idx_src + size]);
         }
 
-        if evc_check_chroma(tree_cons) {
-            let size = cuw >> 1;
-            for j in 0..cuh >> 1 {
-                let idx_dst = ((y >> 1) as usize + j) * (cus >> 1) + (x >> 1) as usize;
-                let idx_src = j * (cuw >> 1);
+        let size = cuw;
+        for j in 0..cuh {
+            let idx_dst = (y as usize + j) * cus + x as usize;
+            let idx_src = j * cuw;
 
-                self.coef[U_C][idx_dst..idx_dst + size]
-                    .copy_from_slice(&src.coef[U_C][idx_src..idx_src + size]);
-                self.reco[U_C][idx_dst..idx_dst + size]
-                    .copy_from_slice(&src.reco[U_C][idx_src..idx_src + size]);
+            self.coef[Y_C][idx_dst..idx_dst + size]
+                .copy_from_slice(&src.coef[Y_C][idx_src..idx_src + size]);
+            self.reco[Y_C][idx_dst..idx_dst + size]
+                .copy_from_slice(&src.reco[Y_C][idx_src..idx_src + size]);
+        }
 
-                self.coef[V_C][idx_dst..idx_dst + size]
-                    .copy_from_slice(&src.coef[V_C][idx_src..idx_src + size]);
-                self.reco[V_C][idx_dst..idx_dst + size]
-                    .copy_from_slice(&src.reco[V_C][idx_src..idx_src + size]);
-            }
+        let size = cuw >> 1;
+        for j in 0..cuh >> 1 {
+            let idx_dst = ((y >> 1) as usize + j) * (cus >> 1) + (x >> 1) as usize;
+            let idx_src = j * (cuw >> 1);
 
-            let size = cuw_scu;
-            for j in 0..cuh_scu {
-                let idx_dst = (cy + j) * cus_scu + cx;
-                let idx_src = j * cuw_scu;
+            self.coef[U_C][idx_dst..idx_dst + size]
+                .copy_from_slice(&src.coef[U_C][idx_src..idx_src + size]);
+            self.reco[U_C][idx_dst..idx_dst + size]
+                .copy_from_slice(&src.reco[U_C][idx_src..idx_src + size]);
 
-                self.qp_u[idx_dst..idx_dst + size]
-                    .copy_from_slice(&src.qp_u[idx_src..idx_src + size]);
-                self.qp_v[idx_dst..idx_dst + size]
-                    .copy_from_slice(&src.qp_v[idx_src..idx_src + size]);
+            self.coef[V_C][idx_dst..idx_dst + size]
+                .copy_from_slice(&src.coef[V_C][idx_src..idx_src + size]);
+            self.reco[V_C][idx_dst..idx_dst + size]
+                .copy_from_slice(&src.reco[V_C][idx_src..idx_src + size]);
+        }
 
-                self.ipm[1][idx_dst..idx_dst + size]
-                    .copy_from_slice(&src.ipm[1][idx_src..idx_src + size]);
+        let size = cuw_scu;
+        for j in 0..cuh_scu {
+            let idx_dst = (cy + j) * cus_scu + cx;
+            let idx_src = j * cuw_scu;
 
-                self.nnz[U_C][idx_dst..idx_dst + size]
-                    .copy_from_slice(&src.nnz[U_C][idx_src..idx_src + size]);
-                self.nnz[V_C][idx_dst..idx_dst + size]
-                    .copy_from_slice(&src.nnz[V_C][idx_src..idx_src + size]);
-            }
+            self.qp_u[idx_dst..idx_dst + size].copy_from_slice(&src.qp_u[idx_src..idx_src + size]);
+            self.qp_v[idx_dst..idx_dst + size].copy_from_slice(&src.qp_v[idx_src..idx_src + size]);
+
+            self.ipm[1][idx_dst..idx_dst + size]
+                .copy_from_slice(&src.ipm[1][idx_src..idx_src + size]);
+
+            self.nnz[U_C][idx_dst..idx_dst + size]
+                .copy_from_slice(&src.nnz[U_C][idx_src..idx_src + size]);
+            self.nnz[V_C][idx_dst..idx_dst + size]
+                .copy_from_slice(&src.nnz[V_C][idx_src..idx_src + size]);
         }
     }
 
@@ -217,10 +206,28 @@ impl EvceCUData {
             h = planes[Y_C].cfg.height - y;
         }
 
-        if evc_check_luma(tree_cons) {
-            /* luma */
-            let dst = &mut planes[Y_C].as_region_mut();
-            let src = &self.reco[Y_C];
+        /* luma */
+        let dst = &mut planes[Y_C].as_region_mut();
+        let src = &self.reco[Y_C];
+
+        for j in 0..h {
+            for i in 0..w {
+                dst[y + j][x + i] = src[j * stride + i];
+            }
+        }
+
+        TRACE_CU(tracer, Y_C, w, h, stride, src);
+
+        /* chroma */
+        x >>= 1;
+        y >>= 1;
+        w >>= 1;
+        h >>= 1;
+        stride >>= 1;
+
+        {
+            let dst = &mut planes[U_C].as_region_mut();
+            let src = &self.reco[U_C];
 
             for j in 0..h {
                 for i in 0..w {
@@ -228,42 +235,20 @@ impl EvceCUData {
                 }
             }
 
-            TRACE_CU(tracer, Y_C, w, h, stride, src)
+            TRACE_CU(tracer, U_C, w, h, stride, src);
         }
 
-        if evc_check_chroma(tree_cons) {
-            /* chroma */
-            x >>= 1;
-            y >>= 1;
-            w >>= 1;
-            h >>= 1;
-            stride >>= 1;
+        {
+            let dst = &mut planes[V_C].as_region_mut();
+            let src = &self.reco[V_C];
 
-            {
-                let dst = &mut planes[U_C].as_region_mut();
-                let src = &self.reco[U_C];
-
-                for j in 0..h {
-                    for i in 0..w {
-                        dst[y + j][x + i] = src[j * stride + i];
-                    }
+            for j in 0..h {
+                for i in 0..w {
+                    dst[y + j][x + i] = src[j * stride + i];
                 }
-
-                TRACE_CU(tracer, U_C, w, h, stride, src)
             }
 
-            {
-                let dst = &mut planes[V_C].as_region_mut();
-                let src = &self.reco[V_C];
-
-                for j in 0..h {
-                    for i in 0..w {
-                        dst[y + j][x + i] = src[j * stride + i];
-                    }
-                }
-
-                TRACE_CU(tracer, V_C, w, h, stride, src)
-            }
+            TRACE_CU(tracer, V_C, w, h, stride, src);
         }
     }
 
@@ -288,104 +273,101 @@ impl EvceCUData {
         let log2_cuw = CONV_LOG2(cuw as usize);
         let log2_cuh = CONV_LOG2(cuh as usize);
 
-        if evc_check_luma(tree_cons) {
-            let size = cuw as usize * cuh as usize;
+        let size = cuw as usize * cuh as usize;
 
-            /* copy coef */
-            self.coef[Y_C][0..size].copy_from_slice(&coef_src.data[Y_C][0..size]);
+        /* copy coef */
+        self.coef[Y_C][0..size].copy_from_slice(&coef_src.data[Y_C][0..size]);
 
-            /* copy reco */
-            self.reco[Y_C][0..size].copy_from_slice(&rec_src.data[Y_C][0..size]);
+        /* copy reco */
+        self.reco[Y_C][0..size].copy_from_slice(&rec_src.data[Y_C][0..size]);
 
-            /* copy mode info */
-            let mut idx = 0;
-            for j in 0..(cuh as usize) >> MIN_CU_LOG2 {
-                for i in 0..(cuw as usize) >> MIN_CU_LOG2 {
-                    self.pred_mode[idx + i] = cu_mode;
-                    self.skip_flag[idx + i] = cu_mode == PredMode::MODE_SKIP;
-                    self.nnz[Y_C][idx + i] = nnz[Y_C];
+        /* copy mode info */
+        let mut idx = 0;
+        for j in 0..(cuh as usize) >> MIN_CU_LOG2 {
+            for i in 0..(cuw as usize) >> MIN_CU_LOG2 {
+                self.pred_mode[idx + i] = cu_mode;
+                self.skip_flag[idx + i] = cu_mode == PredMode::MODE_SKIP;
+                self.nnz[Y_C][idx + i] = nnz[Y_C];
 
-                    self.qp_y[idx + i] = qp_y;
-                    self.map_scu[idx + i].RESET_QP();
-                    self.map_scu[idx + i].SET_IF_COD_SN_QP(
-                        if cu_mode == PredMode::MODE_INTRA {
-                            1
-                        } else {
-                            0
-                        },
-                        slice_num as u32,
-                        qp,
-                    );
-
-                    if self.skip_flag[idx + i] {
-                        self.map_scu[idx + i].SET_SF();
-                    } else {
-                        self.map_scu[idx + i].CLR_SF();
-                    }
-
-                    self.depth[idx + i] = cud as i8;
-
-                    self.map_cu_mode[idx + i].SET_LOGW(log2_cuw as u32);
-                    self.map_cu_mode[idx + i].SET_LOGH(log2_cuh as u32);
-
+                self.qp_y[idx + i] = qp_y;
+                self.map_scu[idx + i].RESET_QP();
+                self.map_scu[idx + i].SET_IF_COD_SN_QP(
                     if cu_mode == PredMode::MODE_INTRA {
-                        self.ipm[0][idx + i] = ipm[0];
-                        self.mv[idx + i][REFP_0][MV_X] = 0;
-                        self.mv[idx + i][REFP_0][MV_Y] = 0;
-                        self.mv[idx + i][REFP_1][MV_X] = 0;
-                        self.mv[idx + i][REFP_1][MV_Y] = 0;
-                        self.refi[idx + i][REFP_0] = -1;
-                        self.refi[idx + i][REFP_1] = -1;
+                        1
                     } else {
-                        self.refi[idx + i][REFP_0] = mi.refi[REFP_0];
-                        self.refi[idx + i][REFP_1] = mi.refi[REFP_1];
-                        self.mvp_idx[idx + i][REFP_0] = mi.mvp_idx[REFP_0];
-                        self.mvp_idx[idx + i][REFP_1] = mi.mvp_idx[REFP_1];
+                        0
+                    },
+                    slice_num as u32,
+                    qp,
+                );
 
-                        {
-                            self.mv[idx + i][REFP_0][MV_X] = mi.mv[REFP_0][MV_X];
-                            self.mv[idx + i][REFP_0][MV_Y] = mi.mv[REFP_0][MV_Y];
-                            self.mv[idx + i][REFP_1][MV_X] = mi.mv[REFP_1][MV_X];
-                            self.mv[idx + i][REFP_1][MV_Y] = mi.mv[REFP_1][MV_Y];
-                        }
-
-                        self.mvd[idx + i][REFP_0][MV_X] = mi.mvd[REFP_0][MV_X];
-                        self.mvd[idx + i][REFP_0][MV_Y] = mi.mvd[REFP_0][MV_Y];
-                        self.mvd[idx + i][REFP_1][MV_X] = mi.mvd[REFP_1][MV_X];
-                        self.mvd[idx + i][REFP_1][MV_Y] = mi.mvd[REFP_1][MV_Y];
-                    }
+                if self.skip_flag[idx + i] {
+                    self.map_scu[idx + i].SET_SF();
+                } else {
+                    self.map_scu[idx + i].CLR_SF();
                 }
 
-                idx += (cuw as usize) >> MIN_CU_LOG2;
+                self.depth[idx + i] = cud as i8;
+
+                self.map_cu_mode[idx + i].SET_LOGW(log2_cuw as u32);
+                self.map_cu_mode[idx + i].SET_LOGH(log2_cuh as u32);
+
+                if cu_mode == PredMode::MODE_INTRA {
+                    self.ipm[0][idx + i] = ipm[0];
+                    self.mv[idx + i][REFP_0][MV_X] = 0;
+                    self.mv[idx + i][REFP_0][MV_Y] = 0;
+                    self.mv[idx + i][REFP_1][MV_X] = 0;
+                    self.mv[idx + i][REFP_1][MV_Y] = 0;
+                    self.refi[idx + i][REFP_0] = -1;
+                    self.refi[idx + i][REFP_1] = -1;
+                } else {
+                    self.refi[idx + i][REFP_0] = mi.refi[REFP_0];
+                    self.refi[idx + i][REFP_1] = mi.refi[REFP_1];
+                    self.mvp_idx[idx + i][REFP_0] = mi.mvp_idx[REFP_0];
+                    self.mvp_idx[idx + i][REFP_1] = mi.mvp_idx[REFP_1];
+
+                    {
+                        self.mv[idx + i][REFP_0][MV_X] = mi.mv[REFP_0][MV_X];
+                        self.mv[idx + i][REFP_0][MV_Y] = mi.mv[REFP_0][MV_Y];
+                        self.mv[idx + i][REFP_1][MV_X] = mi.mv[REFP_1][MV_X];
+                        self.mv[idx + i][REFP_1][MV_Y] = mi.mv[REFP_1][MV_Y];
+                    }
+
+                    self.mvd[idx + i][REFP_0][MV_X] = mi.mvd[REFP_0][MV_X];
+                    self.mvd[idx + i][REFP_0][MV_Y] = mi.mvd[REFP_0][MV_Y];
+                    self.mvd[idx + i][REFP_1][MV_X] = mi.mvd[REFP_1][MV_X];
+                    self.mvd[idx + i][REFP_1][MV_Y] = mi.mvd[REFP_1][MV_Y];
+                }
             }
+
+            idx += (cuw as usize) >> MIN_CU_LOG2;
         }
-        if evc_check_chroma(tree_cons) {
-            let size = (cuw as usize * cuh as usize) >> 2;
 
-            /* copy coef */
-            self.coef[U_C][0..size].copy_from_slice(&coef_src.data[U_C][0..size]);
-            self.coef[V_C][0..size].copy_from_slice(&coef_src.data[V_C][0..size]);
+        let size = (cuw as usize * cuh as usize) >> 2;
 
-            /* copy reco */
-            self.reco[U_C][0..size].copy_from_slice(&rec_src.data[U_C][0..size]);
-            self.reco[V_C][0..size].copy_from_slice(&rec_src.data[V_C][0..size]);
+        /* copy coef */
+        self.coef[U_C][0..size].copy_from_slice(&coef_src.data[U_C][0..size]);
+        self.coef[V_C][0..size].copy_from_slice(&coef_src.data[V_C][0..size]);
 
-            /* copy mode info */
-            let mut idx = 0;
-            for j in 0..(cuh as usize) >> MIN_CU_LOG2 {
-                for i in 0..(cuw as usize) >> MIN_CU_LOG2 {
-                    self.nnz[U_C][idx + i] = nnz[U_C];
-                    self.nnz[V_C][idx + i] = nnz[V_C];
+        /* copy reco */
+        self.reco[U_C][0..size].copy_from_slice(&rec_src.data[U_C][0..size]);
+        self.reco[V_C][0..size].copy_from_slice(&rec_src.data[V_C][0..size]);
 
-                    self.qp_u[idx + i] = qp_u;
-                    self.qp_v[idx + i] = qp_v;
+        /* copy mode info */
+        let mut idx = 0;
+        for j in 0..(cuh as usize) >> MIN_CU_LOG2 {
+            for i in 0..(cuw as usize) >> MIN_CU_LOG2 {
+                self.nnz[U_C][idx + i] = nnz[U_C];
+                self.nnz[V_C][idx + i] = nnz[V_C];
 
-                    if cu_mode == PredMode::MODE_INTRA {
-                        self.ipm[1][idx + i] = ipm[1];
-                    }
+                self.qp_u[idx + i] = qp_u;
+                self.qp_v[idx + i] = qp_v;
+
+                if cu_mode == PredMode::MODE_INTRA {
+                    self.ipm[1][idx + i] = ipm[1];
                 }
-                idx += (cuw as usize) >> MIN_CU_LOG2;
             }
+            idx += (cuw as usize) >> MIN_CU_LOG2;
         }
     }
 }
@@ -641,7 +623,6 @@ impl EvceCtx {
             do_split = true;
             do_curr = true;
             if !boundary {
-                assert!(evc_check_luma(&self.core.tree_cons));
                 nev_max_depth = self.check_nev_block(
                     x0,
                     y0,
@@ -690,9 +671,7 @@ impl EvceCtx {
 
             split_mode = SplitMode::NO_SPLIT;
             if split_allow[split_mode as usize] {
-                if (cuw > self.min_cuwh || cuh > self.min_cuwh)
-                    && evc_check_luma(&self.core.tree_cons)
-                {
+                if cuw > self.min_cuwh || cuh > self.min_cuwh {
                     /* consider CU split mode */
                     self.core.s_temp_run = self.core.s_curr_best[log2_cuw - 2][log2_cuh - 2];
                     self.core.c_temp_run = self.core.c_curr_best[log2_cuw - 2][log2_cuh - 2];
@@ -803,20 +782,18 @@ impl EvceCtx {
                             );
                         }
 
-                        if evc_check_luma(&self.core.tree_cons) {
-                            // update history MV list
-                            // in mode_coding_unit, self.fn_pinter_analyze_cu will store the best MV in mi
-                            // if the cost_temp has been update above, the best MV is in mi
-                            self.mode.get_cu_pred_data(
-                                &self.core.cu_data_best[log2_cuw - 2][log2_cuh - 2],
-                                0,
-                                0,
-                                log2_cuw as u8,
-                                log2_cuh as u8,
-                                log2_cuw as u8,
-                                cud,
-                            );
-                        }
+                        // update history MV list
+                        // in mode_coding_unit, self.fn_pinter_analyze_cu will store the best MV in mi
+                        // if the cost_temp has been update above, the best MV is in mi
+                        self.mode.get_cu_pred_data(
+                            &self.core.cu_data_best[log2_cuw - 2][log2_cuh - 2],
+                            0,
+                            0,
+                            log2_cuw as u8,
+                            log2_cuh as u8,
+                            log2_cuw as u8,
+                            cud,
+                        );
                     }
                 }
                 if is_dqp_set && self.core.cu_qp_delta_code_mode == 2 {
@@ -1576,17 +1553,6 @@ impl EvceCtx {
         log2_cuh: usize,
         cud: u16,
     ) -> f64 {
-        let start_comp = if evc_check_luma(&self.core.tree_cons) {
-            Y_C
-        } else {
-            U_C
-        };
-        let end_comp = if evc_check_chroma(&self.core.tree_cons) {
-            N_C
-        } else {
-            U_C
-        };
-
         assert!((log2_cuw as i8 - log2_cuh as i8).abs() <= 2);
         self.mode_cu_init(x, y, log2_cuw as u8, log2_cuh as u8, cud);
 
@@ -1915,15 +1881,13 @@ impl EvceCtx {
             );
         }
 
-        if evc_check_luma(&self.core.tree_cons) {
-            evce_eco_intra_dir_b(
-                &mut self.core.bs_temp,
-                &mut self.core.s_temp_run,
-                &mut self.core.c_temp_run,
-                self.core.ipm[0] as u8,
-                self.core.mpm_b_list,
-            );
-        }
+        evce_eco_intra_dir_b(
+            &mut self.core.bs_temp,
+            &mut self.core.s_temp_run,
+            &mut self.core.c_temp_run,
+            self.core.ipm[0] as u8,
+            self.core.mpm_b_list,
+        );
 
         if self.pps.cu_qp_delta_enabled_flag {
             self.core.cu_qp_delta_code = self.core.dqp_temp_run.cu_qp_delta_code;
@@ -2361,18 +2325,16 @@ impl EvceCtx {
             for i in 0..w_scu {
                 let k = ind + i;
 
-                if evc_check_luma(&self.core.tree_cons) {
-                    if intra_flag {
-                        self.map_scu[k].SET_IF();
-                    } else {
-                        self.map_scu[k].CLR_IF();
-                    }
+                if intra_flag {
+                    self.map_scu[k].SET_IF();
+                } else {
+                    self.map_scu[k].CLR_IF();
+                }
 
-                    if cbf_l {
-                        self.map_scu[k].SET_CBFL();
-                    } else {
-                        self.map_scu[k].CLR_CBFL();
-                    }
+                if cbf_l {
+                    self.map_scu[k].SET_CBFL();
+                } else {
+                    self.map_scu[k].CLR_CBFL();
                 }
 
                 if !intra_flag {
@@ -2452,18 +2414,16 @@ impl EvceCtx {
             for i in 0..w_scu {
                 let k = ind + i;
 
-                if evc_check_luma(&self.core.tree_cons) {
-                    if intra_flag_save {
-                        self.map_scu[k].SET_IF();
-                    } else {
-                        self.map_scu[k].CLR_IF();
-                    }
+                if intra_flag_save {
+                    self.map_scu[k].SET_IF();
+                } else {
+                    self.map_scu[k].CLR_IF();
+                }
 
-                    if cbf_l_save {
-                        self.map_scu[k].SET_CBFL();
-                    } else {
-                        self.map_scu[k].CLR_CBFL();
-                    }
+                if cbf_l_save {
+                    self.map_scu[k].SET_CBFL();
+                } else {
+                    self.map_scu[k].CLR_CBFL();
                 }
 
                 self.map_scu[k].CLR_COD();

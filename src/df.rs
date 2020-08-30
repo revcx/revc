@@ -42,51 +42,47 @@ pub(crate) fn evc_deblock_cu_hor(
             let qp = map_scu[offset + i].GET_QP();
             let t = (i << MIN_CU_LOG2);
 
-            if evc_check_luma(tree_cons) {
-                deblock_scu_hor(
-                    tracer,
-                    &mut planes[Y_C].as_region_mut(),
-                    qp as usize,
-                    Y_C,
-                    tbl_qp_to_st,
-                    x_pel + t,
-                    y_pel,
-                );
-            }
+            deblock_scu_hor(
+                tracer,
+                &mut planes[Y_C].as_region_mut(),
+                qp as usize,
+                Y_C,
+                tbl_qp_to_st,
+                x_pel + t,
+                y_pel,
+            );
 
-            if evc_check_chroma(tree_cons) {
-                let qp_u = EVC_CLIP3(
-                    -6 * (BIT_DEPTH as i8 - 8),
-                    57,
-                    qp as i8 + pic.pic_qp_u_offset,
-                );
-                let qp_v = EVC_CLIP3(
-                    -6 * (BIT_DEPTH as i8 - 8),
-                    57,
-                    qp as i8 + pic.pic_qp_v_offset,
-                );
+            let qp_u = EVC_CLIP3(
+                -6 * (BIT_DEPTH as i8 - 8),
+                57,
+                qp as i8 + pic.pic_qp_u_offset,
+            );
+            let qp_v = EVC_CLIP3(
+                -6 * (BIT_DEPTH as i8 - 8),
+                57,
+                qp as i8 + pic.pic_qp_v_offset,
+            );
 
-                deblock_scu_hor_chroma(
-                    tracer,
-                    &mut planes[U_C].as_region_mut(),
-                    evc_tbl_qp_chroma_dynamic_ext[0][(EVC_TBL_CHROMA_QP_OFFSET + qp_u) as usize]
-                        as usize,
-                    U_C,
-                    tbl_qp_to_st,
-                    (x_pel + t) >> 1,
-                    y_pel >> 1,
-                );
-                deblock_scu_hor_chroma(
-                    tracer,
-                    &mut planes[V_C].as_region_mut(),
-                    evc_tbl_qp_chroma_dynamic_ext[1][(EVC_TBL_CHROMA_QP_OFFSET + qp_v) as usize]
-                        as usize,
-                    V_C,
-                    tbl_qp_to_st,
-                    (x_pel + t) >> 1,
-                    y_pel >> 1,
-                );
-            }
+            deblock_scu_hor_chroma(
+                tracer,
+                &mut planes[U_C].as_region_mut(),
+                evc_tbl_qp_chroma_dynamic_ext[0][(EVC_TBL_CHROMA_QP_OFFSET + qp_u) as usize]
+                    as usize,
+                U_C,
+                tbl_qp_to_st,
+                (x_pel + t) >> 1,
+                y_pel >> 1,
+            );
+            deblock_scu_hor_chroma(
+                tracer,
+                &mut planes[V_C].as_region_mut(),
+                evc_tbl_qp_chroma_dynamic_ext[1][(EVC_TBL_CHROMA_QP_OFFSET + qp_v) as usize]
+                    as usize,
+                V_C,
+                tbl_qp_to_st,
+                (x_pel + t) >> 1,
+                y_pel >> 1,
+            );
         }
     }
 
@@ -131,50 +127,46 @@ pub(crate) fn evc_deblock_cu_ver(
             let qp = map_scu[offset + j * w_scu + 0].GET_QP();
             let t = (j << MIN_CU_LOG2);
 
-            if evc_check_luma(tree_cons) {
-                deblock_scu_ver(
-                    tracer,
-                    &mut planes[Y_C].as_region_mut(),
-                    qp as usize,
-                    Y_C,
-                    tbl_qp_to_st,
-                    x_pel,
-                    y_pel + t,
-                );
-            }
+            deblock_scu_ver(
+                tracer,
+                &mut planes[Y_C].as_region_mut(),
+                qp as usize,
+                Y_C,
+                tbl_qp_to_st,
+                x_pel,
+                y_pel + t,
+            );
 
-            if evc_check_chroma(tree_cons) {
-                let qp_u = EVC_CLIP3(
-                    -6 * (BIT_DEPTH as i8 - 8),
-                    57,
-                    qp as i8 + pic.pic_qp_u_offset,
-                );
-                let qp_v = EVC_CLIP3(
-                    -6 * (BIT_DEPTH as i8 - 8),
-                    57,
-                    qp as i8 + pic.pic_qp_v_offset,
-                );
-                deblock_scu_ver_chroma(
-                    tracer,
-                    &mut planes[U_C].as_region_mut(),
-                    evc_tbl_qp_chroma_dynamic_ext[0][(EVC_TBL_CHROMA_QP_OFFSET + qp_u) as usize]
-                        as usize,
-                    U_C,
-                    tbl_qp_to_st,
-                    x_pel >> 1,
-                    (y_pel + t) >> 1,
-                );
-                deblock_scu_ver_chroma(
-                    tracer,
-                    &mut planes[V_C].as_region_mut(),
-                    evc_tbl_qp_chroma_dynamic_ext[0][(EVC_TBL_CHROMA_QP_OFFSET + qp_v) as usize]
-                        as usize,
-                    V_C,
-                    tbl_qp_to_st,
-                    x_pel >> 1,
-                    (y_pel + t) >> 1,
-                );
-            }
+            let qp_u = EVC_CLIP3(
+                -6 * (BIT_DEPTH as i8 - 8),
+                57,
+                qp as i8 + pic.pic_qp_u_offset,
+            );
+            let qp_v = EVC_CLIP3(
+                -6 * (BIT_DEPTH as i8 - 8),
+                57,
+                qp as i8 + pic.pic_qp_v_offset,
+            );
+            deblock_scu_ver_chroma(
+                tracer,
+                &mut planes[U_C].as_region_mut(),
+                evc_tbl_qp_chroma_dynamic_ext[0][(EVC_TBL_CHROMA_QP_OFFSET + qp_u) as usize]
+                    as usize,
+                U_C,
+                tbl_qp_to_st,
+                x_pel >> 1,
+                (y_pel + t) >> 1,
+            );
+            deblock_scu_ver_chroma(
+                tracer,
+                &mut planes[V_C].as_region_mut(),
+                evc_tbl_qp_chroma_dynamic_ext[0][(EVC_TBL_CHROMA_QP_OFFSET + qp_v) as usize]
+                    as usize,
+                V_C,
+                tbl_qp_to_st,
+                x_pel >> 1,
+                (y_pel + t) >> 1,
+            );
         }
     }
 
@@ -191,49 +183,46 @@ pub(crate) fn evc_deblock_cu_ver(
             let qp = map_scu[offset + j * w_scu + w].GET_QP();
             let t = (j << MIN_CU_LOG2);
 
-            if evc_check_luma(tree_cons) {
-                deblock_scu_ver(
-                    tracer,
-                    &mut planes[Y_C].as_region_mut(),
-                    qp as usize,
-                    Y_C,
-                    tbl_qp_to_st,
-                    x_pel + cuw,
-                    y_pel + t,
-                );
-            }
-            if evc_check_chroma(tree_cons) {
-                let qp_u = EVC_CLIP3(
-                    -6 * (BIT_DEPTH as i8 - 8),
-                    57,
-                    qp as i8 + pic.pic_qp_u_offset,
-                );
-                let qp_v = EVC_CLIP3(
-                    -6 * (BIT_DEPTH as i8 - 8),
-                    57,
-                    qp as i8 + pic.pic_qp_v_offset,
-                );
-                deblock_scu_ver_chroma(
-                    tracer,
-                    &mut planes[U_C].as_region_mut(),
-                    evc_tbl_qp_chroma_dynamic_ext[0][(EVC_TBL_CHROMA_QP_OFFSET + qp_u) as usize]
-                        as usize,
-                    U_C,
-                    tbl_qp_to_st,
-                    (x_pel + cuw) >> 1,
-                    (y_pel + t) >> 1,
-                );
-                deblock_scu_ver_chroma(
-                    tracer,
-                    &mut planes[V_C].as_region_mut(),
-                    evc_tbl_qp_chroma_dynamic_ext[0][(EVC_TBL_CHROMA_QP_OFFSET + qp_v) as usize]
-                        as usize,
-                    V_C,
-                    tbl_qp_to_st,
-                    (x_pel + cuw) >> 1,
-                    (y_pel + t) >> 1,
-                );
-            }
+            deblock_scu_ver(
+                tracer,
+                &mut planes[Y_C].as_region_mut(),
+                qp as usize,
+                Y_C,
+                tbl_qp_to_st,
+                x_pel + cuw,
+                y_pel + t,
+            );
+
+            let qp_u = EVC_CLIP3(
+                -6 * (BIT_DEPTH as i8 - 8),
+                57,
+                qp as i8 + pic.pic_qp_u_offset,
+            );
+            let qp_v = EVC_CLIP3(
+                -6 * (BIT_DEPTH as i8 - 8),
+                57,
+                qp as i8 + pic.pic_qp_v_offset,
+            );
+            deblock_scu_ver_chroma(
+                tracer,
+                &mut planes[U_C].as_region_mut(),
+                evc_tbl_qp_chroma_dynamic_ext[0][(EVC_TBL_CHROMA_QP_OFFSET + qp_u) as usize]
+                    as usize,
+                U_C,
+                tbl_qp_to_st,
+                (x_pel + cuw) >> 1,
+                (y_pel + t) >> 1,
+            );
+            deblock_scu_ver_chroma(
+                tracer,
+                &mut planes[V_C].as_region_mut(),
+                evc_tbl_qp_chroma_dynamic_ext[0][(EVC_TBL_CHROMA_QP_OFFSET + qp_v) as usize]
+                    as usize,
+                V_C,
+                tbl_qp_to_st,
+                (x_pel + cuw) >> 1,
+                (y_pel + t) >> 1,
+            );
         }
     }
 

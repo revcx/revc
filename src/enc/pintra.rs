@@ -198,98 +198,67 @@ impl EvceCtx {
             self.w_scu,
         );
 
-        if evc_check_luma(&self.core.tree_cons) {
-            pred_cnt = self.make_ipred_list(x, y, log2_cuw, log2_cuh, &mut ipred_list);
-            if pred_cnt == 0 {
-                return MAX_COST;
-            }
+        pred_cnt = self.make_ipred_list(x, y, log2_cuw, log2_cuh, &mut ipred_list);
+        if pred_cnt == 0 {
+            return MAX_COST;
+        }
 
-            for j in 0..pred_cnt {
-                let mut dist_t = 0;
-                let mut dist_tc = 0;
+        for j in 0..pred_cnt {
+            let mut dist_t = 0;
+            let mut dist_tc = 0;
 
-                let i = ipred_list[j];
-                self.core.ipm[0] = i;
-                self.core.ipm[1] = IntraPredDir::IPD_INVALID;
-                cost_t = self.pintra_residue_rdo(x, y, log2_cuw, log2_cuh, &mut dist_t, false);
+            let i = ipred_list[j];
+            self.core.ipm[0] = i;
+            self.core.ipm[1] = IntraPredDir::IPD_INVALID;
+            cost_t = self.pintra_residue_rdo(x, y, log2_cuw, log2_cuh, &mut dist_t, false);
 
-                EVC_TRACE_COUNTER(&mut self.core.bs_temp.tracer);
-                EVC_TRACE(&mut self.core.bs_temp.tracer, "Luma mode ");
-                EVC_TRACE(&mut self.core.bs_temp.tracer, i as u8);
-                EVC_TRACE(&mut self.core.bs_temp.tracer, "  cost is ");
-                EVC_TRACE(&mut self.core.bs_temp.tracer, cost_t as i64);
-                EVC_TRACE(&mut self.core.bs_temp.tracer, " \n");
+            EVC_TRACE_COUNTER(&mut self.core.bs_temp.tracer);
+            EVC_TRACE(&mut self.core.bs_temp.tracer, "Luma mode ");
+            EVC_TRACE(&mut self.core.bs_temp.tracer, i as u8);
+            EVC_TRACE(&mut self.core.bs_temp.tracer, "  cost is ");
+            EVC_TRACE(&mut self.core.bs_temp.tracer, cost_t as i64);
+            EVC_TRACE(&mut self.core.bs_temp.tracer, " \n");
 
-                if cost_t < cost {
-                    cost = cost_t;
-                    best_dist_y = dist_t;
+            if cost_t < cost {
+                cost = cost_t;
+                best_dist_y = dist_t;
 
-                    if sec_best_ipd != best_ipd {
-                        sec_best_ipd = best_ipd;
-                    }
-
-                    best_ipd = i;
-
-                    self.pintra.coef_best.data[Y_C][0..cuwxh]
-                        .copy_from_slice(&self.core.ctmp.data[Y_C][0..cuwxh]);
-                    self.pintra.rec_best.data[Y_C][0..cuwxh]
-                        .copy_from_slice(&self.pintra.rec.data[Y_C][0..cuwxh]);
-
-                    self.pintra.nnz_best[Y_C] = self.core.nnz[Y_C];
-                    self.core.s_temp_prev_comp_best = self.core.s_temp_run;
-                    self.core.c_temp_prev_comp_best = self.core.c_temp_run;
+                if sec_best_ipd != best_ipd {
+                    sec_best_ipd = best_ipd;
                 }
-            }
-        } else {
-            let luma_cup = evc_get_luma_cup(
-                0,
-                0,
-                PEL2SCU(cuw) as u16,
-                PEL2SCU(cuh) as u16,
-                PEL2SCU(cuw) as u16,
-            );
-            let luma_flags = self.core.cu_data_temp[log2_cuw as usize - 2][log2_cuh as usize - 2]
-                .map_scu[luma_cup as usize];
-            assert!(luma_flags.GET_IF() != 0);
-            if luma_flags.GET_IF() != 0 {
-                best_ipd = self.core.cu_data_temp[log2_cuw as usize - 2][log2_cuh as usize - 2].ipm
-                    [0][luma_cup as usize];
-            } else {
-                best_ipd = IntraPredDir::IPD_DC_B;
+
+                best_ipd = i;
+
+                self.pintra.coef_best.data[Y_C][0..cuwxh]
+                    .copy_from_slice(&self.core.ctmp.data[Y_C][0..cuwxh]);
+                self.pintra.rec_best.data[Y_C][0..cuwxh]
+                    .copy_from_slice(&self.pintra.rec.data[Y_C][0..cuwxh]);
+
+                self.pintra.nnz_best[Y_C] = self.core.nnz[Y_C];
+                self.core.s_temp_prev_comp_best = self.core.s_temp_run;
+                self.core.c_temp_prev_comp_best = self.core.c_temp_run;
             }
         }
 
-        if evc_check_chroma(&self.core.tree_cons) {
-            let mut dist_tc = 0i32;
-            self.core.ipm[0] = best_ipd;
-            self.core.ipm[1] = best_ipd;
+        let mut dist_tc = 0i32;
+        self.core.ipm[0] = best_ipd;
+        self.core.ipm[1] = best_ipd;
 
-            cost_t = self.pintra_residue_rdo(x, y, log2_cuw, log2_cuh, &mut dist_tc, true);
+        cost_t = self.pintra_residue_rdo(x, y, log2_cuw, log2_cuh, &mut dist_tc, true);
 
-            best_ipd_c = self.core.ipm[1];
-            best_dist_c = dist_tc;
-            for j in U_C..N_C {
-                let size_tmp = (cuw * cuh) >> (if j == 0 { 0 } else { 2 });
-                self.pintra.coef_best.data[j][0..size_tmp]
-                    .copy_from_slice(&self.core.ctmp.data[j][0..size_tmp]);
-                self.pintra.rec_best.data[j][0..size_tmp]
-                    .copy_from_slice(&self.pintra.rec.data[j][0..size_tmp]);
+        best_ipd_c = self.core.ipm[1];
+        best_dist_c = dist_tc;
+        for j in U_C..N_C {
+            let size_tmp = (cuw * cuh) >> (if j == 0 { 0 } else { 2 });
+            self.pintra.coef_best.data[j][0..size_tmp]
+                .copy_from_slice(&self.core.ctmp.data[j][0..size_tmp]);
+            self.pintra.rec_best.data[j][0..size_tmp]
+                .copy_from_slice(&self.pintra.rec.data[j][0..size_tmp]);
 
-                self.pintra.nnz_best[j] = self.core.nnz[j];
-            }
+            self.pintra.nnz_best[j] = self.core.nnz[j];
         }
 
-        let start_comp = if evc_check_luma(&self.core.tree_cons) {
-            Y_C
-        } else {
-            U_C
-        };
-        let end_comp = if evc_check_chroma(&self.core.tree_cons) {
-            N_C
-        } else {
-            U_C
-        };
-        for j in start_comp..end_comp {
+        for j in 0..N_C {
             let size_tmp = (cuw * cuh) >> (if j == 0 { 0 } else { 2 });
             self.core.ctmp.data[j][0..size_tmp]
                 .copy_from_slice(&self.pintra.coef_best.data[j][0..size_tmp]);
@@ -300,13 +269,9 @@ impl EvceCtx {
             //s_rec[j] = cuw >> (j == 0 ? 0 : 1);
         }
 
-        if evc_check_luma(&self.core.tree_cons) {
-            self.core.ipm[0] = best_ipd;
-        }
-        if evc_check_chroma(&self.core.tree_cons) {
-            self.core.ipm[1] = best_ipd_c;
-            assert!(best_ipd_c != IntraPredDir::IPD_INVALID);
-        }
+        self.core.ipm[0] = best_ipd;
+        self.core.ipm[1] = best_ipd_c;
+        assert!(best_ipd_c != IntraPredDir::IPD_INVALID);
 
         /* cost calculation */
         self.core.s_temp_run = self.core.s_curr_best[log2_cuw - 2][log2_cuh - 2];
@@ -321,14 +286,11 @@ impl EvceCtx {
         cost = (self.lambda[0] * bit_cnt as f64);
 
         self.core.dist_cu = 0;
-        if evc_check_luma(&self.core.tree_cons) {
-            cost += best_dist_y as f64;
-            self.core.dist_cu += best_dist_y;
-        }
-        if evc_check_chroma(&self.core.tree_cons) {
-            cost += best_dist_c as f64;
-            self.core.dist_cu += best_dist_c;
-        }
+        cost += best_dist_y as f64;
+        self.core.dist_cu += best_dist_y;
+
+        cost += best_dist_c as f64;
+        self.core.dist_cu += best_dist_c;
 
         self.core.s_temp_best = self.core.s_temp_run;
         self.core.c_temp_best = self.core.c_temp_run;
@@ -450,8 +412,6 @@ impl EvceCtx {
         let cuh = 1 << log2_cuh;
 
         if !chroma {
-            assert!(evc_check_luma(&self.core.tree_cons));
-
             if let Some(pic) = &self.pintra.pic_o {
                 let frame = &pic.borrow().frame;
                 let planes = &frame.borrow().planes;
@@ -557,8 +517,6 @@ impl EvceCtx {
             *dist = cost as i32;
             cost += (self.lambda[0] * bit_cnt as f64);
         } else {
-            assert!(evc_check_chroma(&self.core.tree_cons));
-
             evc_ipred_b(
                 &self.core.nb.data[U_C][0][2..],
                 &self.core.nb.data[U_C][1][(cuh >> 1) as usize..],
