@@ -15,15 +15,6 @@ use crate::def::*;
 use crate::enc::*;
 use frame::*;
 
-/*****************************************************************************
- * return values and error code
- *****************************************************************************/
-/* not matched CRC value */
-pub const EVC_ERR_BAD_CRC: usize = (201);
-/* CRC value presented but ignored at decoder*/
-pub const EVC_WARN_CRC_IGNORED: usize = (200);
-pub const EVC_OK: usize = 0;
-
 #[derive(Debug, FromPrimitive, ToPrimitive, PartialOrd, Ord, PartialEq, Eq)]
 pub enum EvcError {
     /* no more output, but it is OK */

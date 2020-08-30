@@ -37,8 +37,6 @@ use thiserror::private::DisplayAsDisplay;
 /* support RDOQ */
 pub(crate) const SCALE_BITS: usize = 15; /* Inherited from TMuC, pressumably for fractional bit estimates in RDOQ */
 pub(crate) const ERR_SCALE_PRECISION_BITS: usize = 20;
-/* EVC encoder magic code */
-pub(crate) const EVCE_MAGIC_CODE: u32 = 0x45565945; /* EVYE */
 
 /* Max. and min. Quantization parameter */
 pub(crate) const MAX_QUANT: u8 = 51;
@@ -116,8 +114,6 @@ pub(crate) struct EvcePicOrg {
     pic_icnt: usize,
     /* be used for encoding input */
     is_used: bool,
-    /* address of sub-picture */
-    //EVC_PIC              * spic;
 }
 
 #[derive(Default, Copy, Clone)]
@@ -205,8 +201,6 @@ pub(crate) struct EvceCore {
     /* CU mode */
     cu_mode: PredMode,
     /* intra prediction mode */
-    //u8             mpm[2]; /* mpm table pointer*/
-    //u8             mpm_ext[8];
     mpm_b_list: &'static [u8],
     pims: [u8; IntraPredDir::IPD_CNT_B as usize], /* probable intra mode set*/
     ipm: [IntraPredDir; 2],
@@ -309,111 +303,17 @@ impl EvceCore {
         }
 
         EvceCore {
-            /* coefficient buffer of current CU */
-            //coef: CUBuffer<i16>::default(), //[[i16; MAX_CU_DIM]; N_C]
-            /* CU data for RDO */
             cu_data_best,
             cu_data_temp,
             dqp_data,
-
-            /* temporary coefficient buffer */
-            //ctmp: CUBuffer < i16 >, //[[i16;MAX_CU_DIM];N_C]
-            /* pred buffer of current CU. [1][x][x] is used for bi-pred */
-            //pred: [CUBuffer < pel >; 2], //[2][N_C][MAX_CU_DIM];
-            /* neighbor pixel buffer for intra prediction */
-            //nb: NBBuffer < pel >, //[N_C][N_REF][MAX_CU_SIZE * 3];
-            /* current encoding LCU number */
-            //lcu_num: u16,
-            /*QP for current encoding CU. Used to derive Luma and chroma qp*/
-            //qp: u8,
-            //cu_qp_delta_code: u8,
-            //cu_qp_delta_is_coded: u8,
-            //cu_qp_delta_code_mode: u8,
             dqp_curr_best,
             dqp_next_best,
-            //dqp_temp_best: EvceCUData,
-            //dqp_temp_best_merge: EvceCUData,
-            //dqp_temp_run: EvceCUData,
 
-            /* QP for luma of current encoding CU */
-            //qp_y: u8,
-            ///* QP for chroma of current encoding CU */
-            //qp_u: u8,
-            //qp_v: u8,
-            ///* X address of current LCU */
-            //x_lcu: u16,
-            ///* Y address of current LCU */
-            //y_lcu: u16,
-            ///* X address of current CU in SCU unit */
-            //x_scu: u16,
-            ///* Y address of current CU in SCU unit */
-            //y_scu: u16,
-            ///* left pel position of current LCU */
-            //x_pel: u16,
-            ///* top pel position of current LCU */
-            //y_pel: u16,
-            ///* CU position in current frame in SCU unit */
-            //scup: u32,
-            ///* CU position in current LCU in SCU unit */
-            //cup: u32,
-            ///* CU depth */
-            //cud: u16,
-            ///* neighbor CUs availability of current CU */
-            //avail_cu: u16,
-            ///* Left, right availability of current CU */
-            //avail_lr: u16,
-            //bef_data_idx: u16,
-            ///* CU mode */
-            //cu_mode: MCU,
-            /* intra prediction mode */
-            //u8             mpm[2]; /* mpm table pointer*/
-            //u8             mpm_ext[8];
-            //mpm_b_list: &'static [u8],
-            //pims: [u8; IntraPredDir::IPD_CNT_B as usize], /* probable intra mode set*/
-            //ipm: [IntraPredDir; 2],
-            /* skip flag for MODE_INTER */
-            //skip_flag: bool,
-            /* width of current CU */
-            //cuw: u16,
-            /* height of current CU */
-            //cuh: u16,
-            /* log2 of cuw */
-            //log2_cuw: u8,
-            /* log2 of cuh */
-            // log2_cuh: u8,
-            /* number of non-zero coefficient */
-            //nnz: [u16; N_C],
-            /* platform specific data, if needed */
-            //void          *pf;
-            /* bitstream structure for RDO */
-            //EVC_BSW        bs_temp;
-            /* SBAC structure for full RDO */
-            //EVCE_SBAC      s_curr_best[MAX_CU_DEPTH][MAX_CU_DEPTH];
-            //EVCE_SBAC      s_next_best[MAX_CU_DEPTH][MAX_CU_DEPTH];
-            //EVCE_SBAC      s_temp_best;
-            //EVCE_SBAC      s_temp_best_merge;
-            //EVCE_SBAC      s_temp_run;
-            //EVCE_SBAC      s_temp_prev_comp_best;
-            //EVCE_SBAC      s_temp_prev_comp_run;
-            //EVCE_SBAC      s_curr_before_split[MAX_CU_DEPTH][MAX_CU_DEPTH];
-            //EVCE_BEF_DATA  bef_data[MAX_CU_DEPTH][MAX_CU_DEPTH][MAX_CU_CNT_IN_LCU][MAX_BEF_DATA_NUM];
-            //cost_best: f64,
-            //inter_satd: u32,
-            //dist_cu: i32,
-            //dist_cu_best: i32, //dist of the best intra mode (note: only updated in intra coding now)
-            /* temporal pixel buffer for inter prediction */
-            //pel            eif_tmp_buffer[(MAX_CU_SIZE + 2) * (MAX_CU_SIZE + 2)];
-            //u8             au8_eval_mvp_idx[MAX_NUM_MVP];
-            //ctx_flags: [u8; CtxNevIdx::NUM_CNID as usize],
-            //int            split_mode_child:[4];
-            //int            parent_split_allow[6];
+            delta_dist: [0; N_C],
+            dist_nofilt: [0; N_C],
+            dist_filter: [0; N_C],
 
-            //one picture that arranges cu pixels and neighboring pixels for deblocking (just to match the interface of deblocking functions)
-            delta_dist: [0; N_C], //delta distortion from filtering (negative values mean distortion reduced)
-            dist_nofilt: [0; N_C], //distortion of not filtered samples
-            dist_filter: [0; N_C], //distortion of filtered samples
-
-            evc_tbl_qp_chroma_dynamic_ext, // [[i8; MAX_QP_TABLE_SIZE_EXT]; 2],
+            evc_tbl_qp_chroma_dynamic_ext,
             ..Default::default()
         }
     }
@@ -433,9 +333,6 @@ impl EvceCore {
  * All have to be stored are in this structure.
  *****************************************************************************/
 pub(crate) struct EvceCtx {
-    /* magic code */
-    magic: u32,
-
     /* input frame */
     frm: Option<Frame<pel>>,
     /* output packet */
@@ -444,8 +341,6 @@ pub(crate) struct EvceCtx {
     flush: bool,
     /* address of current input picture, ref_picture  buffer structure */
     pico_buf: Vec<EvcePicOrg>,
-    /* address of current input picture buffer structure */
-    //pico: EvcePicOrg,
     /* index of current input picture buffer in pico_buf[] */
     pico_idx: usize,
     pico_max_cnt: usize,
@@ -453,16 +348,11 @@ pub(crate) struct EvceCtx {
 
     sps_pps_once: bool,
 
-    /* EVCE identifier */
-    //EVCE                   id;
     /* address of core structure */
     core: EvceCore,
-    /* current input (original) image */
-    //EVC_PIC                pic_o;
+
     /* address indicating current encoding, list0, list1 and original pictures */
     pic: Vec<Option<Rc<RefCell<EvcPic>>>>, /* the last one is for original */
-    /* picture address for mode decision */
-    //EVC_PIC * pic_m;
     /* reference picture (0: foward, 1: backward) */
     refp: Vec<Vec<EvcRefP>>, // Rc<RefCell<Vec<Vec<EvcRefP>>>>  refp[MAX_NUM_REF_PICS][REFP_NUM];
     /* encoding parameter */
@@ -487,8 +377,6 @@ pub(crate) struct EvceCtx {
     sh: EvcSh,
     /* reference picture manager */
     rpm: EvcPm,
-    /* create descriptor */
-    //EVCE_CDSC              cdsc;
     /* quantization value of current encoding slice */
     qp: u8,
     /* encoding picture width */
@@ -533,9 +421,7 @@ pub(crate) struct EvceCtx {
     ref_pic_gap_length: u32,
     /* maximum CU depth */
     max_cud: u8,
-    //EVCE_SBAC              sbac_enc;
-    /* address of inbufs */
-    //EVC_IMGB * inbuf[EVCE_MAX_INBUF_CNT];
+
     /* last coded intra picture's picture order count */
     last_intra_poc: i32,
     /* maximum CU width and height */
@@ -654,37 +540,20 @@ impl EvceCtx {
         }
 
         EvceCtx {
-            /* magic code */
-            magic: EVCE_MAGIC_CODE,
-
             frm: None,
             pkt: Some(Packet::default()),
 
             flush: false,
-            /* address of current input picture, ref_picture  buffer structure */
             pico_buf,
-            /* address of current input picture buffer structure */
-            //pico://EVCE_PICO *
-            /* index of current input picture buffer in pico_buf[] */
             pico_idx: 0,
             pico_max_cnt,
             gop_size: param.max_b_frames as usize + 1,
 
             sps_pps_once: false,
-
-            /* EVCE identifier */
-            //EVCE                   id;
-            /* address of core structure */
             core,
-            /* current input (original) image */
-            //EVC_PIC                pic_o;
-            /* address indicating current encoding, list0, list1 and original pictures */
-            pic: vec![None; PIC_D + 1], /* the last one is for original */
-            /* picture address for mode decision */
-            //EVC_PIC * pic_m;
-            /* reference picture (0: foward, 1: backward) */
-            refp, //: Rc::new(RefCell::new(refp)),
-            /* encoding parameter */
+            pic: vec![None; PIC_D + 1],
+
+            refp,
             param,
             /* SBAC */
             sbac_enc: EvceSbac::default(),
@@ -705,8 +574,6 @@ impl EvceCtx {
             sh: EvcSh::default(),
             /* reference picture manager */
             rpm,
-            /* create descriptor */
-            //EVCE_CDSC              cdsc;
             /* quantization value of current encoding slice */
             qp: param.qp,
             /* encoding picture width */
@@ -751,9 +618,7 @@ impl EvceCtx {
             ref_pic_gap_length: 0,
             /* maximum CU depth */
             max_cud,
-            //EVCE_SBAC              sbac_enc;
-            /* address of inbufs */
-            //EVC_IMGB * inbuf[EVCE_MAX_INBUF_CNT];
+
             /* last coded intra picture's picture order count */
             last_intra_poc: 0,
             /* maximum CU width and height */
@@ -846,8 +711,6 @@ impl EvceCtx {
         } else {
             false
         };
-
-        //evc_assert_rv(bitb->addr && bitb->bsize > 0, EVC_ERR_INVALID_ARGUMENT);
 
         /* initialize variables for a picture encoding */
         self.evce_enc_pic_prepare()?;

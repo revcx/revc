@@ -123,14 +123,7 @@ fn print_stat(stat: &EvcStat, bs_cnt: usize) {
     } else if stat.nalu_type == NaluType::EVC_APS_NUT {
         eprint!("Adaptation Parameter Set ({} bytes)", stat.bytes);
     } else if stat.nalu_type == NaluType::EVC_SEI_NUT {
-        eprint!("SEI message: ");
-        if stat.ret == EVC_OK {
-            eprint!("MD5 check OK");
-        } else if stat.ret == EVC_ERR_BAD_CRC {
-            eprint!("MD5 check mismatch!");
-        } else if stat.ret == EVC_WARN_CRC_IGNORED {
-            eprint!("MD5 check ignored!");
-        }
+        eprint!("SEI message ({} bytes)", stat.bytes);
     }
     eprint!("\n");
 }

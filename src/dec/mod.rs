@@ -22,9 +22,6 @@ use bsr::*;
 use eco::*;
 use sbac::*;
 
-/* evc decoder magic code */
-pub(crate) const EVCD_MAGIC_CODE: u32 = 0x45565944; /* EVYD */
-
 /*****************************************************************************
  * CORE information used for decoding process.
  *
@@ -65,7 +62,6 @@ pub(crate) struct EvcdCore {
     //pims: [IntraPredDir; IntraPredDir::IPD_CNT_B as usize], /* probable intra mode set*/
     /* prediction mode of current CU: INTRA, INTER, ... */
     pred_mode: PredMode,
-    DMVRenable: u8,
     /* log2 of cuw */
     log2_cuw: u8,
     /* log2 of cuh */
@@ -111,9 +107,6 @@ pub(crate) struct EvcdCore {
  * All have to be stored are in this structure.
  *****************************************************************************/
 pub(crate) struct EvcdCtx {
-    /* magic code */
-    magic: u32,
-
     /* input packet */
     pkt: Option<Packet>,
 
@@ -189,28 +182,15 @@ pub(crate) struct EvcdCtx {
     f_scu: u32,
     /* the picture order count value */
     poc: EvcPoc,
-    /* the picture order count of the previous Tid0 picture */
-    prev_pic_order_cnt_val: u32,
-    /* the decoding order count of the previous picture */
-    prev_doc_offset: u32,
     /* the number of currently decoded pictures */
     pic_cnt: u32,
     /* flag whether current picture is refecened picture or not */
     slice_ref_flag: bool,
     /* distance between ref pics in addition to closest ref ref pic in LD*/
     ref_pic_gap_length: u32,
-    /* bitstream has an error? */
-    bs_err: u8,
     /* reference picture (0: foward, 1: backward) */
     refp: Vec<Vec<EvcRefP>>, //[[EvcRefP; REFP_NUM]; MAX_NUM_REF_PICS],
-    /* flag for picture signature enabling */
-    use_pic_sign: u8,
-    /* picture signature (MD5 digest 128bits) for each component */
-    pic_sign: [[u8; 16]; N_C],
-    /* flag to indicate picture signature existing or not */
-    pic_sign_exist: u8,
     /* flag to indicate opl decoder output */
-    use_opl: u8,
     num_ctb: u32,
 }
 
@@ -226,7 +206,6 @@ impl EvcdCtx {
         }
 
         EvcdCtx {
-            magic: EVCD_MAGIC_CODE,
             pkt: None,
 
             /* EVCD identifier */
@@ -300,28 +279,15 @@ impl EvcdCtx {
             f_scu: 0,
             /* the picture order count value */
             poc: EvcPoc::default(),
-            /* the picture order count of the previous Tid0 picture */
-            prev_pic_order_cnt_val: 0,
-            /* the decoding order count of the previous picture */
-            prev_doc_offset: 0,
             /* the number of currently decoded pictures */
             pic_cnt: 0,
             /* flag whether current picture is refecened picture or not */
             slice_ref_flag: false,
             /* distance between ref pics in addition to closest ref ref pic in LD*/
             ref_pic_gap_length: 0,
-            /* bitstream has an error? */
-            bs_err: 0,
             /* reference picture (0: foward, 1: backward) */
             refp,
-            /* flag for picture signature enabling */
-            use_pic_sign: 0,
-            /* picture signature (MD5 digest 128bits) for each component */
-            pic_sign: [[0; 16]; N_C],
-            /* flag to indicate picture signature existing or not */
-            pic_sign_exist: 0,
             /* flag to indicate opl decoder output */
-            use_opl: 0,
             num_ctb: 0,
         }
     }
