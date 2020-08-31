@@ -417,434 +417,6 @@ impl EvcdCtx {
         self.core.lcu_num = self.core.x_lcu + self.core.y_lcu * self.w_lcu; // Init the first lcu_num in tile
     }
 
-    fn evcd_set_dec_info(&mut self) {
-        let w_scu = self.w_scu as usize;
-        let scup = self.core.scup as usize;
-        let w_cu = (1 << self.core.log2_cuw as usize) >> MIN_CU_LOG2;
-        let h_cu = (1 << self.core.log2_cuh as usize) >> MIN_CU_LOG2;
-        let flag = if self.core.pred_mode == PredMode::MODE_INTRA {
-            1
-        } else {
-            0
-        };
-
-        if let (Some(map_refi), Some(map_mv)) = (&mut self.map_refi, &mut self.map_mv) {
-            let (mut refis, mut mvs) = (map_refi.borrow_mut(), map_mv.borrow_mut());
-
-            for i in 0..h_cu {
-                let map_scu = &mut self.map_scu[scup + i * w_scu..];
-                let map_ipm = &mut self.map_ipm[scup + i * w_scu..];
-                let map_cu_mode = &mut self.map_cu_mode[scup + i * w_scu..];
-                let refi = &mut refis[scup + i * w_scu..];
-                let mv = &mut mvs[scup + i * w_scu..];
-
-                for j in 0..w_cu {
-                    if self.core.pred_mode == PredMode::MODE_SKIP {
-                        map_scu[j].SET_SF();
-                    } else {
-                        map_scu[j].CLR_SF();
-                    }
-                    if self.core.is_coef[Y_C] {
-                        map_scu[j].SET_CBFL();
-                    } else {
-                        map_scu[j].CLR_CBFL();
-                    }
-
-                    map_cu_mode[j].SET_LOGW(self.core.log2_cuw as u32);
-                    map_cu_mode[j].SET_LOGH(self.core.log2_cuh as u32);
-
-                    if self.pps.cu_qp_delta_enabled_flag {
-                        map_scu[j].RESET_QP();
-                    }
-                    map_scu[j].SET_IF_COD_SN_QP(flag, self.slice_num as u32, self.core.qp);
-
-                    map_ipm[j] = self.core.ipm[0];
-
-                    refi[j][REFP_0] = self.core.refi[REFP_0];
-                    refi[j][REFP_1] = self.core.refi[REFP_1];
-                    mv[j][REFP_0][MV_X] = self.core.mv[REFP_0][MV_X];
-                    mv[j][REFP_0][MV_Y] = self.core.mv[REFP_0][MV_Y];
-                    mv[j][REFP_1][MV_X] = self.core.mv[REFP_1][MV_X];
-                    mv[j][REFP_1][MV_Y] = self.core.mv[REFP_1][MV_Y];
-                }
-            }
-        }
-    }
-
-    fn evcd_itdq(&mut self) {
-        let mut core = &mut self.core;
-        evc_sub_block_itdq(
-            &mut self.bs.tracer,
-            &mut core.coef.data,
-            core.log2_cuw,
-            core.log2_cuh,
-            core.qp_y,
-            core.qp_u,
-            core.qp_v,
-            &core.is_coef,
-        );
-    }
-
-    fn get_nbr_yuv(&mut self, mut x: u16, mut y: u16, mut cuw: u8, mut cuh: u8) {
-        let constrained_intra_flag =
-            self.core.pred_mode == PredMode::MODE_INTRA && self.pps.constrained_intra_pred_flag;
-
-        if let Some(pic) = &self.pic {
-            let frame = &pic.borrow().frame;
-            let planes = &frame.borrow().planes;
-            /* Y */
-            evc_get_nbr_b(
-                x as usize,
-                y as usize,
-                cuw as usize,
-                cuh as usize,
-                &planes[Y_C].as_region(),
-                self.core.avail_cu,
-                &mut self.core.nb.data[Y_C],
-                self.core.scup as usize,
-                &self.map_scu,
-                self.w_scu as usize,
-                self.h_scu as usize,
-                Y_C,
-                constrained_intra_flag,
-            );
-
-            cuw >>= 1;
-            cuh >>= 1;
-            x >>= 1;
-            y >>= 1;
-
-            /* U */
-            evc_get_nbr_b(
-                x as usize,
-                y as usize,
-                cuw as usize,
-                cuh as usize,
-                &planes[U_C].as_region(),
-                self.core.avail_cu,
-                &mut self.core.nb.data[U_C],
-                self.core.scup as usize,
-                &self.map_scu,
-                self.w_scu as usize,
-                self.h_scu as usize,
-                U_C,
-                constrained_intra_flag,
-            );
-
-            /* V */
-            evc_get_nbr_b(
-                x as usize,
-                y as usize,
-                cuw as usize,
-                cuh as usize,
-                &planes[V_C].as_region(),
-                self.core.avail_cu,
-                &mut self.core.nb.data[V_C],
-                self.core.scup as usize,
-                &self.map_scu,
-                self.w_scu as usize,
-                self.h_scu as usize,
-                V_C,
-                constrained_intra_flag,
-            );
-        }
-    }
-
-    fn evcd_get_skip_motion(&mut self, cuw: u8, cuh: u8) {
-        let mut srefi = [[0i8; MAX_NUM_MVP]; REFP_NUM];
-        let mut smvp = [[[0i16; MV_D]; MAX_NUM_MVP]; REFP_NUM];
-
-        let core = &mut self.core;
-        let map_mv = self.map_mv.as_ref().unwrap().borrow();
-
-        evc_get_motion(
-            core.scup as usize,
-            REFP_0,
-            &*map_mv,
-            &self.refp,
-            cuw as usize,
-            cuh as usize,
-            self.w_scu as usize,
-            core.avail_cu,
-            &mut srefi[REFP_0],
-            &mut smvp[REFP_0],
-        );
-
-        core.refi[REFP_0] = srefi[REFP_0][core.mvp_idx[REFP_0] as usize];
-
-        core.mv[REFP_0][MV_X] = smvp[REFP_0][core.mvp_idx[REFP_0] as usize][MV_X];
-        core.mv[REFP_0][MV_Y] = smvp[REFP_0][core.mvp_idx[REFP_0] as usize][MV_Y];
-
-        if self.sh.slice_type == SliceType::EVC_ST_P {
-            core.refi[REFP_1] = REFI_INVALID;
-            core.mv[REFP_1][MV_X] = 0;
-            core.mv[REFP_1][MV_Y] = 0;
-        } else {
-            evc_get_motion(
-                core.scup as usize,
-                REFP_1,
-                &*map_mv,
-                &self.refp,
-                cuw as usize,
-                cuh as usize,
-                self.w_scu as usize,
-                core.avail_cu,
-                &mut srefi[REFP_1],
-                &mut smvp[REFP_1],
-            );
-
-            core.refi[REFP_1] = srefi[REFP_1][core.mvp_idx[REFP_1] as usize];
-            core.mv[REFP_1][MV_X] = smvp[REFP_1][core.mvp_idx[REFP_1] as usize][MV_X];
-            core.mv[REFP_1][MV_Y] = smvp[REFP_1][core.mvp_idx[REFP_1] as usize][MV_Y];
-        }
-    }
-
-    fn evcd_get_inter_motion(&mut self, cuw: u8, cuh: u8) {
-        let mut mvp = [[0i16; MV_D]; MAX_NUM_MVP];
-        let mut refi = [0i8; MAX_NUM_MVP];
-
-        let core = &mut self.core;
-        let map_mv = self.map_mv.as_ref().unwrap().borrow();
-
-        for inter_dir_idx in 0..2 {
-            /* 0: forward, 1: backward */
-            if (((core.inter_dir as usize + 1) >> inter_dir_idx) & 1) != 0 {
-                evc_get_motion(
-                    core.scup as usize,
-                    inter_dir_idx,
-                    &*map_mv,
-                    &self.refp,
-                    cuw as usize,
-                    cuh as usize,
-                    self.w_scu as usize,
-                    core.avail_cu,
-                    &mut refi,
-                    &mut mvp,
-                );
-                core.mv[inter_dir_idx][MV_X] =
-                    mvp[core.mvp_idx[inter_dir_idx] as usize][MV_X] + core.mvd[inter_dir_idx][MV_X];
-                core.mv[inter_dir_idx][MV_Y] =
-                    mvp[core.mvp_idx[inter_dir_idx] as usize][MV_Y] + core.mvd[inter_dir_idx][MV_Y];
-            } else {
-                core.refi[inter_dir_idx] = REFI_INVALID;
-                core.mv[inter_dir_idx][MV_X] = 0;
-                core.mv[inter_dir_idx][MV_Y] = 0;
-            }
-        }
-    }
-
-    fn evcd_eco_unit(
-        &mut self,
-        x: u16,
-        y: u16,
-        log2_cuw: u8,
-        log2_cuh: u8,
-    ) -> Result<(), EvcError> {
-        let cuw = 1 << log2_cuw;
-        let cuh = 1 << log2_cuh;
-
-        //entropy decoding
-        {
-            let core = &mut self.core;
-            let bs = &mut self.bs;
-            let sbac = &mut self.sbac_dec;
-            let sbac_ctx = &mut self.sbac_ctx;
-
-            core.log2_cuw = log2_cuw;
-            core.log2_cuh = log2_cuh;
-            core.x_scu = PEL2SCU(x as usize) as u16;
-            core.y_scu = PEL2SCU(y as usize) as u16;
-            core.scup = core.x_scu as u32 + core.y_scu as u32 * self.w_scu as u32;
-
-            EVC_TRACE_COUNTER(&mut bs.tracer);
-            EVC_TRACE(&mut bs.tracer, "poc: ");
-            EVC_TRACE(&mut bs.tracer, self.poc.poc_val);
-            EVC_TRACE(&mut bs.tracer, " x pos ");
-            EVC_TRACE(&mut bs.tracer, x);
-            EVC_TRACE(&mut bs.tracer, " y pos ");
-            EVC_TRACE(&mut bs.tracer, y);
-            EVC_TRACE(&mut bs.tracer, " width ");
-            EVC_TRACE(&mut bs.tracer, cuw);
-            EVC_TRACE(&mut bs.tracer, " height ");
-            EVC_TRACE(&mut bs.tracer, cuh);
-            EVC_TRACE(&mut bs.tracer, " \n");
-
-            /* parse CU info */
-            evcd_eco_cu(
-                bs,
-                sbac,
-                sbac_ctx,
-                core,
-                self.w_scu,
-                &self.map_scu,
-                &self.map_ipm,
-                &self.dpm,
-                self.sps.dquant_flag,
-                self.pps.cu_qp_delta_enabled_flag,
-                self.sh.slice_type,
-                self.sh.qp,
-                self.sh.qp_u_offset,
-                self.sh.qp_v_offset,
-            )?;
-        }
-
-        /* inverse transform and dequantization */
-        if self.core.pred_mode != PredMode::MODE_SKIP {
-            self.evcd_itdq();
-        }
-
-        /* prediction */
-        if self.core.pred_mode != PredMode::MODE_INTRA {
-            self.core.avail_cu = evc_get_avail_inter(
-                self.core.x_scu as usize,
-                self.core.y_scu as usize,
-                self.w_scu as usize,
-                self.h_scu as usize,
-                self.core.scup as usize,
-                cuw as usize,
-                cuh as usize,
-                &self.map_scu,
-            );
-            if self.core.pred_mode == PredMode::MODE_SKIP {
-                self.evcd_get_skip_motion(cuw, cuh);
-            } else {
-                if self.core.inter_dir == InterPredDir::PRED_DIR {
-                    evc_get_mv_dir(
-                        &self.refp[0],
-                        self.poc.poc_val,
-                        self.core.scup as usize
-                            + ((1 << (self.core.log2_cuw as usize - MIN_CU_LOG2)) - 1)
-                            + ((1 << (self.core.log2_cuh as usize - MIN_CU_LOG2)) - 1)
-                                * self.w_scu as usize,
-                        self.core.scup as usize,
-                        self.w_scu,
-                        self.h_scu,
-                        &mut self.core.mv,
-                    );
-                    self.core.refi[REFP_0] = 0;
-                    self.core.refi[REFP_1] = 0;
-                } else {
-                    self.evcd_get_inter_motion(cuw, cuh);
-                }
-            }
-
-            EVC_TRACE_COUNTER(&mut self.bs.tracer);
-            EVC_TRACE(&mut self.bs.tracer, "Inter: ");
-            EVC_TRACE(&mut self.bs.tracer, self.core.inter_dir as isize);
-            EVC_TRACE(&mut self.bs.tracer, " , mv[REFP_0]:( ");
-            EVC_TRACE(&mut self.bs.tracer, self.core.mv[REFP_0][MV_X]);
-            EVC_TRACE(&mut self.bs.tracer, " , ");
-            EVC_TRACE(&mut self.bs.tracer, self.core.mv[REFP_0][MV_Y]);
-            EVC_TRACE(&mut self.bs.tracer, " ), mv[REFP_1]:( ");
-            EVC_TRACE(&mut self.bs.tracer, self.core.mv[REFP_1][MV_X]);
-            EVC_TRACE(&mut self.bs.tracer, " , ");
-            EVC_TRACE(&mut self.bs.tracer, self.core.mv[REFP_1][MV_Y]);
-            EVC_TRACE(&mut self.bs.tracer, " )\n");
-
-            evc_mc(
-                x as i16,
-                y as i16,
-                self.w as i16,
-                self.h as i16,
-                cuw as i16,
-                cuh as i16,
-                &self.core.refi,
-                &self.core.mv,
-                &self.refp,
-                &mut self.core.pred,
-                self.poc.poc_val,
-            );
-        } else {
-            self.core.avail_cu = evc_get_avail_intra(
-                self.core.x_scu as usize,
-                self.core.y_scu as usize,
-                self.w_scu as usize,
-                self.h_scu as usize,
-                self.core.scup as usize,
-                self.core.log2_cuw,
-                self.core.log2_cuh,
-                &self.map_scu,
-            );
-            self.get_nbr_yuv(x, y, cuw, cuh);
-
-            EVC_TRACE_COUNTER(&mut self.bs.tracer);
-            EVC_TRACE(&mut self.bs.tracer, "Intra: ");
-            EVC_TRACE(&mut self.bs.tracer, self.core.ipm[0] as isize);
-            EVC_TRACE(&mut self.bs.tracer, " , ");
-            EVC_TRACE(&mut self.bs.tracer, self.core.ipm[1] as isize);
-            EVC_TRACE(&mut self.bs.tracer, " \n");
-
-            evc_ipred_b(
-                &self.core.nb.data[Y_C][0][2..],
-                &self.core.nb.data[Y_C][1][cuh as usize..],
-                self.core.nb.data[Y_C][1][cuh as usize - 1],
-                &mut self.core.pred[0].data[Y_C],
-                self.core.ipm[0],
-                cuw as usize,
-                cuh as usize,
-            );
-
-            evc_ipred_b(
-                &self.core.nb.data[U_C][0][2..],
-                &self.core.nb.data[U_C][1][(cuh >> 1) as usize..],
-                self.core.nb.data[U_C][1][(cuh >> 1) as usize - 1],
-                &mut self.core.pred[0].data[U_C],
-                self.core.ipm[1],
-                cuw as usize >> 1,
-                cuh as usize >> 1,
-            );
-            evc_ipred_b(
-                &self.core.nb.data[V_C][0][2..],
-                &self.core.nb.data[V_C][1][(cuh >> 1) as usize..],
-                self.core.nb.data[V_C][1][(cuh >> 1) as usize - 1],
-                &mut self.core.pred[0].data[V_C],
-                self.core.ipm[1],
-                cuw as usize >> 1,
-                cuh as usize >> 1,
-            );
-        }
-        self.evcd_set_dec_info();
-
-        TRACE_PRED(
-            &mut self.bs.tracer,
-            Y_C,
-            cuw as usize,
-            cuh as usize,
-            &self.core.pred[0].data[Y_C],
-        );
-        TRACE_PRED(
-            &mut self.bs.tracer,
-            U_C,
-            cuw as usize >> 1,
-            cuh as usize >> 1,
-            &self.core.pred[0].data[U_C],
-        );
-        TRACE_PRED(
-            &mut self.bs.tracer,
-            V_C,
-            cuw as usize >> 1,
-            cuh as usize >> 1,
-            &self.core.pred[0].data[V_C],
-        );
-
-        /* reconstruction */
-        if let Some(pic) = &self.pic {
-            evc_recon_yuv(
-                &mut self.bs.tracer,
-                x as usize,
-                y as usize,
-                cuw as usize,
-                cuh as usize,
-                &self.core.coef.data,
-                &self.core.pred[0].data,
-                &self.core.is_coef,
-                &mut pic.borrow().frame.borrow_mut().planes,
-            );
-        }
-
-        Ok(())
-    }
-
     fn evcd_eco_tree(
         &mut self,
         x0: u16,
@@ -993,7 +565,45 @@ impl EvcdCtx {
             }
         } else {
             core.cu_qp_delta_code = cu_qp_delta_code;
-            self.evcd_eco_unit(x0, y0, log2_cuw, log2_cuh)?;
+            evcd_eco_unit(
+                bs,
+                sbac,
+                sbac_ctx,
+                core,
+                x0,
+                y0,
+                log2_cuw,
+                log2_cuh,
+                self.w_scu,
+                self.h_scu,
+                self.w,
+                self.h,
+                &self.map_mv,
+                &self.refp,
+                &self.map_scu,
+                &self.map_ipm,
+                &self.dpm,
+                self.poc.poc_val,
+                &self.pic,
+                self.sps.dquant_flag,
+                self.pps.cu_qp_delta_enabled_flag,
+                self.pps.constrained_intra_pred_flag,
+                self.sh.slice_type,
+                self.sh.qp,
+                self.sh.qp_u_offset,
+                self.sh.qp_v_offset,
+            )?;
+            evcd_set_dec_info(
+                core,
+                self.w_scu as usize,
+                self.pps.cu_qp_delta_enabled_flag,
+                self.slice_num,
+                &mut self.map_refi,
+                &mut self.map_mv,
+                &mut self.map_scu,
+                &mut self.map_cu_mode,
+                &mut self.map_ipm,
+            );
         }
 
         Ok(())
