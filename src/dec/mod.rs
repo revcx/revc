@@ -471,239 +471,6 @@ impl EvcdCtx {
         }
     }
 
-    fn evcd_eco_coef(&mut self) -> Result<(), EvcError> {
-        let core = &mut self.core;
-        let bs = &mut self.bs;
-        let sbac = &mut self.sbac_dec;
-        let sbac_ctx = &mut self.sbac_ctx;
-
-        let mut cbf = [false; N_C];
-        let mut b_no_cbf = false;
-
-        let log2_cuw = core.log2_cuw;
-        let log2_cuh = core.log2_cuh;
-
-        let mut tmp_coef = [0; N_C];
-        let is_sub = false;
-        let mut cbf_all = true;
-
-        if cbf_all {
-            eco_cbf(
-                bs,
-                sbac,
-                sbac_ctx,
-                core.pred_mode,
-                &mut cbf,
-                b_no_cbf,
-                is_sub,
-                0,
-                &mut cbf_all,
-            )?;
-        } else {
-            cbf[Y_C] = false;
-            cbf[U_C] = false;
-            cbf[V_C] = false;
-        }
-
-        let mut dqp = 0;
-        if self.pps.cu_qp_delta_enabled_flag
-            && (((!(self.sps.dquant_flag)
-                || (core.cu_qp_delta_code == 1 && !core.cu_qp_delta_is_coded))
-                && (cbf[Y_C] || cbf[U_C] || cbf[V_C]))
-                || (core.cu_qp_delta_code == 2 && !core.cu_qp_delta_is_coded))
-        {
-            dqp = evcd_eco_dqp(bs, sbac, sbac_ctx)?;
-            core.cu_qp_delta_is_coded = true;
-        } else {
-            dqp = 0;
-        }
-        core.qp = GET_QP(core.qp as i8, dqp) as u8;
-        core.qp_y = GET_LUMA_QP(core.qp as i8) as u8;
-
-        let qp_i_cb = EVC_CLIP3(
-            -6 * (BIT_DEPTH as i8 - 8),
-            57,
-            (core.qp as i8 + self.sh.qp_u_offset) as i8,
-        );
-        let qp_i_cr = EVC_CLIP3(
-            -6 * (BIT_DEPTH as i8 - 8),
-            57,
-            (core.qp as i8 + self.sh.qp_v_offset) as i8,
-        );
-        core.qp_u = (core.evc_tbl_qp_chroma_dynamic_ext[0]
-            [(EVC_TBL_CHROMA_QP_OFFSET + qp_i_cb) as usize]
-            + (6 * (BIT_DEPTH - 8)) as i8) as u8;
-        core.qp_v = (core.evc_tbl_qp_chroma_dynamic_ext[1]
-            [(EVC_TBL_CHROMA_QP_OFFSET + qp_i_cr) as usize]
-            + (6 * (BIT_DEPTH - 8)) as i8) as u8;
-
-        for c in 0..N_C {
-            if cbf[c] {
-                let chroma = if c > 0 { 1 } else { 0 };
-                evcd_eco_xcoef(
-                    bs,
-                    sbac,
-                    sbac_ctx,
-                    &mut core.coef.data[c],
-                    log2_cuw - chroma,
-                    log2_cuh - chroma,
-                    c,
-                )?;
-
-                tmp_coef[c] += 1;
-            } else {
-                tmp_coef[c] += 0;
-            }
-        }
-
-        for c in 0..N_C {
-            core.is_coef[c] = if tmp_coef[c] != 0 { true } else { false };
-        }
-
-        Ok(())
-    }
-
-    fn evcd_eco_cu(&mut self) -> Result<(), EvcError> {
-        let core = &mut self.core;
-        let bs = &mut self.bs;
-        let sbac = &mut self.sbac_dec;
-        let sbac_ctx = &mut self.sbac_ctx;
-
-        core.refi[REFP_0] = 0;
-        core.refi[REFP_1] = 0;
-        core.mv[REFP_0][MV_X] = 0;
-        core.mv[REFP_0][MV_Y] = 0;
-        core.mv[REFP_1][MV_X] = 0;
-        core.mv[REFP_1][MV_Y] = 0;
-
-        core.pred_mode = PredMode::MODE_INTRA;
-        core.mvp_idx[REFP_0] = 0;
-        core.mvp_idx[REFP_1] = 0;
-        core.inter_dir = InterPredDir::PRED_L0;
-        for i in 0..REFP_NUM {
-            for j in 0..MV_D {
-                core.mvd[i][j] = 0;
-            }
-        }
-
-        let cuw = 1 << core.log2_cuw as u16;
-        let cuh = 1 << core.log2_cuh as u16;
-        core.avail_lr = evc_check_nev_avail(
-            core.x_scu,
-            core.y_scu,
-            cuw,
-            //cuh,
-            self.w_scu,
-            //self.h_scu,
-            &self.map_scu,
-        );
-
-        if self.sh.slice_type != SliceType::EVC_ST_I {
-            /* CU skip flag */
-            let cu_skip_flag = evcd_eco_cu_skip_flag(bs, sbac, sbac_ctx, &core.ctx_flags)?;
-            if cu_skip_flag != 0 {
-                core.pred_mode = PredMode::MODE_SKIP;
-            }
-        }
-
-        /* parse prediction info */
-        if core.pred_mode == PredMode::MODE_SKIP {
-            core.mvp_idx[REFP_0] = evcd_eco_mvp_idx(bs, sbac, sbac_ctx)?;
-            if self.sh.slice_type == SliceType::EVC_ST_B {
-                core.mvp_idx[REFP_1] = evcd_eco_mvp_idx(bs, sbac, sbac_ctx)?;
-            }
-
-            core.is_coef[Y_C] = false;
-            core.is_coef[U_C] = false;
-            core.is_coef[V_C] = false;
-
-            core.qp = self.sh.qp;
-            core.qp_y = GET_LUMA_QP(core.qp as i8) as u8;
-            let qp_i_cb = EVC_CLIP3(
-                -6 * (BIT_DEPTH - 8) as i8,
-                57,
-                core.qp as i8 + self.sh.qp_u_offset,
-            );
-            let qp_i_cr = EVC_CLIP3(
-                -6 * (BIT_DEPTH - 8) as i8,
-                57,
-                core.qp as i8 + self.sh.qp_v_offset,
-            );
-
-            core.qp_u = (core.evc_tbl_qp_chroma_dynamic_ext[0]
-                [(EVC_TBL_CHROMA_QP_OFFSET + qp_i_cb) as usize]
-                + (6 * (BIT_DEPTH - 8)) as i8) as u8;
-            core.qp_v = (core.evc_tbl_qp_chroma_dynamic_ext[1]
-                [(EVC_TBL_CHROMA_QP_OFFSET + qp_i_cr) as usize]
-                + (6 * (BIT_DEPTH - 8)) as i8) as u8;
-        } else {
-            core.pred_mode =
-                evcd_eco_pred_mode(bs, sbac, sbac_ctx, &core.ctx_flags, self.sh.slice_type)?;
-
-            if core.pred_mode == PredMode::MODE_INTER {
-                //TODO: bugfix? missing SLICE_TYPE==B for direct_mode_flag?
-                core.inter_dir = evcd_eco_direct_mode_flag(bs, sbac, sbac_ctx)?;
-
-                if core.inter_dir != InterPredDir::PRED_DIR {
-                    /* inter_pred_idc */
-                    core.inter_dir =
-                        evcd_eco_inter_pred_idc(bs, sbac, sbac_ctx, self.sh.slice_type)?;
-
-                    for inter_dir_idx in 0..2 {
-                        /* 0: forward, 1: backward */
-                        if (((core.inter_dir as usize + 1) >> inter_dir_idx) & 1) != 0 {
-                            core.refi[inter_dir_idx] = evcd_eco_refi(
-                                bs,
-                                sbac,
-                                sbac_ctx,
-                                self.dpm.as_ref().unwrap().num_refp[inter_dir_idx],
-                            )? as i8;
-                            core.mvp_idx[inter_dir_idx] = evcd_eco_mvp_idx(bs, sbac, sbac_ctx)?;
-                            evcd_eco_get_mvd(bs, sbac, sbac_ctx, &mut core.mvd[inter_dir_idx])?;
-                        }
-                    }
-                }
-            } else if core.pred_mode == PredMode::MODE_INTRA {
-                core.mpm_b_list = evc_get_mpm_b(
-                    core.x_scu,
-                    core.y_scu,
-                    &self.map_scu,
-                    &self.map_ipm,
-                    core.scup,
-                    self.w_scu,
-                );
-
-                let mut luma_ipm = IntraPredDir::IPD_DC_B;
-                core.ipm[0] = evcd_eco_intra_dir_b(bs, sbac, sbac_ctx, core.mpm_b_list)?.into();
-                luma_ipm = core.ipm[0];
-                core.ipm[1] = luma_ipm;
-
-                core.refi[REFP_0] = REFI_INVALID;
-                core.refi[REFP_1] = REFI_INVALID;
-                core.mv[REFP_0][MV_X] = 0;
-                core.mv[REFP_0][MV_Y] = 0;
-                core.mv[REFP_1][MV_X] = 0;
-                core.mv[REFP_1][MV_Y] = 0;
-            } else {
-                evc_assert_rv(false, EvcError::EVC_ERR_MALFORMED_BITSTREAM)?;
-            }
-
-            /* clear coefficient buffer */
-            for i in 0..(cuw * cuh) as usize {
-                core.coef.data[Y_C][i] = 0;
-            }
-            for i in 0..((cuw >> 1) * (cuh >> 1)) as usize {
-                core.coef.data[U_C][i] = 0;
-                core.coef.data[V_C][i] = 0;
-            }
-
-            /* parse coefficients */
-            self.evcd_eco_coef()?;
-        }
-
-        Ok(())
-    }
-
     fn evcd_itdq(&mut self) {
         let mut core = &mut self.core;
         evc_sub_block_itdq(
@@ -881,6 +648,7 @@ impl EvcdCtx {
             let core = &mut self.core;
             let bs = &mut self.bs;
             let sbac = &mut self.sbac_dec;
+            let sbac_ctx = &mut self.sbac_ctx;
 
             core.log2_cuw = log2_cuw;
             core.log2_cuh = log2_cuh;
@@ -902,7 +670,22 @@ impl EvcdCtx {
             EVC_TRACE(&mut bs.tracer, " \n");
 
             /* parse CU info */
-            self.evcd_eco_cu()?;
+            evcd_eco_cu(
+                bs,
+                sbac,
+                sbac_ctx,
+                core,
+                self.w_scu,
+                &self.map_scu,
+                &self.map_ipm,
+                &self.dpm,
+                self.sps.dquant_flag,
+                self.pps.cu_qp_delta_enabled_flag,
+                self.sh.slice_type,
+                self.sh.qp,
+                self.sh.qp_u_offset,
+                self.sh.qp_v_offset,
+            )?;
         }
 
         /* inverse transform and dequantization */
