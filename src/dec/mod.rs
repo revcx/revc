@@ -83,10 +83,6 @@ pub(crate) struct EvcdCore {
     x_lcu: u16,
     /* Y address of current LCU */
     y_lcu: u16,
-    /* left pel position of current LCU */
-    x_pel: u16,
-    /* top pel position of current LCU */
-    y_pel: u16,
     /* split mode map for current LCU */
     split_mode: LcuSplitMode,
 
@@ -339,8 +335,6 @@ impl EvcdCtx {
         self.core.lcu_num = 0;
         self.core.x_lcu = 0;
         self.core.y_lcu = 0;
-        self.core.x_pel = 0;
-        self.core.y_pel = 0;
         self.core.qp = self.sh.qp;
         self.core.qp_y = self.sh.qp + (6 * (BIT_DEPTH - 8)) as u8;
         self.core.qp_u = (self.core.evc_tbl_qp_chroma_dynamic_ext[0]
@@ -362,8 +356,6 @@ impl EvcdCtx {
     }
 
     fn update_core_loc_param(&mut self) {
-        self.core.x_pel = self.core.x_lcu << MAX_CU_LOG2 as u16; // entry point's x location in pixel
-        self.core.y_pel = self.core.y_lcu << MAX_CU_LOG2 as u16; // entry point's y location in pixel
         self.core.lcu_num = self.core.x_lcu + self.core.y_lcu * self.w_lcu; // Init the first lcu_num in tile
     }
 
@@ -395,14 +387,12 @@ impl EvcdCtx {
                     EVC_TRACE(&mut bs.tracer, "x pos ");
                     EVC_TRACE(
                         &mut bs.tracer,
-                        core.x_pel
-                            + (cup % (MAX_CU_SIZE as u16 >> MIN_CU_LOG2) << MIN_CU_LOG2 as u16),
+                        x0 + (cup % (MAX_CU_SIZE as u16 >> MIN_CU_LOG2) << MIN_CU_LOG2 as u16),
                     );
                     EVC_TRACE(&mut bs.tracer, " y pos ");
                     EVC_TRACE(
                         &mut bs.tracer,
-                        core.y_pel
-                            + (cup / (MAX_CU_SIZE as u16 >> MIN_CU_LOG2) << MIN_CU_LOG2 as u16),
+                        y0 + (cup / (MAX_CU_SIZE as u16 >> MIN_CU_LOG2) << MIN_CU_LOG2 as u16),
                     );
                     EVC_TRACE(&mut bs.tracer, " width ");
                     EVC_TRACE(&mut bs.tracer, cuw);
@@ -429,12 +419,12 @@ impl EvcdCtx {
                 EVC_TRACE(&mut bs.tracer, "x pos ");
                 EVC_TRACE(
                     &mut bs.tracer,
-                    core.x_pel + (cup % (MAX_CU_SIZE as u16 >> MIN_CU_LOG2) << MIN_CU_LOG2 as u16),
+                    x0 + (cup % (MAX_CU_SIZE as u16 >> MIN_CU_LOG2) << MIN_CU_LOG2 as u16),
                 );
                 EVC_TRACE(&mut bs.tracer, " y pos ");
                 EVC_TRACE(
                     &mut bs.tracer,
-                    core.y_pel + (cup / (MAX_CU_SIZE as u16 >> MIN_CU_LOG2) << MIN_CU_LOG2 as u16),
+                    y0 + (cup / (MAX_CU_SIZE as u16 >> MIN_CU_LOG2) << MIN_CU_LOG2 as u16),
                 );
                 EVC_TRACE(&mut bs.tracer, " width ");
                 EVC_TRACE(&mut bs.tracer, cuw);
@@ -594,8 +584,8 @@ impl EvcdCtx {
             }
 
             self.evcd_eco_tree(
-                self.core.x_pel,
-                self.core.y_pel,
+                self.core.x_lcu << MAX_CU_LOG2,
+                self.core.y_lcu << MAX_CU_LOG2,
                 MAX_CU_LOG2 as u8,
                 MAX_CU_LOG2 as u8,
                 0,
