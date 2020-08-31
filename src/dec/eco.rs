@@ -275,16 +275,14 @@ pub(crate) fn evcd_eco_cu_skip_flag(
     bs: &mut EvcdBsr,
     sbac: &mut EvcdSbac,
     sbac_ctx: &mut EvcSbacCtx,
-    ctx_flags: &[u8],
 ) -> Result<u32, EvcError> {
-    let ctx_flag = ctx_flags[CNID_SKIP_FLAG] as usize;
-    let cu_skip_flag = sbac.decode_bin(bs, &mut sbac_ctx.skip_flag[ctx_flag])?; /* cu_skip_flag */
+    let cu_skip_flag = sbac.decode_bin(bs, &mut sbac_ctx.skip_flag[0])?; /* cu_skip_flag */
 
     EVC_TRACE_COUNTER(&mut bs.tracer);
     EVC_TRACE(&mut bs.tracer, "skip flag ");
     EVC_TRACE(&mut bs.tracer, cu_skip_flag);
     EVC_TRACE(&mut bs.tracer, " ctx ");
-    EVC_TRACE(&mut bs.tracer, ctx_flag);
+    EVC_TRACE(&mut bs.tracer, 0);
     EVC_TRACE(&mut bs.tracer, " \n");
 
     Ok(cu_skip_flag)
@@ -294,12 +292,10 @@ pub(crate) fn evcd_eco_pred_mode(
     bs: &mut EvcdBsr,
     sbac: &mut EvcdSbac,
     sbac_ctx: &mut EvcSbacCtx,
-    ctx_flags: &[u8],
     slice_type: SliceType,
 ) -> Result<PredMode, EvcError> {
     if slice_type != SliceType::EVC_ST_I {
-        let ctx_flag = ctx_flags[CNID_PRED_MODE] as usize;
-        let pred_mode = if sbac.decode_bin(bs, &mut sbac_ctx.pred_mode[ctx_flag])? != 0 {
+        let pred_mode = if sbac.decode_bin(bs, &mut sbac_ctx.pred_mode[0])? != 0 {
             PredMode::MODE_INTRA
         } else {
             PredMode::MODE_INTER
@@ -852,7 +848,7 @@ fn evcd_eco_cu(
 
     if sh_slice_type != SliceType::EVC_ST_I {
         /* CU skip flag */
-        let cu_skip_flag = evcd_eco_cu_skip_flag(bs, sbac, sbac_ctx, &core.ctx_flags)?;
+        let cu_skip_flag = evcd_eco_cu_skip_flag(bs, sbac, sbac_ctx)?;
         if cu_skip_flag != 0 {
             core.pred_mode = PredMode::MODE_SKIP;
         }
@@ -889,7 +885,7 @@ fn evcd_eco_cu(
             [(EVC_TBL_CHROMA_QP_OFFSET + qp_i_cr) as usize]
             + (6 * (BIT_DEPTH - 8)) as i8) as u8;
     } else {
-        core.pred_mode = evcd_eco_pred_mode(bs, sbac, sbac_ctx, &core.ctx_flags, sh_slice_type)?;
+        core.pred_mode = evcd_eco_pred_mode(bs, sbac, sbac_ctx, sh_slice_type)?;
 
         if core.pred_mode == PredMode::MODE_INTER {
             //TODO: bugfix? missing SLICE_TYPE==B for direct_mode_flag?

@@ -62,6 +62,7 @@ pub(crate) struct EvcdCore {
 
     /* prediction mode of current CU: INTRA, INTER, ... */
     pred_mode: PredMode,
+    inter_dir: InterPredDir,
 
     /* is there coefficient? */
     is_coef: [bool; N_C],
@@ -82,8 +83,6 @@ pub(crate) struct EvcdCore {
 
     mvp_idx: [u8; REFP_NUM],
     mvd: [[i16; MV_D]; REFP_NUM],
-    inter_dir: InterPredDir,
-    ctx_flags: [u8; NUM_CNID],
 
     evc_tbl_qp_chroma_dynamic_ext: Vec<Vec<i8>>, // [[i8; MAX_QP_TABLE_SIZE_EXT]; 2],
 }

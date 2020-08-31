@@ -241,13 +241,6 @@ impl From<u8> for IntraPredDir {
     }
 }
 
-pub(crate) const CNID_SKIP_FLAG: usize = 0;
-pub(crate) const CNID_PRED_MODE: usize = 1;
-pub(crate) const NUM_CNID: usize = 2;
-
-/*************************************************
-
-*/
 /*****************************************************************************
 * macros for CU map
 

@@ -249,7 +249,6 @@ pub(crate) struct EvceCore {
     dist_cu: i32,
     dist_cu_best: i32, //dist of the best intra mode (note: only updated in intra coding now)
 
-    ctx_flags: [u8; NUM_CNID],
     split_mode_child: [bool; 4],
     parent_split_allow: [bool; 6],
 
@@ -1570,13 +1569,7 @@ impl EvceCtx {
 
             /* entropy coding a CU */
             if slice_type != SliceType::EVC_ST_I {
-                evce_eco_skip_flag(
-                    bs,
-                    sbac,
-                    sbac_ctx,
-                    core.skip_flag as u32,
-                    core.ctx_flags[CNID_SKIP_FLAG] as usize,
-                );
+                evce_eco_skip_flag(bs, sbac, sbac_ctx, core.skip_flag as u32);
 
                 if core.skip_flag {
                     evce_eco_mvp_idx(
@@ -1595,13 +1588,7 @@ impl EvceCtx {
                         );
                     }
                 } else {
-                    evce_eco_pred_mode(
-                        bs,
-                        sbac,
-                        sbac_ctx,
-                        core.cu_mode,
-                        core.ctx_flags[CNID_PRED_MODE] as usize,
-                    );
+                    evce_eco_pred_mode(bs, sbac, sbac_ctx, core.cu_mode);
 
                     if core.cu_mode != PredMode::MODE_INTRA {
                         evce_eco_direct_mode_flag(

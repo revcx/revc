@@ -1760,7 +1760,7 @@ impl EvceCtx {
         if slice_type != SliceType::EVC_ST_I {
             self.core.s_temp_run.encode_bin(
                 &mut self.core.bs_temp,
-                &mut self.core.c_temp_run.skip_flag[self.core.ctx_flags[CNID_SKIP_FLAG] as usize],
+                &mut self.core.c_temp_run.skip_flag[0],
                 0,
             ); /* skip_flag */
             evce_eco_pred_mode(
@@ -1768,7 +1768,6 @@ impl EvceCtx {
                 &mut self.core.s_temp_run,
                 &mut self.core.c_temp_run,
                 PredMode::MODE_INTRA,
-                self.core.ctx_flags[CNID_PRED_MODE] as usize,
             );
         }
 
@@ -1846,7 +1845,7 @@ impl EvceCtx {
         if slice_type != SliceType::EVC_ST_I {
             self.core.s_temp_run.encode_bin(
                 &mut self.core.bs_temp,
-                &mut self.core.c_temp_run.skip_flag[self.core.ctx_flags[CNID_SKIP_FLAG] as usize],
+                &mut self.core.c_temp_run.skip_flag[0],
                 0,
             ); /* skip_flag */
             evce_eco_pred_mode(
@@ -1854,7 +1853,6 @@ impl EvceCtx {
                 &mut self.core.s_temp_run,
                 &mut self.core.c_temp_run,
                 PredMode::MODE_INTRA,
-                self.core.ctx_flags[CNID_PRED_MODE] as usize,
             );
         }
 
@@ -1915,7 +1913,7 @@ impl EvceCtx {
         if slice_type != SliceType::EVC_ST_I {
             self.core.s_temp_run.encode_bin(
                 &mut self.core.bs_temp,
-                &mut self.core.c_temp_run.skip_flag[self.core.ctx_flags[CNID_SKIP_FLAG] as usize],
+                &mut self.core.c_temp_run.skip_flag[0],
                 0,
             ); /* skip_flag */
 
@@ -1924,7 +1922,6 @@ impl EvceCtx {
                 &mut self.core.s_temp_run,
                 &mut self.core.c_temp_run,
                 PredMode::MODE_INTER,
-                self.core.ctx_flags[CNID_PRED_MODE] as usize,
             );
 
             let dir_flag = pidx == InterPredDir::PRED_DIR as usize;
@@ -2073,7 +2070,7 @@ impl EvceCtx {
         if slice_type != SliceType::EVC_ST_I {
             self.core.s_temp_run.encode_bin(
                 &mut self.core.bs_temp,
-                &mut self.core.c_temp_run.skip_flag[self.core.ctx_flags[CNID_SKIP_FLAG] as usize],
+                &mut self.core.c_temp_run.skip_flag[0],
                 1,
             ); /* skip_flag */
 
