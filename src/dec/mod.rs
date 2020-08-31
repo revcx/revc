@@ -70,12 +70,11 @@ pub(crate) struct EvcdCore {
     is_coef: [bool; N_C],
 
     /* QP for current encoding MB */
+    qp: u8,
     qp_y: u8,
     qp_u: u8,
     qp_v: u8,
 
-    qp: u8,
-    cu_qp_delta_code: u8,
     cu_qp_delta_is_coded: bool,
 
     /************** current LCU *************/
@@ -348,8 +347,6 @@ impl EvcdCtx {
         log2_cuh: u8,
         cup: u16,
         cud: u16,
-        next_split: bool,
-        qt_depth: u8,
         mut cu_qp_delta_code: u8,
     ) -> Result<(), EvcError> {
         let core = &mut self.core;
@@ -362,38 +359,34 @@ impl EvcdCtx {
         let mut split_mode = SplitMode::NO_SPLIT;
         if cuw > MIN_CU_SIZE as u16 || cuh > MIN_CU_SIZE as u16 {
             if x0 + cuw <= self.w && y0 + cuh <= self.h {
-                if next_split {
-                    split_mode = evcd_eco_split_mode(bs, sbac, sbac_ctx, cuw, cuh)?;
-                    EVC_TRACE_COUNTER(&mut bs.tracer);
-                    EVC_TRACE(&mut bs.tracer, "x pos ");
-                    EVC_TRACE(
-                        &mut bs.tracer,
-                        x0 + (cup % (MAX_CU_SIZE as u16 >> MIN_CU_LOG2) << MIN_CU_LOG2 as u16),
-                    );
-                    EVC_TRACE(&mut bs.tracer, " y pos ");
-                    EVC_TRACE(
-                        &mut bs.tracer,
-                        y0 + (cup / (MAX_CU_SIZE as u16 >> MIN_CU_LOG2) << MIN_CU_LOG2 as u16),
-                    );
-                    EVC_TRACE(&mut bs.tracer, " width ");
-                    EVC_TRACE(&mut bs.tracer, cuw);
-                    EVC_TRACE(&mut bs.tracer, " height ");
-                    EVC_TRACE(&mut bs.tracer, cuh);
-                    EVC_TRACE(&mut bs.tracer, " depth ");
-                    EVC_TRACE(&mut bs.tracer, cud);
-                    EVC_TRACE(&mut bs.tracer, " split mode ");
-                    EVC_TRACE(
-                        &mut bs.tracer,
-                        if split_mode == SplitMode::NO_SPLIT {
-                            0
-                        } else {
-                            5
-                        },
-                    );
-                    EVC_TRACE(&mut bs.tracer, " \n");
-                } else {
-                    split_mode = SplitMode::NO_SPLIT;
-                }
+                split_mode = evcd_eco_split_mode(bs, sbac, sbac_ctx, cuw, cuh)?;
+                EVC_TRACE_COUNTER(&mut bs.tracer);
+                EVC_TRACE(&mut bs.tracer, "x pos ");
+                EVC_TRACE(
+                    &mut bs.tracer,
+                    x0 + (cup % (MAX_CU_SIZE as u16 >> MIN_CU_LOG2) << MIN_CU_LOG2 as u16),
+                );
+                EVC_TRACE(&mut bs.tracer, " y pos ");
+                EVC_TRACE(
+                    &mut bs.tracer,
+                    y0 + (cup / (MAX_CU_SIZE as u16 >> MIN_CU_LOG2) << MIN_CU_LOG2 as u16),
+                );
+                EVC_TRACE(&mut bs.tracer, " width ");
+                EVC_TRACE(&mut bs.tracer, cuw);
+                EVC_TRACE(&mut bs.tracer, " height ");
+                EVC_TRACE(&mut bs.tracer, cuh);
+                EVC_TRACE(&mut bs.tracer, " depth ");
+                EVC_TRACE(&mut bs.tracer, cud);
+                EVC_TRACE(&mut bs.tracer, " split mode ");
+                EVC_TRACE(
+                    &mut bs.tracer,
+                    if split_mode == SplitMode::NO_SPLIT {
+                        0
+                    } else {
+                        5
+                    },
+                );
+                EVC_TRACE(&mut bs.tracer, " \n");
             } else {
                 split_mode = evcd_eco_split_mode(bs, sbac, sbac_ctx, cuw, cuh)?;
                 EVC_TRACE_COUNTER(&mut bs.tracer);
@@ -473,14 +466,11 @@ impl EvcdCtx {
                         log2_sub_cuh,
                         split_struct.cup[cur_part_num],
                         split_struct.cud[cur_part_num],
-                        true,
-                        split_mode.inc_qt_depth(qt_depth),
                         cu_qp_delta_code,
                     )?;
                 }
             }
         } else {
-            core.cu_qp_delta_code = cu_qp_delta_code;
             evcd_eco_unit(
                 bs,
                 sbac,
@@ -503,12 +493,29 @@ impl EvcdCtx {
                 &self.pic,
                 self.sps.dquant_flag,
                 self.pps.cu_qp_delta_enabled_flag,
+                cu_qp_delta_code,
                 self.pps.constrained_intra_pred_flag,
                 self.sh.slice_type,
                 self.sh.qp,
                 self.sh.qp_u_offset,
                 self.sh.qp_v_offset,
             )?;
+
+            /* reconstruction */
+            if let Some(pic) = &self.pic {
+                evc_recon_yuv(
+                    &mut bs.tracer,
+                    x0 as usize,
+                    y0 as usize,
+                    cuw as usize,
+                    cuh as usize,
+                    &core.coef.data,
+                    &core.pred[0].data,
+                    &core.is_coef,
+                    &mut pic.borrow().frame.borrow_mut().planes,
+                );
+            }
+
             evcd_set_dec_info(
                 core,
                 x0,
@@ -561,8 +568,6 @@ impl EvcdCtx {
                 MAX_CU_LOG2 as u8,
                 MAX_CU_LOG2 as u8,
                 0,
-                0,
-                true,
                 0,
                 0,
             )?;

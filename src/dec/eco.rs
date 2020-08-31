@@ -713,6 +713,7 @@ fn evcd_eco_coef(
     log2_cuh: u8,
     sps_dquant_flag: bool,
     pps_cu_qp_delta_enabled_flag: bool,
+    cu_qp_delta_code: u8,
     sh_qp_u_offset: i8,
     sh_qp_v_offset: i8,
 ) -> Result<(), EvcError> {
@@ -743,7 +744,7 @@ fn evcd_eco_coef(
 
     let mut dqp = 0;
     if pps_cu_qp_delta_enabled_flag
-        && ((!sps_dquant_flag || (core.cu_qp_delta_code == 1 && !core.cu_qp_delta_is_coded))
+        && ((!sps_dquant_flag || (cu_qp_delta_code == 1 && !core.cu_qp_delta_is_coded))
             && (cbf[Y_C] || cbf[U_C] || cbf[V_C]))
     {
         dqp = evcd_eco_dqp(bs, sbac, sbac_ctx)?;
@@ -812,6 +813,7 @@ fn evcd_eco_cu(
     dpm: &Option<EvcPm>,
     sps_dquant_flag: bool,
     pps_cu_qp_delta_enabled_flag: bool,
+    cu_qp_delta_code: u8,
     sh_slice_type: SliceType,
     sh_qp: u8,
     sh_qp_u_offset: i8,
@@ -945,6 +947,7 @@ fn evcd_eco_cu(
             log2_cuh,
             sps_dquant_flag,
             pps_cu_qp_delta_enabled_flag,
+            cu_qp_delta_code,
             sh_qp_u_offset,
             sh_qp_v_offset,
         )?;
@@ -975,6 +978,7 @@ pub(crate) fn evcd_eco_unit(
     pic: &Option<Rc<RefCell<EvcPic>>>,
     sps_dquant_flag: bool,
     pps_cu_qp_delta_enabled_flag: bool,
+    cu_qp_delta_code: u8,
     pps_constrained_intra_pred_flag: bool,
     sh_slice_type: SliceType,
     sh_qp: u8,
@@ -1022,6 +1026,7 @@ pub(crate) fn evcd_eco_unit(
             dpm,
             sps_dquant_flag,
             pps_cu_qp_delta_enabled_flag,
+            cu_qp_delta_code,
             sh_slice_type,
             sh_qp,
             sh_qp_u_offset,
@@ -1197,21 +1202,6 @@ pub(crate) fn evcd_eco_unit(
         cuh as usize >> 1,
         &core.pred[0].data[V_C],
     );
-
-    /* reconstruction */
-    if let Some(p) = &pic {
-        evc_recon_yuv(
-            &mut bs.tracer,
-            x as usize,
-            y as usize,
-            cuw as usize,
-            cuh as usize,
-            &core.coef.data,
-            &core.pred[0].data,
-            &core.is_coef,
-            &mut p.borrow().frame.borrow_mut().planes,
-        );
-    }
 
     Ok(())
 }
