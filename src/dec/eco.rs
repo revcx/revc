@@ -845,7 +845,6 @@ fn evcd_eco_cu(
 
     let cuw = 1 << log2_cuw;
     let cuh = 1 << log2_cuh;
-    let avail_lr = evc_check_nev_avail(x_scu, y_scu, cuw, w_scu, map_scu);
 
     if sh_slice_type != SliceType::EVC_ST_I {
         /* CU skip flag */

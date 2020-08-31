@@ -469,7 +469,6 @@ pub(crate) struct EvceCtx {
     map_ipm: Vec<IntraPredDir>,
     map_depth: Vec<i8>,
     pic_dbk: Option<Rc<RefCell<EvcPic>>>, //one picture that arranges cu pixels and neighboring pixels for deblocking (just to match the interface of deblocking functions)
-    map_cu_mode: Vec<MCU>,
     lambda: [f64; 3],
     sqrt_lambda: [f64; 3],
     dist_chroma_weight: [f64; 2],
@@ -666,7 +665,6 @@ impl EvceCtx {
             map_ipm,
             map_depth,
             pic_dbk: None, //one picture that arranges cu pixels and neighboring pixels for deblocking (just to match the interface of deblocking functions)
-            map_cu_mode,
             lambda: [0.0; 3],
             sqrt_lambda: [0.0; 3],
             dist_chroma_weight: [0.0; 2],
@@ -824,9 +822,6 @@ impl EvceCtx {
 
         /* clear map */
         for v in &mut self.map_scu {
-            *v = MCU::default();
-        }
-        for v in &mut self.map_cu_mode {
             *v = MCU::default();
         }
 
@@ -1760,7 +1755,6 @@ impl EvceCtx {
 
         for i in 0..h_cu {
             let map_scu = &mut self.map_scu[scup + i * w_scu..];
-            let map_cu_mode = &mut self.map_cu_mode[scup + i * w_scu..];
 
             for j in 0..w_cu {
                 if self.core.cu_mode == PredMode::MODE_SKIP {
@@ -1775,9 +1769,6 @@ impl EvceCtx {
                 }
 
                 map_scu[j].SET_COD();
-
-                map_cu_mode[j].SET_LOGW(self.core.log2_cuw as u32);
-                map_cu_mode[j].SET_LOGH(self.core.log2_cuh as u32);
 
                 if self.pps.cu_qp_delta_enabled_flag {
                     map_scu[j].RESET_QP();

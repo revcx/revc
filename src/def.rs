@@ -244,16 +244,16 @@ impl From<u8> for IntraPredDir {
 /*****************************************************************************
 * macros for CU map
 
-- [ 0: 6] : slice number (0 ~ 128)
+- [ 0: 6] : SN: slice number (0 ~ 128)
 - [ 7:14] : reserved
-- [15:15] : 1 -> intra CU, 0 -> inter CU
+- [15:15] : IF: 1 -> intra CU, 0 -> inter CU
 - [16:22] : QP
-- [23:23] : skip mode flag
-- [24:24] : luma cbf
-- [25:25] : dmvr_flag
-- [26:26] : IBC mode flag
+- [23:23] : SF: skip mode flag
+- [24:24] : CBFL: luma cbf
+- [25:25] : reserved
+- [26:26] : reserved
 - [27:30] : reserved
-- [31:31] : 0 -> no encoded/decoded CU, 1 -> encoded/decoded CU
+- [31:31] : COD: 0 -> no encoded/decoded CU, 1 -> encoded/decoded CU
 *****************************************************************************/
 #[derive(Default, Clone, Copy)]
 pub(crate) struct MCU(u32);
@@ -365,25 +365,6 @@ impl MCU {
     #[inline]
     pub(crate) fn IS_COD_NIF(&self) -> bool {
         ((self.0 >> 15) & 0x10001) == 0x10000
-    }
-
-    /* set log2_cuw & log2_cuh to map */
-    #[inline]
-    pub(crate) fn SET_LOGW(&mut self, v: u32) {
-        self.0 = ((self.0 & 0xF0FFFFFF) | ((v) & 0x0F) << 24);
-    }
-    #[inline]
-    pub(crate) fn SET_LOGH(&mut self, v: u32) {
-        self.0 = ((self.0 & 0x0FFFFFFF) | ((v) & 0x0F) << 28);
-    }
-    /* get log2_cuw & log2_cuh to map */
-    #[inline]
-    pub(crate) fn GET_LOGW(&self) -> u32 {
-        (self.0 >> 24) & 0x0F
-    }
-    #[inline]
-    pub(crate) fn GET_LOGH(&self) -> u32 {
-        (self.0 >> 28) & 0x0F
     }
 }
 /*****************************************************************************
