@@ -57,17 +57,9 @@ pub(crate) struct EvcdCore {
     /* motion vector for current CU */
     mv: [[i16; MV_D]; REFP_NUM],
 
-    /* neighbor CUs availability of current CU */
-    avail_cu: u16,
-    /* Left, right availability of current CU */
-    avail_lr: u16,
     /* intra prediction direction of current CU */
     ipm: [IntraPredDir; 2],
-    /* most probable mode for intra prediction */
-    mpm_b_list: &'static [u8],
-    //mpm: [u8; 2],
-    //mpm_ext: [u8; 8],
-    //pims: [IntraPredDir; IntraPredDir::IPD_CNT_B as usize], /* probable intra mode set*/
+
     /* prediction mode of current CU: INTRA, INTER, ... */
     pred_mode: PredMode,
 
