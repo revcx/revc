@@ -807,6 +807,8 @@ fn evcd_eco_cu(
     sbac: &mut EvcdSbac,
     sbac_ctx: &mut EvcSbacCtx,
     core: &mut EvcdCore,
+    x: u16,
+    y: u16,
     log2_cuw: u8,
     log2_cuh: u8,
     w_scu: u16,
@@ -820,6 +822,13 @@ fn evcd_eco_cu(
     sh_qp_u_offset: i8,
     sh_qp_v_offset: i8,
 ) -> Result<(), EvcError> {
+    //CU position X in a frame in SCU unit
+    let x_scu = PEL2SCU(x as usize) as u16;
+    //CU position Y in a frame in SCU unit
+    let y_scu = PEL2SCU(y as usize) as u16;
+    //CU position in current frame in SCU unit
+    let scup = x_scu as u32 + y_scu as u32 * w_scu as u32;
+
     core.refi[REFP_0] = 0;
     core.refi[REFP_1] = 0;
     core.mv[REFP_0][MV_X] = 0;
@@ -839,7 +848,7 @@ fn evcd_eco_cu(
 
     let cuw = 1 << log2_cuw;
     let cuh = 1 << log2_cuh;
-    core.avail_lr = evc_check_nev_avail(core.x_scu, core.y_scu, cuw, w_scu, map_scu);
+    core.avail_lr = evc_check_nev_avail(x_scu, y_scu, cuw, w_scu, map_scu);
 
     if sh_slice_type != SliceType::EVC_ST_I {
         /* CU skip flag */
@@ -905,8 +914,7 @@ fn evcd_eco_cu(
                 }
             }
         } else if core.pred_mode == PredMode::MODE_INTRA {
-            core.mpm_b_list =
-                evc_get_mpm_b(core.x_scu, core.y_scu, map_scu, map_ipm, core.scup, w_scu);
+            core.mpm_b_list = evc_get_mpm_b(x_scu, y_scu, map_scu, map_ipm, scup, w_scu);
 
             let mut luma_ipm = IntraPredDir::IPD_DC_B;
             core.ipm[0] = evcd_eco_intra_dir_b(bs, sbac, sbac_ctx, core.mpm_b_list)?.into();
@@ -981,12 +989,15 @@ pub(crate) fn evcd_eco_unit(
     let cuw = 1 << log2_cuw;
     let cuh = 1 << log2_cuh;
 
+    //CU position X in a frame in SCU unit
+    let x_scu = PEL2SCU(x as usize) as u16;
+    //CU position Y in a frame in SCU unit
+    let y_scu = PEL2SCU(y as usize) as u16;
+    //CU position in current frame in SCU unit
+    let scup = x_scu as u32 + y_scu as u32 * w_scu as u32;
+
     //entropy decoding
     {
-        core.x_scu = PEL2SCU(x as usize) as u16;
-        core.y_scu = PEL2SCU(y as usize) as u16;
-        core.scup = core.x_scu as u32 + core.y_scu as u32 * w_scu as u32;
-
         EVC_TRACE_COUNTER(&mut bs.tracer);
         EVC_TRACE(&mut bs.tracer, "poc: ");
         EVC_TRACE(&mut bs.tracer, poc_val);
@@ -1006,6 +1017,8 @@ pub(crate) fn evcd_eco_unit(
             sbac,
             sbac_ctx,
             core,
+            x,
+            y,
             log2_cuw,
             log2_cuh,
             w_scu,
@@ -1038,26 +1051,26 @@ pub(crate) fn evcd_eco_unit(
     /* prediction */
     if core.pred_mode != PredMode::MODE_INTRA {
         core.avail_cu = evc_get_avail_inter(
-            core.x_scu as usize,
-            core.y_scu as usize,
+            x_scu as usize,
+            y_scu as usize,
             w_scu as usize,
             h_scu as usize,
-            core.scup as usize,
+            scup as usize,
             cuw as usize,
             cuh as usize,
             map_scu,
         );
         if core.pred_mode == PredMode::MODE_SKIP {
-            evcd_get_skip_motion(core, cuw, cuh, w_scu, map_mv, refp, sh_slice_type);
+            evcd_get_skip_motion(core, cuw, cuh, w_scu, scup, map_mv, refp, sh_slice_type);
         } else {
             if core.inter_dir == InterPredDir::PRED_DIR {
                 evc_get_mv_dir(
                     &refp[0],
                     poc_val,
-                    core.scup as usize
+                    scup as usize
                         + ((1 << (log2_cuw as usize - MIN_CU_LOG2)) - 1)
                         + ((1 << (log2_cuh as usize - MIN_CU_LOG2)) - 1) * w_scu as usize,
-                    core.scup as usize,
+                    scup as usize,
                     w_scu,
                     h_scu,
                     &mut core.mv,
@@ -1065,7 +1078,7 @@ pub(crate) fn evcd_eco_unit(
                 core.refi[REFP_0] = 0;
                 core.refi[REFP_1] = 0;
             } else {
-                evcd_get_inter_motion(core, cuw, cuh, w_scu, map_mv, refp);
+                evcd_get_inter_motion(core, cuw, cuh, w_scu, scup, map_mv, refp);
             }
         }
 
@@ -1097,11 +1110,11 @@ pub(crate) fn evcd_eco_unit(
         );
     } else {
         core.avail_cu = evc_get_avail_intra(
-            core.x_scu as usize,
-            core.y_scu as usize,
+            x_scu as usize,
+            y_scu as usize,
             w_scu as usize,
             h_scu as usize,
-            core.scup as usize,
+            scup as usize,
             log2_cuw,
             log2_cuh,
             map_scu,
@@ -1114,6 +1127,7 @@ pub(crate) fn evcd_eco_unit(
             cuh,
             w_scu,
             h_scu,
+            scup,
             map_scu,
             pic,
             pps_constrained_intra_pred_flag,
@@ -1201,6 +1215,7 @@ fn evcd_get_skip_motion(
     cuw: u8,
     cuh: u8,
     w_scu: u16,
+    scup: u32,
     map_mv: &Option<Rc<RefCell<Vec<[[i16; MV_D]; REFP_NUM]>>>>,
     refp: &Vec<Vec<EvcRefP>>,
     sh_slice_type: SliceType,
@@ -1211,7 +1226,7 @@ fn evcd_get_skip_motion(
     let map_mv = map_mv.as_ref().unwrap().borrow();
 
     evc_get_motion(
-        core.scup as usize,
+        scup as usize,
         REFP_0,
         &*map_mv,
         refp,
@@ -1234,7 +1249,7 @@ fn evcd_get_skip_motion(
         core.mv[REFP_1][MV_Y] = 0;
     } else {
         evc_get_motion(
-            core.scup as usize,
+            scup as usize,
             REFP_1,
             &*map_mv,
             refp,
@@ -1257,6 +1272,7 @@ fn evcd_get_inter_motion(
     cuw: u8,
     cuh: u8,
     w_scu: u16,
+    scup: u32,
     map_mv: &Option<Rc<RefCell<Vec<[[i16; MV_D]; REFP_NUM]>>>>,
     refp: &Vec<Vec<EvcRefP>>,
 ) {
@@ -1269,7 +1285,7 @@ fn evcd_get_inter_motion(
         /* 0: forward, 1: backward */
         if (((core.inter_dir as usize + 1) >> inter_dir_idx) & 1) != 0 {
             evc_get_motion(
-                core.scup as usize,
+                scup as usize,
                 inter_dir_idx,
                 &*map_mv,
                 refp,
@@ -1300,6 +1316,7 @@ fn get_nbr_yuv(
     mut cuh: u8,
     w_scu: u16,
     h_scu: u16,
+    scup: u32,
     map_scu: &[MCU],
     pic: &Option<Rc<RefCell<EvcPic>>>,
     pps_constrained_intra_pred_flag: bool,
@@ -1319,7 +1336,7 @@ fn get_nbr_yuv(
             &planes[Y_C].as_region(),
             core.avail_cu,
             &mut core.nb.data[Y_C],
-            core.scup as usize,
+            scup as usize,
             map_scu,
             w_scu as usize,
             h_scu as usize,
@@ -1341,7 +1358,7 @@ fn get_nbr_yuv(
             &planes[U_C].as_region(),
             core.avail_cu,
             &mut core.nb.data[U_C],
-            core.scup as usize,
+            scup as usize,
             map_scu,
             w_scu as usize,
             h_scu as usize,
@@ -1358,7 +1375,7 @@ fn get_nbr_yuv(
             &planes[V_C].as_region(),
             core.avail_cu,
             &mut core.nb.data[V_C],
-            core.scup as usize,
+            scup as usize,
             map_scu,
             w_scu as usize,
             h_scu as usize,
@@ -1370,6 +1387,8 @@ fn get_nbr_yuv(
 
 pub(crate) fn evcd_set_dec_info(
     core: &mut EvcdCore,
+    x: u16,
+    y: u16,
     log2_cuw: u8,
     log2_cuh: u8,
     w_scu: usize,
@@ -1381,7 +1400,13 @@ pub(crate) fn evcd_set_dec_info(
     map_cu_mode: &mut [MCU],
     map_ipm: &mut [IntraPredDir],
 ) {
-    let scup = core.scup as usize;
+    //CU position X in a frame in SCU unit
+    let x_scu = PEL2SCU(x as usize) as usize;
+    //CU position Y in a frame in SCU unit
+    let y_scu = PEL2SCU(y as usize) as usize;
+    //CU position in current frame in SCU unit
+    let scup = x_scu + y_scu * w_scu;
+
     let w_cu = (1 << log2_cuw) >> MIN_CU_LOG2;
     let h_cu = (1 << log2_cuh) >> MIN_CU_LOG2;
     let flag = if core.pred_mode == PredMode::MODE_INTRA {

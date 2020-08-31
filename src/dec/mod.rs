@@ -57,12 +57,6 @@ pub(crate) struct EvcdCore {
     /* motion vector for current CU */
     mv: [[i16; MV_D]; REFP_NUM],
 
-    /* CU position in current frame in SCU unit */
-    scup: u32,
-    /* CU position X in a frame in SCU unit */
-    x_scu: u16,
-    /* CU position Y in a frame in SCU unit */
-    y_scu: u16,
     /* neighbor CUs availability of current CU */
     avail_cu: u16,
     /* Left, right availability of current CU */
@@ -378,8 +372,6 @@ impl EvcdCtx {
     fn update_core_loc_param(&mut self) {
         self.core.x_pel = self.core.x_lcu << MAX_CU_LOG2 as u16; // entry point's x location in pixel
         self.core.y_pel = self.core.y_lcu << MAX_CU_LOG2 as u16; // entry point's y location in pixel
-        self.core.x_scu = self.core.x_lcu << (MAX_CU_LOG2 - MIN_CU_LOG2) as u16; // set x_scu location
-        self.core.y_scu = self.core.y_lcu << (MAX_CU_LOG2 - MIN_CU_LOG2) as u16; // set y_scu location
         self.core.lcu_num = self.core.x_lcu + self.core.y_lcu * self.w_lcu; // Init the first lcu_num in tile
     }
 
@@ -561,6 +553,8 @@ impl EvcdCtx {
             )?;
             evcd_set_dec_info(
                 core,
+                x0,
+                y0,
                 log2_cuw,
                 log2_cuh,
                 self.w_scu as usize,
