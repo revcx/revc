@@ -77,12 +77,6 @@ pub(crate) struct EvcdCore {
     cu_qp_delta_is_coded: bool,
 
     /************** current LCU *************/
-    /* address of current LCU,  */
-    lcu_num: u16,
-    /* X address of current LCU */
-    x_lcu: u16,
-    /* Y address of current LCU */
-    y_lcu: u16,
     /* split mode map for current LCU */
     split_mode: LcuSplitMode,
 
@@ -332,9 +326,6 @@ impl EvcdCtx {
     }
 
     fn slice_init(&mut self) {
-        self.core.lcu_num = 0;
-        self.core.x_lcu = 0;
-        self.core.y_lcu = 0;
         self.core.qp = self.sh.qp;
         self.core.qp_y = self.sh.qp + (6 * (BIT_DEPTH - 8)) as u8;
         self.core.qp_u = (self.core.evc_tbl_qp_chroma_dynamic_ext[0]
@@ -353,10 +344,6 @@ impl EvcdCtx {
         if self.sh.slice_type == SliceType::EVC_ST_I {
             self.last_intra_poc = self.poc.poc_val;
         }
-    }
-
-    fn update_core_loc_param(&mut self) {
-        self.core.lcu_num = self.core.x_lcu + self.core.y_lcu * self.w_lcu; // Init the first lcu_num in tile
     }
 
     fn evcd_eco_tree(
@@ -563,16 +550,13 @@ impl EvcdCtx {
         );
 
         //TODO: move x_lcu/y_lcu=0 to pic init
-        self.core.x_lcu = 0; //entry point lcu's x location
-        self.core.y_lcu = 0; // entry point lcu's y location
+        let mut x_lcu = 0; //entry point lcu's x location
+        let mut y_lcu = 0; // entry point lcu's y location
         while self.num_ctb > 0 {
-            self.update_core_loc_param();
+            let lcu_num = x_lcu + y_lcu * self.w_lcu; // Init the first lcu_num in tile
 
             //LCU decoding with in a tile
-            evc_assert_rv(
-                (self.core.lcu_num as u32) < self.f_lcu,
-                EvcError::EVC_ERR_UNEXPECTED,
-            )?;
+            evc_assert_rv((lcu_num as u32) < self.f_lcu, EvcError::EVC_ERR_UNEXPECTED)?;
 
             // invoke coding_tree() recursion
             for i in 0..NUM_CU_DEPTH {
@@ -584,8 +568,8 @@ impl EvcdCtx {
             }
 
             self.evcd_eco_tree(
-                self.core.x_lcu << MAX_CU_LOG2,
-                self.core.y_lcu << MAX_CU_LOG2,
+                x_lcu << MAX_CU_LOG2,
+                y_lcu << MAX_CU_LOG2,
                 MAX_CU_LOG2 as u8,
                 MAX_CU_LOG2 as u8,
                 0,
@@ -595,17 +579,17 @@ impl EvcdCtx {
                 0,
             )?;
             // set split flags to map
-            self.map_split[self.core.lcu_num as usize].clone_from(&self.core.split_mode);
+            self.map_split[lcu_num as usize].clone_from(&self.core.split_mode);
 
             self.num_ctb -= 1;
             // read end_of_picture_flag
             if (self.num_ctb == 0) {
                 evcd_eco_tile_end_flag(&mut self.bs, &mut self.sbac_dec)?;
             } else {
-                self.core.x_lcu += 1;
-                if self.core.x_lcu >= self.w_lcu {
-                    self.core.x_lcu = 0;
-                    self.core.y_lcu += 1;
+                x_lcu += 1;
+                if x_lcu >= self.w_lcu {
+                    x_lcu = 0;
+                    y_lcu += 1;
                 }
             }
             //eprint!("{} ", self.num_ctb);
