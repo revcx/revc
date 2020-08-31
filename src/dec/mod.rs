@@ -48,21 +48,23 @@ pub(crate) struct EvcdCore {
     /************** Frame-based processing **************/
 
     /************** current CU **************/
-
-
     /* neighbor pixel buffer for intra prediction */
     nb: NBBuffer<pel>, // [N_C][N_REF][MAX_CU_SIZE * 3];
-    /* reference index for current CU */
-    refi: [i8; REFP_NUM],
-    /* motion vector for current CU */
-    mv: [[i16; MV_D]; REFP_NUM],
+
+    /* prediction mode of current CU: INTRA, INTER, ... */
+    pred_mode: PredMode,
 
     /* intra prediction direction of current CU */
     ipm: [IntraPredDir; 2],
 
-    /* prediction mode of current CU: INTRA, INTER, ... */
-    pred_mode: PredMode,
+    // inter prediction
     inter_dir: InterPredDir,
+    /* reference index for current CU */
+    refi: [i8; REFP_NUM],
+    /* motion vector for current CU */
+    mv: [[i16; MV_D]; REFP_NUM],
+    mvp_idx: [u8; REFP_NUM],
+    mvd: [[i16; MV_D]; REFP_NUM],
 
     /* is there coefficient? */
     is_coef: [bool; N_C],
@@ -80,9 +82,6 @@ pub(crate) struct EvcdCore {
     /************** current LCU *************/
     /* split mode map for current LCU */
     split_mode: LcuSplitMode,
-
-    mvp_idx: [u8; REFP_NUM],
-    mvd: [[i16; MV_D]; REFP_NUM],
 
     evc_tbl_qp_chroma_dynamic_ext: Vec<Vec<i8>>, // [[i8; MAX_QP_TABLE_SIZE_EXT]; 2],
 }
@@ -110,8 +109,6 @@ pub(crate) struct EvcdCtx {
     map_refi: Option<Rc<RefCell<Vec<[i8; REFP_NUM]>>>>,
     /* intra prediction modes */
     map_ipm: Vec<IntraPredDir>,
-    /* new coding tool flag*/
-    map_cu_mode: Vec<MCU>,
 
     /* *******************************************************************/
     /* current decoding bitstream */
@@ -200,8 +197,6 @@ impl EvcdCtx {
             map_refi: None,
             /* intra prediction modes */
             map_ipm: vec![],
-            /* new coding tool flag*/
-            map_cu_mode: vec![],
 
             /**************************************************************************/
             /* current decoding bitstream */
@@ -292,9 +287,6 @@ impl EvcdCtx {
         /* alloc SCU map */
         self.map_scu = vec![MCU::default(); self.f_scu as usize];
 
-        /* alloc cu mode SCU map */
-        self.map_cu_mode = vec![MCU::default(); self.f_scu as usize];
-
         /* alloc map for CU split flag */
         self.map_split = vec![LcuSplitMode::default(); self.f_lcu as usize];
 
@@ -337,7 +329,6 @@ impl EvcdCtx {
         /* clear maps */
         for i in 0..self.f_scu as usize {
             self.map_scu[i] = MCU::default();
-            self.map_cu_mode[i] = MCU::default();
         }
 
         if self.sh.slice_type == SliceType::EVC_ST_I {
@@ -531,7 +522,6 @@ impl EvcdCtx {
                 &mut self.map_refi,
                 &mut self.map_mv,
                 &mut self.map_scu,
-                &mut self.map_cu_mode,
                 &mut self.map_ipm,
             );
         }

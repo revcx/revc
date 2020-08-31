@@ -1408,7 +1408,6 @@ pub(crate) fn evcd_set_dec_info(
     map_refi: &mut Option<Rc<RefCell<Vec<[i8; REFP_NUM]>>>>,
     map_mv: &mut Option<Rc<RefCell<Vec<[[i16; MV_D]; REFP_NUM]>>>>,
     map_scu: &mut [MCU],
-    map_cu_mode: &mut [MCU],
     map_ipm: &mut [IntraPredDir],
 ) {
     //CU position X in a frame in SCU unit
@@ -1432,7 +1431,6 @@ pub(crate) fn evcd_set_dec_info(
         for i in 0..h_cu {
             let map_scu = &mut map_scu[scup + i * w_scu..];
             let map_ipm = &mut map_ipm[scup + i * w_scu..];
-            let map_cu_mode = &mut map_cu_mode[scup + i * w_scu..];
             let refi = &mut refis[scup + i * w_scu..];
             let mv = &mut mvs[scup + i * w_scu..];
 
@@ -1447,9 +1445,6 @@ pub(crate) fn evcd_set_dec_info(
                 } else {
                     map_scu[j].CLR_CBFL();
                 }
-
-                map_cu_mode[j].SET_LOGW(log2_cuw as u32);
-                map_cu_mode[j].SET_LOGH(log2_cuh as u32);
 
                 if pps_cu_qp_delta_enabled_flag {
                     map_scu[j].RESET_QP();
