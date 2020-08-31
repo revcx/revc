@@ -30,8 +30,8 @@ use sbac::*;
 #[derive(Default)]
 pub(crate) struct EvcdCore {
     /************** LCU-based processing **************/
-    top_mcu: Vec<MCU>,                         //[Width/MIN_CU_SIZE]
-    lft_mcu: [MCU; MAX_CU_SIZE / MIN_CU_SIZE], //[MAX_CU_SIZE/MIN_CU_SIZE]
+    top_mcu: Vec<MCU>, //[Width/MIN_CU_SIZE]
+    lft_mcu: Vec<MCU>, //[MAX_CU_SIZE/MIN_CU_SIZE]
     // intra prediction pixel line buffer
     top_pel: Vec<Vec<pel>>, //[N_C][Width]
     lft_pel: Vec<Vec<pel>>, //[N_C][MAX_CU_SIZE]
@@ -274,12 +274,18 @@ impl EvcdCtx {
         self.h_scu = (self.h + ((1 << MIN_CU_LOG2) - 1) as u16) >> MIN_CU_LOG2 as u16;
         self.f_scu = (self.w_scu * self.h_scu) as u32;
 
-        // TOP LINE BUFFERS
+        // Top/Left Line Buffer
         self.core.top_mcu = vec![MCU::default(); self.w_scu as usize];
         self.core.top_pel = vec![
             vec![0; self.w as usize],
             vec![0; (self.w >> 1) as usize],
             vec![0; (self.w >> 1) as usize],
+        ];
+        self.core.lft_mcu = vec![MCU::default(); MAX_CU_SIZE / MIN_CU_SIZE];
+        self.core.lft_pel = vec![
+            vec![0; MAX_CU_SIZE],
+            vec![0; MAX_CU_SIZE >> 1],
+            vec![0; MAX_CU_SIZE >> 1],
         ];
 
         /* alloc SCU map */

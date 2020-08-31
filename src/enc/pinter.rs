@@ -610,7 +610,6 @@ impl EvceCtx {
                     &mvp,
                     &self.refp,
                     &mut self.pinter.pred[InterPredDir::PRED_NUM as usize],
-                    self.poc.poc_val,
                 );
 
                 if let Some(pic) = &self.pinter.pic_o {
@@ -834,7 +833,6 @@ impl EvceCtx {
                 &self.pinter.mv[pidx],
                 &self.refp,
                 &mut self.pinter.pred[pidx],
-                0,
             );
 
             if let Some(pic) = &self.pinter.pic_o {
@@ -1003,7 +1001,6 @@ impl EvceCtx {
             &self.pinter.mv[pidx],
             &self.refp,
             &mut self.pinter.pred[pred_coef_idx],
-            self.poc.poc_val,
         );
 
         /* get residual */

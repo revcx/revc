@@ -1111,7 +1111,6 @@ pub(crate) fn evcd_eco_unit(
             &core.mv,
             refp,
             &mut core.pred,
-            poc_val,
         );
     } else {
         let avail_cu = evc_get_avail_intra(
