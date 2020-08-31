@@ -1125,7 +1125,8 @@ pub(crate) fn evcd_eco_unit(
             log2_cuh,
             map_scu,
         );
-        get_nbr_yuv(
+
+        evcd_get_nbr_yuv(
             core,
             x,
             y,
@@ -1317,7 +1318,7 @@ fn evcd_get_inter_motion(
     }
 }
 
-fn get_nbr_yuv(
+fn evcd_get_nbr_yuv(
     core: &mut EvcdCore,
     mut x: u16,
     mut y: u16,
