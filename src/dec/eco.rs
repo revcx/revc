@@ -996,43 +996,42 @@ pub(crate) fn evcd_eco_unit(
     let scup = x_scu as u32 + y_scu as u32 * w_scu as u32;
 
     //entropy decoding
-    {
-        EVC_TRACE_COUNTER(&mut bs.tracer);
-        EVC_TRACE(&mut bs.tracer, "poc: ");
-        EVC_TRACE(&mut bs.tracer, poc_val);
-        EVC_TRACE(&mut bs.tracer, " x pos ");
-        EVC_TRACE(&mut bs.tracer, x);
-        EVC_TRACE(&mut bs.tracer, " y pos ");
-        EVC_TRACE(&mut bs.tracer, y);
-        EVC_TRACE(&mut bs.tracer, " width ");
-        EVC_TRACE(&mut bs.tracer, cuw);
-        EVC_TRACE(&mut bs.tracer, " height ");
-        EVC_TRACE(&mut bs.tracer, cuh);
-        EVC_TRACE(&mut bs.tracer, " \n");
 
-        /* parse CU info */
-        evcd_eco_cu(
-            bs,
-            sbac,
-            sbac_ctx,
-            core,
-            x,
-            y,
-            log2_cuw,
-            log2_cuh,
-            w_scu,
-            map_scu,
-            map_ipm,
-            dpm,
-            sps_dquant_flag,
-            pps_cu_qp_delta_enabled_flag,
-            cu_qp_delta_code,
-            sh_slice_type,
-            sh_qp,
-            sh_qp_u_offset,
-            sh_qp_v_offset,
-        )?;
-    }
+    EVC_TRACE_COUNTER(&mut bs.tracer);
+    EVC_TRACE(&mut bs.tracer, "poc: ");
+    EVC_TRACE(&mut bs.tracer, poc_val);
+    EVC_TRACE(&mut bs.tracer, " x pos ");
+    EVC_TRACE(&mut bs.tracer, x);
+    EVC_TRACE(&mut bs.tracer, " y pos ");
+    EVC_TRACE(&mut bs.tracer, y);
+    EVC_TRACE(&mut bs.tracer, " width ");
+    EVC_TRACE(&mut bs.tracer, cuw);
+    EVC_TRACE(&mut bs.tracer, " height ");
+    EVC_TRACE(&mut bs.tracer, cuh);
+    EVC_TRACE(&mut bs.tracer, " \n");
+
+    /* parse CU info */
+    evcd_eco_cu(
+        bs,
+        sbac,
+        sbac_ctx,
+        core,
+        x,
+        y,
+        log2_cuw,
+        log2_cuh,
+        w_scu,
+        map_scu,
+        map_ipm,
+        dpm,
+        sps_dquant_flag,
+        pps_cu_qp_delta_enabled_flag,
+        cu_qp_delta_code,
+        sh_slice_type,
+        sh_qp,
+        sh_qp_u_offset,
+        sh_qp_v_offset,
+    )?;
 
     /* inverse transform and dequantization */
     if core.pred_mode != PredMode::MODE_SKIP {
@@ -1202,6 +1201,21 @@ pub(crate) fn evcd_eco_unit(
         cuh as usize >> 1,
         &core.pred[0].data[V_C],
     );
+
+    /* reconstruction */
+    if let Some(pic) = &pic {
+        evc_recon_yuv(
+            &mut bs.tracer,
+            x as usize,
+            y as usize,
+            cuw as usize,
+            cuh as usize,
+            &core.coef.data,
+            &core.pred[0].data,
+            &core.is_coef,
+            &mut pic.borrow().frame.borrow_mut().planes,
+        );
+    }
 
     Ok(())
 }

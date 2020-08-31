@@ -341,8 +341,8 @@ impl EvcdCtx {
 
     fn evcd_eco_tree(
         &mut self,
-        x0: u16,
-        y0: u16,
+        x: u16,
+        y: u16,
         log2_cuw: u8,
         log2_cuh: u8,
         cup: u16,
@@ -358,18 +358,18 @@ impl EvcdCtx {
         let cuh = 1u16 << log2_cuh;
         let mut split_mode = SplitMode::NO_SPLIT;
         if cuw > MIN_CU_SIZE as u16 || cuh > MIN_CU_SIZE as u16 {
-            if x0 + cuw <= self.w && y0 + cuh <= self.h {
+            if x + cuw <= self.w && y + cuh <= self.h {
                 split_mode = evcd_eco_split_mode(bs, sbac, sbac_ctx, cuw, cuh)?;
                 EVC_TRACE_COUNTER(&mut bs.tracer);
                 EVC_TRACE(&mut bs.tracer, "x pos ");
                 EVC_TRACE(
                     &mut bs.tracer,
-                    x0 + (cup % (MAX_CU_SIZE as u16 >> MIN_CU_LOG2) << MIN_CU_LOG2 as u16),
+                    x + (cup % (MAX_CU_SIZE as u16 >> MIN_CU_LOG2) << MIN_CU_LOG2 as u16),
                 );
                 EVC_TRACE(&mut bs.tracer, " y pos ");
                 EVC_TRACE(
                     &mut bs.tracer,
-                    y0 + (cup / (MAX_CU_SIZE as u16 >> MIN_CU_LOG2) << MIN_CU_LOG2 as u16),
+                    y + (cup / (MAX_CU_SIZE as u16 >> MIN_CU_LOG2) << MIN_CU_LOG2 as u16),
                 );
                 EVC_TRACE(&mut bs.tracer, " width ");
                 EVC_TRACE(&mut bs.tracer, cuw);
@@ -393,12 +393,12 @@ impl EvcdCtx {
                 EVC_TRACE(&mut bs.tracer, "x pos ");
                 EVC_TRACE(
                     &mut bs.tracer,
-                    x0 + (cup % (MAX_CU_SIZE as u16 >> MIN_CU_LOG2) << MIN_CU_LOG2 as u16),
+                    x + (cup % (MAX_CU_SIZE as u16 >> MIN_CU_LOG2) << MIN_CU_LOG2 as u16),
                 );
                 EVC_TRACE(&mut bs.tracer, " y pos ");
                 EVC_TRACE(
                     &mut bs.tracer,
-                    y0 + (cup / (MAX_CU_SIZE as u16 >> MIN_CU_LOG2) << MIN_CU_LOG2 as u16),
+                    y + (cup / (MAX_CU_SIZE as u16 >> MIN_CU_LOG2) << MIN_CU_LOG2 as u16),
                 );
                 EVC_TRACE(&mut bs.tracer, " width ");
                 EVC_TRACE(&mut bs.tracer, cuw);
@@ -443,8 +443,8 @@ impl EvcdCtx {
         if split_mode != SplitMode::NO_SPLIT {
             let split_struct = evc_split_get_part_structure(
                 split_mode,
-                x0,
-                y0,
+                x,
+                y,
                 cuw,
                 cuh,
                 cup,
@@ -476,8 +476,8 @@ impl EvcdCtx {
                 sbac,
                 sbac_ctx,
                 core,
-                x0,
-                y0,
+                x,
+                y,
                 log2_cuw,
                 log2_cuh,
                 self.w_scu,
@@ -501,25 +501,10 @@ impl EvcdCtx {
                 self.sh.qp_v_offset,
             )?;
 
-            /* reconstruction */
-            if let Some(pic) = &self.pic {
-                evc_recon_yuv(
-                    &mut bs.tracer,
-                    x0 as usize,
-                    y0 as usize,
-                    cuw as usize,
-                    cuh as usize,
-                    &core.coef.data,
-                    &core.pred[0].data,
-                    &core.is_coef,
-                    &mut pic.borrow().frame.borrow_mut().planes,
-                );
-            }
-
             evcd_set_dec_info(
                 core,
-                x0,
-                y0,
+                x,
+                y,
                 log2_cuw,
                 log2_cuh,
                 self.w_scu as usize,
