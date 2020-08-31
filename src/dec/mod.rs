@@ -35,17 +35,20 @@ pub(crate) struct EvcdCore {
     // intra prediction pixel line buffer
     top_pel: Vec<Vec<pel>>, //[N_C][Width]
     lft_pel: Vec<Vec<pel>>, //[N_C][MAX_CU_SIZE]
+
+    /* coefficient buffer of current CU */
+    coef: CUBuffer<i16>, //[[i16; MAX_CU_DIM]; N_C], //[N_C][MAX_CU_DIM]
+    /* pred buffer of current CU */
+    /* [1] is used for bi-pred. */
+    pred: [CUBuffer<pel>; 2], //[[[pel; MAX_CU_DIM]; N_C]; 2], //[2][N_C][MAX_CU_DIM]
+
     // deblocking line buffer
     //TODO:
 
     /************** Frame-based processing **************/
 
     /************** current CU **************/
-    /* coefficient buffer of current CU */
-    coef: CUBuffer<i16>, //[[i16; MAX_CU_DIM]; N_C], //[N_C][MAX_CU_DIM]
-    /* pred buffer of current CU */
-    /* [1] is used for bi-pred. */
-    pred: [CUBuffer<pel>; 2], //[[[pel; MAX_CU_DIM]; N_C]; 2], //[2][N_C][MAX_CU_DIM]
+
 
     /* neighbor pixel buffer for intra prediction */
     nb: NBBuffer<pel>, // [N_C][N_REF][MAX_CU_SIZE * 3];
@@ -73,10 +76,7 @@ pub(crate) struct EvcdCore {
     //pims: [IntraPredDir; IntraPredDir::IPD_CNT_B as usize], /* probable intra mode set*/
     /* prediction mode of current CU: INTRA, INTER, ... */
     pred_mode: PredMode,
-    /* log2 of cuw */
-    log2_cuw: u8,
-    /* log2 of cuh */
-    log2_cuh: u8,
+
     /* is there coefficient? */
     is_coef: [bool; N_C],
 
@@ -561,6 +561,8 @@ impl EvcdCtx {
             )?;
             evcd_set_dec_info(
                 core,
+                log2_cuw,
+                log2_cuh,
                 self.w_scu as usize,
                 self.pps.cu_qp_delta_enabled_flag,
                 self.slice_num,

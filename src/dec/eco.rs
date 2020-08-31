@@ -713,6 +713,8 @@ fn evcd_eco_coef(
     sbac: &mut EvcdSbac,
     sbac_ctx: &mut EvcSbacCtx,
     core: &mut EvcdCore,
+    log2_cuw: u8,
+    log2_cuh: u8,
     sps_dquant_flag: bool,
     pps_cu_qp_delta_enabled_flag: bool,
     sh_qp_u_offset: i8,
@@ -720,9 +722,6 @@ fn evcd_eco_coef(
 ) -> Result<(), EvcError> {
     let mut cbf = [false; N_C];
     let mut b_no_cbf = false;
-
-    let log2_cuw = core.log2_cuw;
-    let log2_cuh = core.log2_cuh;
 
     let mut tmp_coef = [0; N_C];
     let is_sub = false;
@@ -808,6 +807,8 @@ fn evcd_eco_cu(
     sbac: &mut EvcdSbac,
     sbac_ctx: &mut EvcSbacCtx,
     core: &mut EvcdCore,
+    log2_cuw: u8,
+    log2_cuh: u8,
     w_scu: u16,
     map_scu: &[MCU],
     map_ipm: &[IntraPredDir],
@@ -836,8 +837,8 @@ fn evcd_eco_cu(
         }
     }
 
-    let cuw = 1 << core.log2_cuw as u16;
-    let cuh = 1 << core.log2_cuh as u16;
+    let cuw = 1 << log2_cuw;
+    let cuh = 1 << log2_cuh;
     core.avail_lr = evc_check_nev_avail(core.x_scu, core.y_scu, cuw, w_scu, map_scu);
 
     if sh_slice_type != SliceType::EVC_ST_I {
@@ -937,6 +938,8 @@ fn evcd_eco_cu(
             sbac,
             sbac_ctx,
             core,
+            log2_cuw,
+            log2_cuh,
             sps_dquant_flag,
             pps_cu_qp_delta_enabled_flag,
             sh_qp_u_offset,
@@ -980,8 +983,6 @@ pub(crate) fn evcd_eco_unit(
 
     //entropy decoding
     {
-        core.log2_cuw = log2_cuw;
-        core.log2_cuh = log2_cuh;
         core.x_scu = PEL2SCU(x as usize) as u16;
         core.y_scu = PEL2SCU(y as usize) as u16;
         core.scup = core.x_scu as u32 + core.y_scu as u32 * w_scu as u32;
@@ -1005,6 +1006,8 @@ pub(crate) fn evcd_eco_unit(
             sbac,
             sbac_ctx,
             core,
+            log2_cuw,
+            log2_cuh,
             w_scu,
             map_scu,
             map_ipm,
@@ -1023,8 +1026,8 @@ pub(crate) fn evcd_eco_unit(
         evc_sub_block_itdq(
             &mut bs.tracer,
             &mut core.coef.data,
-            core.log2_cuw,
-            core.log2_cuh,
+            log2_cuw,
+            log2_cuh,
             core.qp_y,
             core.qp_u,
             core.qp_v,
@@ -1052,8 +1055,8 @@ pub(crate) fn evcd_eco_unit(
                     &refp[0],
                     poc_val,
                     core.scup as usize
-                        + ((1 << (core.log2_cuw as usize - MIN_CU_LOG2)) - 1)
-                        + ((1 << (core.log2_cuh as usize - MIN_CU_LOG2)) - 1) * w_scu as usize,
+                        + ((1 << (log2_cuw as usize - MIN_CU_LOG2)) - 1)
+                        + ((1 << (log2_cuh as usize - MIN_CU_LOG2)) - 1) * w_scu as usize,
                     core.scup as usize,
                     w_scu,
                     h_scu,
@@ -1099,8 +1102,8 @@ pub(crate) fn evcd_eco_unit(
             w_scu as usize,
             h_scu as usize,
             core.scup as usize,
-            core.log2_cuw,
-            core.log2_cuh,
+            log2_cuw,
+            log2_cuh,
             map_scu,
         );
         get_nbr_yuv(
@@ -1367,6 +1370,8 @@ fn get_nbr_yuv(
 
 pub(crate) fn evcd_set_dec_info(
     core: &mut EvcdCore,
+    log2_cuw: u8,
+    log2_cuh: u8,
     w_scu: usize,
     pps_cu_qp_delta_enabled_flag: bool,
     slice_num: u16,
@@ -1377,8 +1382,8 @@ pub(crate) fn evcd_set_dec_info(
     map_ipm: &mut [IntraPredDir],
 ) {
     let scup = core.scup as usize;
-    let w_cu = (1 << core.log2_cuw as usize) >> MIN_CU_LOG2;
-    let h_cu = (1 << core.log2_cuh as usize) >> MIN_CU_LOG2;
+    let w_cu = (1 << log2_cuw) >> MIN_CU_LOG2;
+    let h_cu = (1 << log2_cuh) >> MIN_CU_LOG2;
     let flag = if core.pred_mode == PredMode::MODE_INTRA {
         1
     } else {
@@ -1407,8 +1412,8 @@ pub(crate) fn evcd_set_dec_info(
                     map_scu[j].CLR_CBFL();
                 }
 
-                map_cu_mode[j].SET_LOGW(core.log2_cuw as u32);
-                map_cu_mode[j].SET_LOGH(core.log2_cuh as u32);
+                map_cu_mode[j].SET_LOGW(log2_cuw as u32);
+                map_cu_mode[j].SET_LOGH(log2_cuh as u32);
 
                 if pps_cu_qp_delta_enabled_flag {
                     map_scu[j].RESET_QP();
