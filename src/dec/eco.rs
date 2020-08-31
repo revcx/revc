@@ -743,9 +743,8 @@ fn evcd_eco_coef(
 
     let mut dqp = 0;
     if pps_cu_qp_delta_enabled_flag
-        && (((!(sps_dquant_flag) || (core.cu_qp_delta_code == 1 && !core.cu_qp_delta_is_coded))
+        && ((!sps_dquant_flag || (core.cu_qp_delta_code == 1 && !core.cu_qp_delta_is_coded))
             && (cbf[Y_C] || cbf[U_C] || cbf[V_C]))
-            || (core.cu_qp_delta_code == 2 && !core.cu_qp_delta_is_coded))
     {
         dqp = evcd_eco_dqp(bs, sbac, sbac_ctx)?;
         core.cu_qp_delta_is_coded = true;

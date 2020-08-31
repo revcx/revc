@@ -37,10 +37,10 @@ pub(crate) struct EvcdCore {
     lft_pel: Vec<Vec<pel>>, //[N_C][MAX_CU_SIZE]
 
     /* coefficient buffer of current CU */
-    coef: CUBuffer<i16>, //[[i16; MAX_CU_DIM]; N_C], //[N_C][MAX_CU_DIM]
+    coef: CUBuffer<i16>, //[N_C][MAX_CU_DIM]
     /* pred buffer of current CU */
     /* [1] is used for bi-pred. */
-    pred: [CUBuffer<pel>; 2], //[[[pel; MAX_CU_DIM]; N_C]; 2], //[2][N_C][MAX_CU_DIM]
+    pred: [CUBuffer<pel>; 2], //[2][N_C][MAX_CU_DIM]
 
     // deblocking line buffer
     //TODO:
@@ -69,9 +69,8 @@ pub(crate) struct EvcdCore {
     /* is there coefficient? */
     is_coef: [bool; N_C],
 
-    /* QP for Luma of current encoding MB */
+    /* QP for current encoding MB */
     qp_y: u8,
-    /* QP for Chroma of current encoding MB */
     qp_u: u8,
     qp_v: u8,
 
@@ -113,23 +112,22 @@ pub(crate) struct EvcdCtx {
     /* *******************************************************************/
     /* current decoding bitstream */
     bs: EvcdBsr,
+    /* SBAC */
+    sbac_dec: EvcdSbac,
+    sbac_ctx: EvcSbacCtx,
+
     /* current nalu header */
     nalu: EvcNalu,
     /* current slice header */
     sh: EvcSh,
     /* decoded picture buffer management */
     dpm: Option<EvcPm>,
-    /* create descriptor */
-    //EVCD_CDSC               cdsc;
     /* sequence parameter set */
     sps: EvcSps,
     /* picture parameter set */
     pps: EvcPps,
     /* current decoded (decoding) picture buffer */
     pic: Option<Rc<RefCell<EvcPic>>>,
-    /* SBAC */
-    sbac_dec: EvcdSbac,
-    sbac_ctx: EvcSbacCtx,
     /* decoding picture width */
     w: u16,
     /* decoding picture height */
@@ -160,11 +158,11 @@ pub(crate) struct EvcdCtx {
     poc: EvcPoc,
     /* the number of currently decoded pictures */
     pic_cnt: u32,
-    /* flag whether current picture is refecened picture or not */
+    /* flag whether current picture is referenced picture or not */
     slice_ref_flag: bool,
     /* distance between ref pics in addition to closest ref ref pic in LD*/
     ref_pic_gap_length: u32,
-    /* reference picture (0: foward, 1: backward) */
+    /* reference picture (0: forward, 1: backward) */
     refp: Vec<Vec<EvcRefP>>, //[[EvcRefP; REFP_NUM]; MAX_NUM_REF_PICS],
     /* flag to indicate opl decoder output */
     num_ctb: u32,
@@ -186,6 +184,7 @@ impl EvcdCtx {
 
             /* CORE information used for fast operation */
             core: EvcdCore::default(),
+
             /* MAPS *******************************************************************/
             /* SCU map for CU information */
             map_scu: vec![],
@@ -201,23 +200,22 @@ impl EvcdCtx {
             /**************************************************************************/
             /* current decoding bitstream */
             bs: EvcdBsr::default(),
+            /* SBAC */
+            sbac_dec: EvcdSbac::default(),
+            sbac_ctx: EvcSbacCtx::default(),
+
             /* current nalu header */
             nalu: EvcNalu::default(),
             /* current slice header */
             sh: EvcSh::default(),
             /* decoded picture buffer management */
             dpm: None,
-            /* create descriptor */
-            //EVCD_CDSC               cdsc;
             /* sequence parameter set */
             sps: EvcSps::default(),
             /* picture parameter set */
             pps: EvcPps::default(),
             /* current decoded (decoding) picture buffer */
             pic: None,
-            /* SBAC */
-            sbac_dec: EvcdSbac::default(),
-            sbac_ctx: EvcSbacCtx::default(),
             /* decoding picture width */
             w: 0,
             /* decoding picture height */
@@ -427,13 +425,8 @@ impl EvcdCtx {
         if self.pps.cu_qp_delta_enabled_flag && self.sps.dquant_flag {
             if split_mode == SplitMode::NO_SPLIT
                 && (log2_cuh + log2_cuw >= self.pps.cu_qp_delta_area)
-                && cu_qp_delta_code != 2
             {
-                if log2_cuh == 7 || log2_cuw == 7 {
-                    cu_qp_delta_code = 2;
-                } else {
-                    cu_qp_delta_code = 1;
-                }
+                cu_qp_delta_code = 1;
                 core.cu_qp_delta_is_coded = false;
             }
         }
