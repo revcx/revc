@@ -757,7 +757,11 @@ pub(crate) struct CUBuffer<T: Default + Copy> {
 impl<T: Default + Copy> Default for CUBuffer<T> {
     fn default() -> Self {
         CUBuffer {
-            data: vec![vec![T::default(); MAX_CU_DIM]; N_C],
+            data: vec![
+                vec![T::default(); MAX_CU_DIM],
+                vec![T::default(); MAX_CU_DIM >> 2],
+                vec![T::default(); MAX_CU_DIM >> 2],
+            ],
         }
     }
 }

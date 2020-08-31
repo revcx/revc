@@ -29,6 +29,17 @@ use sbac::*;
  *****************************************************************************/
 #[derive(Default)]
 pub(crate) struct EvcdCore {
+    /************** LCU-based processing **************/
+    top_mcu: Vec<MCU>,                         //[Width/MIN_CU_SIZE]
+    lft_mcu: [MCU; MAX_CU_SIZE / MIN_CU_SIZE], //[MAX_CU_SIZE/MIN_CU_SIZE]
+    // intra prediction pixel line buffer
+    top_pel: Vec<Vec<pel>>, //[N_C][Width]
+    lft_pel: Vec<Vec<pel>>, //[N_C][MAX_CU_SIZE]
+    // deblocking line buffer
+    //TODO:
+
+    /************** Frame-based processing **************/
+
     /************** current CU **************/
     /* coefficient buffer of current CU */
     coef: CUBuffer<i16>, //[[i16; MAX_CU_DIM]; N_C], //[N_C][MAX_CU_DIM]
@@ -110,23 +121,9 @@ pub(crate) struct EvcdCtx {
     /* input packet */
     pkt: Option<Packet>,
 
-    /************** LCU-based processing **************/
-    top_mcu: Vec<MCU>,                         //[Width/MIN_CU_SIZE]
-    lft_mcu: [MCU; MAX_CU_SIZE / MIN_CU_SIZE], //[MAX_CU_SIZE/MIN_CU_SIZE]
-    // intra prediction pixel line buffer
-    top_pel: Vec<Vec<pel>>, //[N_C][Width]
-    lft_pel: Vec<Vec<pel>>, //[N_C][MAX_CU_SIZE]
-    /* coefficient buffer of current CU */
-    coef: Vec<Vec<i16>>, //[N_C][MAX_CU_DIM]
-    /* pred buffer of current CU */
-    /* [1] is used for bi-pred. */
-    pred: Vec<Vec<Vec<pel>>>, //[2][N_C][MAX_CU_DIM]
-    // deblocking line buffer
-    //TODO:
-
-    /************** Frame-based processing **************/
     /* CORE information used for fast operation */
     core: EvcdCore,
+
     /* MAPS *******************************************************************/
     /* SCU map for CU information */
     map_scu: Vec<MCU>,
@@ -214,37 +211,6 @@ impl EvcdCtx {
 
         EvcdCtx {
             pkt: None,
-
-            /* EVCD identifier */
-            /************** LCU-based processing **************/
-            top_mcu: vec![],
-            lft_mcu: [MCU::default(); MAX_CU_SIZE / MIN_CU_SIZE],
-            // intra prediction line buffer
-            top_pel: vec![],
-            lft_pel: vec![
-                vec![0; MAX_CU_SIZE],
-                vec![0; MAX_CU_SIZE >> 1],
-                vec![0; MAX_CU_SIZE >> 1],
-            ],
-            coef: vec![
-                vec![0; MAX_CU_DIM],
-                vec![0; MAX_CU_DIM >> 2],
-                vec![0; MAX_CU_DIM >> 2],
-            ],
-            pred: vec![
-                vec![
-                    vec![0; MAX_CU_DIM],
-                    vec![0; MAX_CU_DIM >> 2],
-                    vec![0; MAX_CU_DIM >> 2],
-                ],
-                vec![
-                    vec![0; MAX_CU_DIM],
-                    vec![0; MAX_CU_DIM >> 2],
-                    vec![0; MAX_CU_DIM >> 2],
-                ],
-            ],
-            // deblocking line buffer
-            //TODO:
 
             /* CORE information used for fast operation */
             core: EvcdCore::default(),
@@ -341,8 +307,8 @@ impl EvcdCtx {
         self.f_scu = (self.w_scu * self.h_scu) as u32;
 
         // TOP LINE BUFFERS
-        self.top_mcu = vec![MCU::default(); self.w_scu as usize];
-        self.top_pel = vec![
+        self.core.top_mcu = vec![MCU::default(); self.w_scu as usize];
+        self.core.top_pel = vec![
             vec![0; self.w as usize],
             vec![0; (self.w >> 1) as usize],
             vec![0; (self.w >> 1) as usize],
