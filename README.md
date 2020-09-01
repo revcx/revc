@@ -44,8 +44,8 @@ REVC is a Rust-based EVC (baseline) video codec implementation.
   - [x] Translate ETM baseline decoder from C to Rust
   - [x] Translate ETM baseline encoder from C to Rust		 
 - [ ] 0.2 Optimization:
-  - [ ] profiling and benchmarking
-  - [ ] rust safe code optimization
+  - [x] profiling and benchmarking
+  - [ ] memory/cache optimization
   - [ ] assembly optimization
     - [ ] armeabi-v7a
     - [ ] arm64-v8a
