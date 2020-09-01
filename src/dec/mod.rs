@@ -49,7 +49,7 @@ pub(crate) struct EvcdCore {
 
     /************** current CU **************/
     /* neighbor pixel buffer for intra prediction */
-    nb: NBBuffer<pel>, // [N_C][MAX_CU_SIZE*2+1];
+    nb: NBBuffer<pel>, // [N_C][MAX_CU_SIZE*4+1];
 
     /* prediction mode of current CU: INTRA, INTER, ... */
     pred_mode: PredMode,
