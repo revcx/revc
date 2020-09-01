@@ -49,92 +49,84 @@ fn evc_get_transform_shift(log2_size: usize, typ: u8) -> usize {
     }
 }
 
-fn tx_pb2b0(src: &[i16], dst: &mut [i32], shift: usize, line: usize) {
-    let add = if shift == 0 { 0 } else { 1 << (shift - 1) };
-
-    for j in 0..line {
+fn tx_pb2b0(src: &[i16], dst: &mut [i32], log2_line: usize) {
+    for j in 0..(1 << log2_line) {
         /* E and O */
         let E = src[j * 2 + 0] as i64 + src[j * 2 + 1] as i64;
         let O = src[j * 2 + 0] as i64 - src[j * 2 + 1] as i64;
 
-        dst[0 * line + j] = ((evc_tbl_tm2[0][0] as i64 * E + add) >> shift) as i32;
-        dst[1 * line + j] = ((evc_tbl_tm2[1][0] as i64 * O + add) >> shift) as i32;
+        dst[(0 << log2_line) + j] = (evc_tbl_tm2[0][0] as i64 * E) as i32;
+        dst[(1 << log2_line) + j] = (evc_tbl_tm2[1][0] as i64 * O) as i32;
     }
 }
-fn tx_pb2b1(src: &[i32], dst: &mut [i16], shift: usize, line: usize) {
-    let add = if shift == 0 { 0 } else { 1 << (shift - 1) };
+fn tx_pb2b1(src: &[i32], dst: &mut [i16], shift: usize, log2_line: usize) {
+    let add = 1 << (shift - 1);
 
-    for j in 0..line {
+    for j in 0..(1 << log2_line) {
         /* E and O */
         let E = src[j * 2 + 0] as i64 + src[j * 2 + 1] as i64;
         let O = src[j * 2 + 0] as i64 - src[j * 2 + 1] as i64;
 
-        dst[0 * line + j] = ((evc_tbl_tm2[0][0] as i64 * E + add) >> shift) as i16;
-        dst[1 * line + j] = ((evc_tbl_tm2[1][0] as i64 * O + add) >> shift) as i16;
+        dst[(0 << log2_line) + j] = ((evc_tbl_tm2[0][0] as i64 * E + add) >> shift) as i16;
+        dst[(1 << log2_line) + j] = ((evc_tbl_tm2[1][0] as i64 * O + add) >> shift) as i16;
     }
 }
 
-fn tx_pb4b0(src: &[i16], dst: &mut [i32], shift: usize, line: usize) {
+fn tx_pb4b0(src: &[i16], dst: &mut [i32], log2_line: usize) {
     let mut E = [0i64; 2];
     let mut O = [0i64; 2];
-    let add = if shift == 0 { 0 } else { 1 << (shift - 1) };
 
-    for j in 0..line {
+    for j in 0..(1 << log2_line) {
         /* E and O */
         E[0] = src[j * 4 + 0] as i64 + src[j * 4 + 3] as i64;
         O[0] = src[j * 4 + 0] as i64 - src[j * 4 + 3] as i64;
         E[1] = src[j * 4 + 1] as i64 + src[j * 4 + 2] as i64;
         O[1] = src[j * 4 + 1] as i64 - src[j * 4 + 2] as i64;
 
-        dst[0 * line + j] =
-            ((evc_tbl_tm4[0][0] as i64 * E[0] + evc_tbl_tm4[0][1] as i64 * E[1] + add) >> shift)
-                as i32;
-        dst[2 * line + j] =
-            ((evc_tbl_tm4[2][0] as i64 * E[0] + evc_tbl_tm4[2][1] as i64 * E[1] + add) >> shift)
-                as i32;
-        dst[1 * line + j] =
-            ((evc_tbl_tm4[1][0] as i64 * O[0] + evc_tbl_tm4[1][1] as i64 * O[1] + add) >> shift)
-                as i32;
-        dst[3 * line + j] =
-            ((evc_tbl_tm4[3][0] as i64 * O[0] + evc_tbl_tm4[3][1] as i64 * O[1] + add) >> shift)
-                as i32;
+        dst[(0 << log2_line) + j] =
+            (evc_tbl_tm4[0][0] as i64 * E[0] + evc_tbl_tm4[0][1] as i64 * E[1]) as i32;
+        dst[(2 << log2_line) + j] =
+            (evc_tbl_tm4[2][0] as i64 * E[0] + evc_tbl_tm4[2][1] as i64 * E[1]) as i32;
+        dst[(1 << log2_line) + j] =
+            (evc_tbl_tm4[1][0] as i64 * O[0] + evc_tbl_tm4[1][1] as i64 * O[1]) as i32;
+        dst[(3 << log2_line) + j] =
+            (evc_tbl_tm4[3][0] as i64 * O[0] + evc_tbl_tm4[3][1] as i64 * O[1]) as i32;
     }
 }
-fn tx_pb4b1(src: &[i32], dst: &mut [i16], shift: usize, line: usize) {
+fn tx_pb4b1(src: &[i32], dst: &mut [i16], shift: usize, log2_line: usize) {
     let mut E = [0i64; 2];
     let mut O = [0i64; 2];
-    let add = if shift == 0 { 0 } else { 1 << (shift - 1) };
+    let add = 1 << (shift - 1);
 
-    for j in 0..line {
+    for j in 0..(1 << log2_line) {
         /* E and O */
         E[0] = src[j * 4 + 0] as i64 + src[j * 4 + 3] as i64;
         O[0] = src[j * 4 + 0] as i64 - src[j * 4 + 3] as i64;
         E[1] = src[j * 4 + 1] as i64 + src[j * 4 + 2] as i64;
         O[1] = src[j * 4 + 1] as i64 - src[j * 4 + 2] as i64;
 
-        dst[0 * line + j] =
+        dst[(0 << log2_line) + j] =
             ((evc_tbl_tm4[0][0] as i64 * E[0] + evc_tbl_tm4[0][1] as i64 * E[1] + add) >> shift)
                 as i16;
-        dst[2 * line + j] =
+        dst[(2 << log2_line) + j] =
             ((evc_tbl_tm4[2][0] as i64 * E[0] + evc_tbl_tm4[2][1] as i64 * E[1] + add) >> shift)
                 as i16;
-        dst[1 * line + j] =
+        dst[(1 << log2_line) + j] =
             ((evc_tbl_tm4[1][0] as i64 * O[0] + evc_tbl_tm4[1][1] as i64 * O[1] + add) >> shift)
                 as i16;
-        dst[3 * line + j] =
+        dst[(3 << log2_line) + j] =
             ((evc_tbl_tm4[3][0] as i64 * O[0] + evc_tbl_tm4[3][1] as i64 * O[1] + add) >> shift)
                 as i16;
     }
 }
 
-fn tx_pb8b0(src: &[i16], dst: &mut [i32], shift: usize, line: usize) {
+fn tx_pb8b0(src: &[i16], dst: &mut [i32], log2_line: usize) {
     let mut E = [0i64; 4];
     let mut O = [0i64; 4];
     let mut EE = [0i64; 2];
     let mut EO = [0i64; 2];
-    let add = if shift == 0 { 0 } else { 1 << (shift - 1) };
 
-    for j in 0..line {
+    for j in 0..(1 << log2_line) {
         /* E and O*/
         for k in 0..4 {
             E[k] = src[j * 8 + k] as i64 + src[j * 8 + 7 - k] as i64;
@@ -146,53 +138,41 @@ fn tx_pb8b0(src: &[i16], dst: &mut [i32], shift: usize, line: usize) {
         EE[1] = E[1] + E[2];
         EO[1] = E[1] - E[2];
 
-        dst[0 * line + j] =
-            ((evc_tbl_tm8[0][0] as i64 * EE[0] + evc_tbl_tm8[0][1] as i64 * EE[1] + add) >> shift)
-                as i32;
-        dst[4 * line + j] =
-            ((evc_tbl_tm8[4][0] as i64 * EE[0] + evc_tbl_tm8[4][1] as i64 * EE[1] + add) >> shift)
-                as i32;
-        dst[2 * line + j] =
-            ((evc_tbl_tm8[2][0] as i64 * EO[0] + evc_tbl_tm8[2][1] as i64 * EO[1] + add) >> shift)
-                as i32;
-        dst[6 * line + j] =
-            ((evc_tbl_tm8[6][0] as i64 * EO[0] + evc_tbl_tm8[6][1] as i64 * EO[1] + add) >> shift)
-                as i32;
+        dst[(0 << log2_line) + j] =
+            (evc_tbl_tm8[0][0] as i64 * EE[0] + evc_tbl_tm8[0][1] as i64 * EE[1]) as i32;
+        dst[(4 << log2_line) + j] =
+            (evc_tbl_tm8[4][0] as i64 * EE[0] + evc_tbl_tm8[4][1] as i64 * EE[1]) as i32;
+        dst[(2 << log2_line) + j] =
+            (evc_tbl_tm8[2][0] as i64 * EO[0] + evc_tbl_tm8[2][1] as i64 * EO[1]) as i32;
+        dst[(6 << log2_line) + j] =
+            (evc_tbl_tm8[6][0] as i64 * EO[0] + evc_tbl_tm8[6][1] as i64 * EO[1]) as i32;
 
-        dst[1 * line + j] = ((evc_tbl_tm8[1][0] as i64 * O[0]
+        dst[(1 << log2_line) + j] = (evc_tbl_tm8[1][0] as i64 * O[0]
             + evc_tbl_tm8[1][1] as i64 * O[1]
             + evc_tbl_tm8[1][2] as i64 * O[2]
-            + evc_tbl_tm8[1][3] as i64 * O[3]
-            + add)
-            >> shift) as i32;
-        dst[3 * line + j] = ((evc_tbl_tm8[3][0] as i64 * O[0]
+            + evc_tbl_tm8[1][3] as i64 * O[3]) as i32;
+        dst[(3 << log2_line) + j] = (evc_tbl_tm8[3][0] as i64 * O[0]
             + evc_tbl_tm8[3][1] as i64 * O[1]
             + evc_tbl_tm8[3][2] as i64 * O[2]
-            + evc_tbl_tm8[3][3] as i64 * O[3]
-            + add)
-            >> shift) as i32;
-        dst[5 * line + j] = ((evc_tbl_tm8[5][0] as i64 * O[0]
+            + evc_tbl_tm8[3][3] as i64 * O[3]) as i32;
+        dst[(5 << log2_line) + j] = (evc_tbl_tm8[5][0] as i64 * O[0]
             + evc_tbl_tm8[5][1] as i64 * O[1]
             + evc_tbl_tm8[5][2] as i64 * O[2]
-            + evc_tbl_tm8[5][3] as i64 * O[3]
-            + add)
-            >> shift) as i32;
-        dst[7 * line + j] = ((evc_tbl_tm8[7][0] as i64 * O[0]
+            + evc_tbl_tm8[5][3] as i64 * O[3]) as i32;
+        dst[(7 << log2_line) + j] = (evc_tbl_tm8[7][0] as i64 * O[0]
             + evc_tbl_tm8[7][1] as i64 * O[1]
             + evc_tbl_tm8[7][2] as i64 * O[2]
-            + evc_tbl_tm8[7][3] as i64 * O[3]
-            + add)
-            >> shift) as i32;
+            + evc_tbl_tm8[7][3] as i64 * O[3]) as i32;
     }
 }
-fn tx_pb8b1(src: &[i32], dst: &mut [i16], shift: usize, line: usize) {
+fn tx_pb8b1(src: &[i32], dst: &mut [i16], shift: usize, log2_line: usize) {
     let mut E = [0i64; 4];
     let mut O = [0i64; 4];
     let mut EE = [0i64; 2];
     let mut EO = [0i64; 2];
-    let add = if shift == 0 { 0 } else { 1 << (shift - 1) };
+    let add = 1 << (shift - 1);
 
-    for j in 0..line {
+    for j in 0..(1 << log2_line) {
         /* E and O*/
         for k in 0..4 {
             E[k] = src[j * 8 + k] as i64 + src[j * 8 + 7 - k] as i64;
@@ -204,38 +184,38 @@ fn tx_pb8b1(src: &[i32], dst: &mut [i16], shift: usize, line: usize) {
         EE[1] = E[1] + E[2];
         EO[1] = E[1] - E[2];
 
-        dst[0 * line + j] =
+        dst[(0 << log2_line) + j] =
             ((evc_tbl_tm8[0][0] as i64 * EE[0] + evc_tbl_tm8[0][1] as i64 * EE[1] + add) >> shift)
                 as i16;
-        dst[4 * line + j] =
+        dst[(4 << log2_line) + j] =
             ((evc_tbl_tm8[4][0] as i64 * EE[0] + evc_tbl_tm8[4][1] as i64 * EE[1] + add) >> shift)
                 as i16;
-        dst[2 * line + j] =
+        dst[(2 << log2_line) + j] =
             ((evc_tbl_tm8[2][0] as i64 * EO[0] + evc_tbl_tm8[2][1] as i64 * EO[1] + add) >> shift)
                 as i16;
-        dst[6 * line + j] =
+        dst[(6 << log2_line) + j] =
             ((evc_tbl_tm8[6][0] as i64 * EO[0] + evc_tbl_tm8[6][1] as i64 * EO[1] + add) >> shift)
                 as i16;
 
-        dst[1 * line + j] = ((evc_tbl_tm8[1][0] as i64 * O[0]
+        dst[(1 << log2_line) + j] = ((evc_tbl_tm8[1][0] as i64 * O[0]
             + evc_tbl_tm8[1][1] as i64 * O[1]
             + evc_tbl_tm8[1][2] as i64 * O[2]
             + evc_tbl_tm8[1][3] as i64 * O[3]
             + add)
             >> shift) as i16;
-        dst[3 * line + j] = ((evc_tbl_tm8[3][0] as i64 * O[0]
+        dst[(3 << log2_line) + j] = ((evc_tbl_tm8[3][0] as i64 * O[0]
             + evc_tbl_tm8[3][1] as i64 * O[1]
             + evc_tbl_tm8[3][2] as i64 * O[2]
             + evc_tbl_tm8[3][3] as i64 * O[3]
             + add)
             >> shift) as i16;
-        dst[5 * line + j] = ((evc_tbl_tm8[5][0] as i64 * O[0]
+        dst[(5 << log2_line) + j] = ((evc_tbl_tm8[5][0] as i64 * O[0]
             + evc_tbl_tm8[5][1] as i64 * O[1]
             + evc_tbl_tm8[5][2] as i64 * O[2]
             + evc_tbl_tm8[5][3] as i64 * O[3]
             + add)
             >> shift) as i16;
-        dst[7 * line + j] = ((evc_tbl_tm8[7][0] as i64 * O[0]
+        dst[(7 << log2_line) + j] = ((evc_tbl_tm8[7][0] as i64 * O[0]
             + evc_tbl_tm8[7][1] as i64 * O[1]
             + evc_tbl_tm8[7][2] as i64 * O[2]
             + evc_tbl_tm8[7][3] as i64 * O[3]
@@ -244,16 +224,15 @@ fn tx_pb8b1(src: &[i32], dst: &mut [i16], shift: usize, line: usize) {
     }
 }
 
-fn tx_pb16b0(src: &[i16], dst: &mut [i32], shift: usize, line: usize) {
+fn tx_pb16b0(src: &[i16], dst: &mut [i32], log2_line: usize) {
     let mut E = [0i64; 8];
     let mut O = [0i64; 8];
     let mut EE = [0i64; 4];
     let mut EO = [0i64; 4];
     let mut EEE = [0i64; 2];
     let mut EEO = [0i64; 2];
-    let add = if shift == 0 { 0 } else { 1 << (shift - 1) };
 
-    for j in 0..line {
+    for j in 0..(1 << log2_line) {
         /* E and O*/
         for k in 0..8 {
             E[k] = src[j * 16 + k] as i64 + src[j * 16 + 15 - k] as i64;
@@ -270,52 +249,44 @@ fn tx_pb16b0(src: &[i16], dst: &mut [i32], shift: usize, line: usize) {
         EEE[1] = EE[1] + EE[2];
         EEO[1] = EE[1] - EE[2];
 
-        dst[0 * line + j] =
-            ((evc_tbl_tm16[0][0] as i64 * EEE[0] + evc_tbl_tm16[0][1] as i64 * EEE[1] + add)
-                >> shift) as i32;
-        dst[8 * line + j] =
-            ((evc_tbl_tm16[8][0] as i64 * EEE[0] + evc_tbl_tm16[8][1] as i64 * EEE[1] + add)
-                >> shift) as i32;
-        dst[4 * line + j] =
-            ((evc_tbl_tm16[4][0] as i64 * EEO[0] + evc_tbl_tm16[4][1] as i64 * EEO[1] + add)
-                >> shift) as i32;
-        dst[12 * line + j] =
-            ((evc_tbl_tm16[12][0] as i64 * EEO[0] + evc_tbl_tm16[12][1] as i64 * EEO[1] + add)
-                >> shift) as i32;
+        dst[(0 << log2_line) + j] =
+            (evc_tbl_tm16[0][0] as i64 * EEE[0] + evc_tbl_tm16[0][1] as i64 * EEE[1]) as i32;
+        dst[(8 << log2_line) + j] =
+            (evc_tbl_tm16[8][0] as i64 * EEE[0] + evc_tbl_tm16[8][1] as i64 * EEE[1]) as i32;
+        dst[(4 << log2_line) + j] =
+            (evc_tbl_tm16[4][0] as i64 * EEO[0] + evc_tbl_tm16[4][1] as i64 * EEO[1]) as i32;
+        dst[(12 << log2_line) + j] =
+            (evc_tbl_tm16[12][0] as i64 * EEO[0] + evc_tbl_tm16[12][1] as i64 * EEO[1]) as i32;
 
         for k in (2..16).step_by(4) {
-            dst[k * line + j] = ((evc_tbl_tm16[k][0] as i64 * EO[0]
+            dst[(k << log2_line) + j] = (evc_tbl_tm16[k][0] as i64 * EO[0]
                 + evc_tbl_tm16[k][1] as i64 * EO[1]
                 + evc_tbl_tm16[k][2] as i64 * EO[2]
-                + evc_tbl_tm16[k][3] as i64 * EO[3]
-                + add)
-                >> shift) as i32;
+                + evc_tbl_tm16[k][3] as i64 * EO[3]) as i32;
         }
 
         for k in (1..16).step_by(2) {
-            dst[k * line + j] = ((evc_tbl_tm16[k][0] as i64 * O[0]
+            dst[(k << log2_line) + j] = (evc_tbl_tm16[k][0] as i64 * O[0]
                 + evc_tbl_tm16[k][1] as i64 * O[1]
                 + evc_tbl_tm16[k][2] as i64 * O[2]
                 + evc_tbl_tm16[k][3] as i64 * O[3]
                 + evc_tbl_tm16[k][4] as i64 * O[4]
                 + evc_tbl_tm16[k][5] as i64 * O[5]
                 + evc_tbl_tm16[k][6] as i64 * O[6]
-                + evc_tbl_tm16[k][7] as i64 * O[7]
-                + add)
-                >> shift) as i32;
+                + evc_tbl_tm16[k][7] as i64 * O[7]) as i32;
         }
     }
 }
-fn tx_pb16b1(src: &[i32], dst: &mut [i16], shift: usize, line: usize) {
+fn tx_pb16b1(src: &[i32], dst: &mut [i16], shift: usize, log2_line: usize) {
     let mut E = [0i64; 8];
     let mut O = [0i64; 8];
     let mut EE = [0i64; 4];
     let mut EO = [0i64; 4];
     let mut EEE = [0i64; 2];
     let mut EEO = [0i64; 2];
-    let add = if shift == 0 { 0 } else { 1 << (shift - 1) };
+    let add = 1 << (shift - 1);
 
-    for j in 0..line {
+    for j in 0..(1 << log2_line) {
         /* E and O*/
         for k in 0..8 {
             E[k] = src[j * 16 + k] as i64 + src[j * 16 + 15 - k] as i64;
@@ -332,21 +303,21 @@ fn tx_pb16b1(src: &[i32], dst: &mut [i16], shift: usize, line: usize) {
         EEE[1] = EE[1] + EE[2];
         EEO[1] = EE[1] - EE[2];
 
-        dst[0 * line + j] =
+        dst[(0 << log2_line) + j] =
             ((evc_tbl_tm16[0][0] as i64 * EEE[0] + evc_tbl_tm16[0][1] as i64 * EEE[1] + add)
                 >> shift) as i16;
-        dst[8 * line + j] =
+        dst[(8 << log2_line) + j] =
             ((evc_tbl_tm16[8][0] as i64 * EEE[0] + evc_tbl_tm16[8][1] as i64 * EEE[1] + add)
                 >> shift) as i16;
-        dst[4 * line + j] =
+        dst[(4 << log2_line) + j] =
             ((evc_tbl_tm16[4][0] as i64 * EEO[0] + evc_tbl_tm16[4][1] as i64 * EEO[1] + add)
                 >> shift) as i16;
-        dst[12 * line + j] =
+        dst[(12 << log2_line) + j] =
             ((evc_tbl_tm16[12][0] as i64 * EEO[0] + evc_tbl_tm16[12][1] as i64 * EEO[1] + add)
                 >> shift) as i16;
 
         for k in (2..16).step_by(4) {
-            dst[k * line + j] = ((evc_tbl_tm16[k][0] as i64 * EO[0]
+            dst[(k << log2_line) + j] = ((evc_tbl_tm16[k][0] as i64 * EO[0]
                 + evc_tbl_tm16[k][1] as i64 * EO[1]
                 + evc_tbl_tm16[k][2] as i64 * EO[2]
                 + evc_tbl_tm16[k][3] as i64 * EO[3]
@@ -355,7 +326,7 @@ fn tx_pb16b1(src: &[i32], dst: &mut [i16], shift: usize, line: usize) {
         }
 
         for k in (1..16).step_by(2) {
-            dst[k * line + j] = ((evc_tbl_tm16[k][0] as i64 * O[0]
+            dst[(k << log2_line) + j] = ((evc_tbl_tm16[k][0] as i64 * O[0]
                 + evc_tbl_tm16[k][1] as i64 * O[1]
                 + evc_tbl_tm16[k][2] as i64 * O[2]
                 + evc_tbl_tm16[k][3] as i64 * O[3]
@@ -369,7 +340,7 @@ fn tx_pb16b1(src: &[i32], dst: &mut [i16], shift: usize, line: usize) {
     }
 }
 
-fn tx_pb32b0(src: &[i16], dst: &mut [i32], shift: usize, line: usize) {
+fn tx_pb32b0(src: &[i16], dst: &mut [i32], log2_line: usize) {
     let mut E = [0i64; 16];
     let mut O = [0i64; 16];
     let mut EE = [0i64; 8];
@@ -378,9 +349,8 @@ fn tx_pb32b0(src: &[i16], dst: &mut [i32], shift: usize, line: usize) {
     let mut EEO = [0i64; 4];
     let mut EEEE = [0i64; 2];
     let mut EEEO = [0i64; 2];
-    let add = if shift == 0 { 0 } else { 1 << (shift - 1) };
 
-    for j in 0..line {
+    for j in 0..(1 << log2_line) {
         /* E and O*/
         for k in 0..16 {
             E[k] = src[j * 32 + k] as i64 + src[j * 32 + 31 - k] as i64;
@@ -402,40 +372,33 @@ fn tx_pb32b0(src: &[i16], dst: &mut [i32], shift: usize, line: usize) {
         EEEE[1] = EEE[1] + EEE[2];
         EEEO[1] = EEE[1] - EEE[2];
 
-        dst[0 * line + j] =
-            ((evc_tbl_tm32[0][0] as i64 * EEEE[0] + evc_tbl_tm32[0][1] as i64 * EEEE[1] + add)
-                >> shift) as i32;
-        dst[16 * line + j] =
-            ((evc_tbl_tm32[16][0] as i64 * EEEE[0] + evc_tbl_tm32[16][1] as i64 * EEEE[1] + add)
-                >> shift) as i32;
-        dst[8 * line + j] =
-            ((evc_tbl_tm32[8][0] as i64 * EEEO[0] + evc_tbl_tm32[8][1] as i64 * EEEO[1] + add)
-                >> shift) as i32;
-        dst[24 * line + j] =
-            ((evc_tbl_tm32[24][0] as i64 * EEEO[0] + evc_tbl_tm32[24][1] as i64 * EEEO[1] + add)
-                >> shift) as i32;
+        dst[(0 << log2_line) + j] =
+            (evc_tbl_tm32[0][0] as i64 * EEEE[0] + evc_tbl_tm32[0][1] as i64 * EEEE[1]) as i32;
+        dst[(16 << log2_line) + j] =
+            (evc_tbl_tm32[16][0] as i64 * EEEE[0] + evc_tbl_tm32[16][1] as i64 * EEEE[1]) as i32;
+        dst[(8 << log2_line) + j] =
+            (evc_tbl_tm32[8][0] as i64 * EEEO[0] + evc_tbl_tm32[8][1] as i64 * EEEO[1]) as i32;
+        dst[(24 << log2_line) + j] =
+            (evc_tbl_tm32[24][0] as i64 * EEEO[0] + evc_tbl_tm32[24][1] as i64 * EEEO[1]) as i32;
         for k in (4..32).step_by(8) {
-            dst[k * line + j] = ((evc_tbl_tm32[k][0] as i64 * EEO[0]
+            dst[(k << log2_line) + j] = (evc_tbl_tm32[k][0] as i64 * EEO[0]
                 + evc_tbl_tm32[k][1] as i64 * EEO[1]
                 + evc_tbl_tm32[k][2] as i64 * EEO[2]
-                + evc_tbl_tm32[k][3] as i64 * EEO[3]
-                + add)
-                >> shift) as i32;
+                + evc_tbl_tm32[k][3] as i64 * EEO[3])
+                as i32;
         }
         for k in (2..32).step_by(4) {
-            dst[k * line + j] = ((evc_tbl_tm32[k][0] as i64 * EO[0]
+            dst[(k << log2_line) + j] = (evc_tbl_tm32[k][0] as i64 * EO[0]
                 + evc_tbl_tm32[k][1] as i64 * EO[1]
                 + evc_tbl_tm32[k][2] as i64 * EO[2]
                 + evc_tbl_tm32[k][3] as i64 * EO[3]
                 + evc_tbl_tm32[k][4] as i64 * EO[4]
                 + evc_tbl_tm32[k][5] as i64 * EO[5]
                 + evc_tbl_tm32[k][6] as i64 * EO[6]
-                + evc_tbl_tm32[k][7] as i64 * EO[7]
-                + add)
-                >> shift) as i32;
+                + evc_tbl_tm32[k][7] as i64 * EO[7]) as i32;
         }
         for k in (1..32).step_by(2) {
-            dst[k * line + j] = ((evc_tbl_tm32[k][0] as i64 * O[0]
+            dst[(k << log2_line) + j] = (evc_tbl_tm32[k][0] as i64 * O[0]
                 + evc_tbl_tm32[k][1] as i64 * O[1]
                 + evc_tbl_tm32[k][2] as i64 * O[2]
                 + evc_tbl_tm32[k][3] as i64 * O[3]
@@ -450,13 +413,12 @@ fn tx_pb32b0(src: &[i16], dst: &mut [i32], shift: usize, line: usize) {
                 + evc_tbl_tm32[k][12] as i64 * O[12]
                 + evc_tbl_tm32[k][13] as i64 * O[13]
                 + evc_tbl_tm32[k][14] as i64 * O[14]
-                + evc_tbl_tm32[k][15] as i64 * O[15]
-                + add)
-                >> shift) as i32;
+                + evc_tbl_tm32[k][15] as i64 * O[15])
+                as i32;
         }
     }
 }
-fn tx_pb32b1(src: &[i32], dst: &mut [i16], shift: usize, line: usize) {
+fn tx_pb32b1(src: &[i32], dst: &mut [i16], shift: usize, log2_line: usize) {
     let mut E = [0i64; 16];
     let mut O = [0i64; 16];
     let mut EE = [0i64; 8];
@@ -465,9 +427,9 @@ fn tx_pb32b1(src: &[i32], dst: &mut [i16], shift: usize, line: usize) {
     let mut EEO = [0i64; 4];
     let mut EEEE = [0i64; 2];
     let mut EEEO = [0i64; 2];
-    let add = if shift == 0 { 0 } else { 1 << (shift - 1) };
+    let add = 1 << (shift - 1);
 
-    for j in 0..line {
+    for j in 0..(1 << log2_line) {
         /* E and O*/
         for k in 0..16 {
             E[k] = src[j * 32 + k] as i64 + src[j * 32 + 31 - k] as i64;
@@ -489,20 +451,20 @@ fn tx_pb32b1(src: &[i32], dst: &mut [i16], shift: usize, line: usize) {
         EEEE[1] = EEE[1] + EEE[2];
         EEEO[1] = EEE[1] - EEE[2];
 
-        dst[0 * line + j] =
+        dst[(0 << log2_line) + j] =
             ((evc_tbl_tm32[0][0] as i64 * EEEE[0] + evc_tbl_tm32[0][1] as i64 * EEEE[1] + add)
                 >> shift) as i16;
-        dst[16 * line + j] =
+        dst[(16 << log2_line) + j] =
             ((evc_tbl_tm32[16][0] as i64 * EEEE[0] + evc_tbl_tm32[16][1] as i64 * EEEE[1] + add)
                 >> shift) as i16;
-        dst[8 * line + j] =
+        dst[(8 << log2_line) + j] =
             ((evc_tbl_tm32[8][0] as i64 * EEEO[0] + evc_tbl_tm32[8][1] as i64 * EEEO[1] + add)
                 >> shift) as i16;
-        dst[24 * line + j] =
+        dst[(24 << log2_line) + j] =
             ((evc_tbl_tm32[24][0] as i64 * EEEO[0] + evc_tbl_tm32[24][1] as i64 * EEEO[1] + add)
                 >> shift) as i16;
         for k in (4..32).step_by(8) {
-            dst[k * line + j] = ((evc_tbl_tm32[k][0] as i64 * EEO[0]
+            dst[(k << log2_line) + j] = ((evc_tbl_tm32[k][0] as i64 * EEO[0]
                 + evc_tbl_tm32[k][1] as i64 * EEO[1]
                 + evc_tbl_tm32[k][2] as i64 * EEO[2]
                 + evc_tbl_tm32[k][3] as i64 * EEO[3]
@@ -510,7 +472,7 @@ fn tx_pb32b1(src: &[i32], dst: &mut [i16], shift: usize, line: usize) {
                 >> shift) as i16;
         }
         for k in (2..32).step_by(4) {
-            dst[k * line + j] = ((evc_tbl_tm32[k][0] as i64 * EO[0]
+            dst[(k << log2_line) + j] = ((evc_tbl_tm32[k][0] as i64 * EO[0]
                 + evc_tbl_tm32[k][1] as i64 * EO[1]
                 + evc_tbl_tm32[k][2] as i64 * EO[2]
                 + evc_tbl_tm32[k][3] as i64 * EO[3]
@@ -522,7 +484,7 @@ fn tx_pb32b1(src: &[i32], dst: &mut [i16], shift: usize, line: usize) {
                 >> shift) as i16;
         }
         for k in (1..32).step_by(2) {
-            dst[k * line + j] = ((evc_tbl_tm32[k][0] as i64 * O[0]
+            dst[(k << log2_line) + j] = ((evc_tbl_tm32[k][0] as i64 * O[0]
                 + evc_tbl_tm32[k][1] as i64 * O[1]
                 + evc_tbl_tm32[k][2] as i64 * O[2]
                 + evc_tbl_tm32[k][3] as i64 * O[3]
@@ -544,7 +506,7 @@ fn tx_pb32b1(src: &[i32], dst: &mut [i16], shift: usize, line: usize) {
     }
 }
 
-fn tx_pb64b0(src: &[i16], dst: &mut [i32], shift: usize, line: usize) {
+fn tx_pb64b0(src: &[i16], dst: &mut [i32], log2_line: usize) {
     let mut E = [0i64; 32];
     let mut O = [0i64; 32];
     let mut EE = [0i64; 16];
@@ -555,9 +517,8 @@ fn tx_pb64b0(src: &[i16], dst: &mut [i32], shift: usize, line: usize) {
     let mut EEEO = [0i64; 4];
     let mut EEEEE = [0i64; 2];
     let mut EEEEO = [0i64; 2];
-    let add = if shift == 0 { 0 } else { 1 << (shift - 1) };
 
-    for j in 0..line {
+    for j in 0..(1 << log2_line) {
         for k in 0..32 {
             E[k] = src[j * 64 + k] as i64 + src[j * 64 + 63 - k] as i64;
             O[k] = src[j * 64 + k] as i64 - src[j * 64 + 63 - k] as i64;
@@ -579,48 +540,44 @@ fn tx_pb64b0(src: &[i16], dst: &mut [i32], shift: usize, line: usize) {
         EEEEE[1] = EEEE[1] + EEEE[2];
         EEEEO[1] = EEEE[1] - EEEE[2];
 
-        dst[0 * line + j] =
-            ((evc_tbl_tm64[0][0] as i64 * EEEEE[0] + evc_tbl_tm64[0][1] as i64 * EEEEE[1] + add)
-                >> shift) as i32;
-        dst[16 * line + j] =
-            ((evc_tbl_tm64[16][0] as i64 * EEEEO[0] + evc_tbl_tm64[16][1] as i64 * EEEEO[1] + add)
-                >> shift) as i32;
-        dst[32 * line + j] = 0;
-        dst[48 * line + j] = 0;
+        dst[(0 << log2_line) + j] =
+            (evc_tbl_tm64[0][0] as i64 * EEEEE[0] + evc_tbl_tm64[0][1] as i64 * EEEEE[1]) as i32;
+        dst[(16 << log2_line) + j] =
+            (evc_tbl_tm64[16][0] as i64 * EEEEO[0] + evc_tbl_tm64[16][1] as i64 * EEEEO[1]) as i32;
+        dst[(32 << log2_line) + j] = 0;
+        dst[(48 << log2_line) + j] = 0;
 
         for k in (8..64).step_by(16) {
             if k > 31 {
-                dst[k * line + j] = 0;
+                dst[(k << log2_line) + j] = 0;
             } else {
-                dst[k * line + j] = ((evc_tbl_tm64[k][0] as i64 * EEEO[0]
+                dst[(k << log2_line) + j] = (evc_tbl_tm64[k][0] as i64 * EEEO[0]
                     + evc_tbl_tm64[k][1] as i64 * EEEO[1]
                     + evc_tbl_tm64[k][2] as i64 * EEEO[2]
-                    + evc_tbl_tm64[k][3] as i64 * EEEO[3]
-                    + add)
-                    >> shift) as i32;
+                    + evc_tbl_tm64[k][3] as i64 * EEEO[3])
+                    as i32;
             }
         }
         for k in (4..64).step_by(8) {
             if k > 31 {
-                dst[k * line + j] = 0;
+                dst[(k << log2_line) + j] = 0;
             } else {
-                dst[k * line + j] = ((evc_tbl_tm64[k][0] as i64 * EEO[0]
+                dst[(k << log2_line) + j] = (evc_tbl_tm64[k][0] as i64 * EEO[0]
                     + evc_tbl_tm64[k][1] as i64 * EEO[1]
                     + evc_tbl_tm64[k][2] as i64 * EEO[2]
                     + evc_tbl_tm64[k][3] as i64 * EEO[3]
                     + evc_tbl_tm64[k][4] as i64 * EEO[4]
                     + evc_tbl_tm64[k][5] as i64 * EEO[5]
                     + evc_tbl_tm64[k][6] as i64 * EEO[6]
-                    + evc_tbl_tm64[k][7] as i64 * EEO[7]
-                    + add)
-                    >> shift) as i32;
+                    + evc_tbl_tm64[k][7] as i64 * EEO[7])
+                    as i32;
             }
         }
         for k in (2..64).step_by(4) {
             if k > 31 {
-                dst[k * line + j] = 0;
+                dst[(k << log2_line) + j] = 0;
             } else {
-                dst[k * line + j] = ((evc_tbl_tm64[k][0] as i64 * EO[0]
+                dst[(k << log2_line) + j] = (evc_tbl_tm64[k][0] as i64 * EO[0]
                     + evc_tbl_tm64[k][1] as i64 * EO[1]
                     + evc_tbl_tm64[k][2] as i64 * EO[2]
                     + evc_tbl_tm64[k][3] as i64 * EO[3]
@@ -635,16 +592,15 @@ fn tx_pb64b0(src: &[i16], dst: &mut [i32], shift: usize, line: usize) {
                     + evc_tbl_tm64[k][12] as i64 * EO[12]
                     + evc_tbl_tm64[k][13] as i64 * EO[13]
                     + evc_tbl_tm64[k][14] as i64 * EO[14]
-                    + evc_tbl_tm64[k][15] as i64 * EO[15]
-                    + add)
-                    >> shift) as i32;
+                    + evc_tbl_tm64[k][15] as i64 * EO[15])
+                    as i32;
             }
         }
         for k in (1..64).step_by(2) {
             if k > 31 {
-                dst[k * line + j] = 0;
+                dst[(k << log2_line) + j] = 0;
             } else {
-                dst[k * line + j] = ((evc_tbl_tm64[k][0] as i64 * O[0]
+                dst[(k << log2_line) + j] = (evc_tbl_tm64[k][0] as i64 * O[0]
                     + evc_tbl_tm64[k][1] as i64 * O[1]
                     + evc_tbl_tm64[k][2] as i64 * O[2]
                     + evc_tbl_tm64[k][3] as i64 * O[3]
@@ -675,14 +631,13 @@ fn tx_pb64b0(src: &[i16], dst: &mut [i32], shift: usize, line: usize) {
                     + evc_tbl_tm64[k][28] as i64 * O[28]
                     + evc_tbl_tm64[k][29] as i64 * O[29]
                     + evc_tbl_tm64[k][30] as i64 * O[30]
-                    + evc_tbl_tm64[k][31] as i64 * O[31]
-                    + add)
-                    >> shift) as i32;
+                    + evc_tbl_tm64[k][31] as i64 * O[31])
+                    as i32;
             }
         }
     }
 }
-fn tx_pb64b1(src: &[i32], dst: &mut [i16], shift: usize, line: usize) {
+fn tx_pb64b1(src: &[i32], dst: &mut [i16], shift: usize, log2_line: usize) {
     let mut E = [0i64; 32];
     let mut O = [0i64; 32];
     let mut EE = [0i64; 16];
@@ -695,7 +650,7 @@ fn tx_pb64b1(src: &[i32], dst: &mut [i16], shift: usize, line: usize) {
     let mut EEEEO = [0i64; 2];
     let add = if shift == 0 { 0 } else { 1 << (shift - 1) };
 
-    for j in 0..line {
+    for j in 0..(1 << log2_line) {
         for k in 0..32 {
             E[k] = src[j * 64 + k] as i64 + src[j * 64 + 63 - k] as i64;
             O[k] = src[j * 64 + k] as i64 - src[j * 64 + 63 - k] as i64;
@@ -717,20 +672,20 @@ fn tx_pb64b1(src: &[i32], dst: &mut [i16], shift: usize, line: usize) {
         EEEEE[1] = EEEE[1] + EEEE[2];
         EEEEO[1] = EEEE[1] - EEEE[2];
 
-        dst[0 * line + j] =
+        dst[(0 << log2_line) + j] =
             ((evc_tbl_tm64[0][0] as i64 * EEEEE[0] + evc_tbl_tm64[0][1] as i64 * EEEEE[1] + add)
                 >> shift) as i16;
-        dst[16 * line + j] =
+        dst[(16 << log2_line) + j] =
             ((evc_tbl_tm64[16][0] as i64 * EEEEO[0] + evc_tbl_tm64[16][1] as i64 * EEEEO[1] + add)
                 >> shift) as i16;
-        dst[32 * line + j] = 0;
-        dst[48 * line + j] = 0;
+        dst[(32 << log2_line) + j] = 0;
+        dst[(48 << log2_line) + j] = 0;
 
         for k in (8..64).step_by(16) {
             if k > 31 {
-                dst[k * line + j] = 0;
+                dst[(k << log2_line) + j] = 0;
             } else {
-                dst[k * line + j] = ((evc_tbl_tm64[k][0] as i64 * EEEO[0]
+                dst[(k << log2_line) + j] = ((evc_tbl_tm64[k][0] as i64 * EEEO[0]
                     + evc_tbl_tm64[k][1] as i64 * EEEO[1]
                     + evc_tbl_tm64[k][2] as i64 * EEEO[2]
                     + evc_tbl_tm64[k][3] as i64 * EEEO[3]
@@ -740,9 +695,9 @@ fn tx_pb64b1(src: &[i32], dst: &mut [i16], shift: usize, line: usize) {
         }
         for k in (4..64).step_by(8) {
             if k > 31 {
-                dst[k * line + j] = 0;
+                dst[(k << log2_line) + j] = 0;
             } else {
-                dst[k * line + j] = ((evc_tbl_tm64[k][0] as i64 * EEO[0]
+                dst[(k << log2_line) + j] = ((evc_tbl_tm64[k][0] as i64 * EEO[0]
                     + evc_tbl_tm64[k][1] as i64 * EEO[1]
                     + evc_tbl_tm64[k][2] as i64 * EEO[2]
                     + evc_tbl_tm64[k][3] as i64 * EEO[3]
@@ -756,9 +711,9 @@ fn tx_pb64b1(src: &[i32], dst: &mut [i16], shift: usize, line: usize) {
         }
         for k in (2..64).step_by(4) {
             if k > 31 {
-                dst[k * line + j] = 0;
+                dst[(k << log2_line) + j] = 0;
             } else {
-                dst[k * line + j] = ((evc_tbl_tm64[k][0] as i64 * EO[0]
+                dst[(k << log2_line) + j] = ((evc_tbl_tm64[k][0] as i64 * EO[0]
                     + evc_tbl_tm64[k][1] as i64 * EO[1]
                     + evc_tbl_tm64[k][2] as i64 * EO[2]
                     + evc_tbl_tm64[k][3] as i64 * EO[3]
@@ -780,9 +735,9 @@ fn tx_pb64b1(src: &[i32], dst: &mut [i16], shift: usize, line: usize) {
         }
         for k in (1..64).step_by(2) {
             if k > 31 {
-                dst[k * line + j] = 0;
+                dst[(k << log2_line) + j] = 0;
             } else {
-                dst[k * line + j] = ((evc_tbl_tm64[k][0] as i64 * O[0]
+                dst[(k << log2_line) + j] = ((evc_tbl_tm64[k][0] as i64 * O[0]
                     + evc_tbl_tm64[k][1] as i64 * O[1]
                     + evc_tbl_tm64[k][2] as i64 * O[2]
                     + evc_tbl_tm64[k][3] as i64 * O[3]
@@ -821,8 +776,8 @@ fn tx_pb64b1(src: &[i32], dst: &mut [i16], shift: usize, line: usize) {
     }
 }
 
-type EVC_TXB0 = fn(src: &[i16], dst: &mut [i32], shift: usize, line: usize);
-type EVC_TXB1 = fn(src: &[i32], dst: &mut [i16], shift: usize, line: usize);
+type EVC_TXB0 = fn(src: &[i16], dst: &mut [i32], log2_line: usize);
+type EVC_TXB1 = fn(src: &[i32], dst: &mut [i16], shift: usize, log2_line: usize);
 
 static tbl_txb0: [EVC_TXB0; MAX_TR_LOG2] = [
     tx_pb2b0, tx_pb4b0, tx_pb8b0, tx_pb16b0, tx_pb32b0, tx_pb64b0,
@@ -836,8 +791,8 @@ fn evce_trans(coef: &mut [i16], log2_cuw: usize, log2_cuh: usize) {
     let shift2 = evc_get_transform_shift(log2_cuh, 1);
 
     let mut tb = [0i32; MAX_TR_DIM]; /* temp buffer */
-    tbl_txb0[log2_cuw - 1](coef, &mut tb, 0, 1 << log2_cuh);
-    tbl_txb1[log2_cuh - 1](&tb, coef, (shift1 + shift2), 1 << log2_cuw);
+    tbl_txb0[log2_cuw - 1](coef, &mut tb, log2_cuh);
+    tbl_txb1[log2_cuh - 1](&tb, coef, (shift1 + shift2), log2_cuw);
 }
 
 fn get_ic_rate_cost_rl(

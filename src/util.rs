@@ -250,7 +250,6 @@ pub(crate) fn evc_get_avail_intra(
     let log2_scuh = log2_cuh as usize - MIN_CU_LOG2;
     let scuw = 1 << log2_scuw;
     let scuh = 1 << log2_scuh;
-    let curr_scup = x_scu + y_scu * w_scu;
 
     if x_scu > 0 && map_scu[(scup - 1) as usize].GET_COD() != 0 {
         SET_AVAIL(&mut avail, AVAIL_LE);
