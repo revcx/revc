@@ -168,9 +168,8 @@ impl<T: Pixel> Plane<T> {
         let xorigin =
             xpad.align_power_of_two(Self::STRIDE_ALIGNMENT_LOG2 + 1 - mem::size_of::<T>());
         let yorigin = ypad;
-        let stride = (xorigin + width + xpad).align_power_of_two(
-      Self::STRIDE_ALIGNMENT_LOG2 + 1 - mem::size_of::<T>()
-    );
+        let stride = (xorigin + width + xpad)
+            .align_power_of_two(Self::STRIDE_ALIGNMENT_LOG2 + 1 - mem::size_of::<T>());
         let alloc_height = yorigin + height + ypad;
         let data = PlaneData::new(stride * alloc_height);
 
