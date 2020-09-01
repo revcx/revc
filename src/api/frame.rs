@@ -217,14 +217,14 @@ impl<T: Pixel> Frame<T> {
         //TODO: support Monochrome
         Frame {
             planes: [
-                Plane::new(width, height, 0, 0, PIC_PAD_SIZE_L, MIN_CU_LOG2),
+                Plane::new(width, height, 0, 0, PIC_PAD_SIZE_L, PIC_PAD_SIZE_L),
                 Plane::new(
                     (width + 1) >> 1,
                     (height + 1) >> 1,
                     1,
                     1,
                     PIC_PAD_SIZE_C,
-                    MIN_CU_LOG2 - 1,
+                    PIC_PAD_SIZE_C,
                 ),
                 Plane::new(
                     (width + 1) >> 1,
@@ -232,7 +232,7 @@ impl<T: Pixel> Frame<T> {
                     1,
                     1,
                     PIC_PAD_SIZE_C,
-                    MIN_CU_LOG2 - 1,
+                    PIC_PAD_SIZE_C,
                 ),
             ],
             chroma_sampling,

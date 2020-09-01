@@ -154,20 +154,24 @@ where
 }
 
 impl<T: Pixel> Plane<T> {
+    /// Stride alignment in bytes.
+    const STRIDE_ALIGNMENT_LOG2: usize = 5;
+
     pub fn new(
         width: usize,
         height: usize,
         xdec: usize,
         ydec: usize,
-        pad: usize,
-        align_log2: usize,
+        xpad: usize,
+        ypad: usize,
     ) -> Self {
-        let xpad = pad;
-        let ypad = pad;
-        let xorigin = pad;
-        let yorigin = pad;
-        let stride = xorigin + xpad + (width.align_power_of_two(align_log2));
-        let alloc_height = yorigin + ypad + (height.align_power_of_two(align_log2));
+        let xorigin =
+            xpad.align_power_of_two(Self::STRIDE_ALIGNMENT_LOG2 + 1 - mem::size_of::<T>());
+        let yorigin = ypad;
+        let stride = (xorigin + width + xpad).align_power_of_two(
+      Self::STRIDE_ALIGNMENT_LOG2 + 1 - mem::size_of::<T>()
+    );
+        let alloc_height = yorigin + height + ypad;
         let data = PlaneData::new(stride * alloc_height);
 
         Plane {
