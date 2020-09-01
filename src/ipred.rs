@@ -67,8 +67,7 @@ pub(crate) fn evc_get_nbr_b(
         if IS_AVAIL(avail_cu, AVAIL_UP_LE)
             && (!constrained_intra_pred || map_scu[scup - w_scu - 1].GET_IF() != 0)
         {
-            //evc_mcpy(up - 1, src - s_src - 1, cuw * sizeof(pel));
-            up_left[0..cuw].copy_from_slice(&src[y - 1][x - 1..x - 1 + cuw]);
+            up_left[0] = src[y - 1][x - 1];
         } else {
             up_left[0] = (1 << (BIT_DEPTH - 1)) as pel;
         }
