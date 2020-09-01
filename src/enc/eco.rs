@@ -395,11 +395,10 @@ pub(crate) fn evce_eco_pred_mode(
     sbac: &mut EvceSbac,
     sbac_ctx: &mut EvcSbacCtx,
     pred_mode: PredMode,
-    ctx: usize,
 ) {
     sbac.encode_bin(
         bs,
-        &mut sbac_ctx.pred_mode[ctx],
+        &mut sbac_ctx.pred_mode[0],
         if pred_mode == PredMode::MODE_INTRA {
             1
         } else {
@@ -664,15 +663,14 @@ pub(crate) fn evce_eco_skip_flag(
     sbac: &mut EvceSbac,
     sbac_ctx: &mut EvcSbacCtx,
     flag: u32,
-    ctx: usize,
 ) {
-    sbac.encode_bin(bs, &mut sbac_ctx.skip_flag[ctx], flag);
+    sbac.encode_bin(bs, &mut sbac_ctx.skip_flag[0], flag);
 
     EVC_TRACE_COUNTER(&mut bs.tracer);
     EVC_TRACE(&mut bs.tracer, "skip flag ");
     EVC_TRACE(&mut bs.tracer, flag);
     EVC_TRACE(&mut bs.tracer, " ctx ");
-    EVC_TRACE(&mut bs.tracer, ctx);
+    EVC_TRACE(&mut bs.tracer, 0);
     EVC_TRACE(&mut bs.tracer, " \n");
 }
 

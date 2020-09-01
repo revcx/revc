@@ -615,7 +615,6 @@ pub(crate) fn evc_mc(
     mv: &[[i16; MV_D]; REFP_NUM],
     refp: &Vec<Vec<EvcRefP>>,
     pred: &mut [CUBuffer<pel>; 2],
-    poc_c: i32,
 ) {
     let mut bidx = 0;
     let mut mv_t = [[0i16; MV_D]; REFP_NUM];

@@ -18,26 +18,25 @@ fn evc_recon_plane_region(
 ) {
     if !is_coef {
         /* just copy pred to rec */
+        let mut src = pred;
         for j in 0..cuh {
-            for i in 0..cuw {
-                rec[y + j][x + i] = EVC_CLIP3(0, (1 << BIT_DEPTH) - 1, pred[j * cuw + i]);
-            }
+            let dst = &mut rec[y + j];
+            dst[x..x + cuw].copy_from_slice(&src[..cuw]);
+            src = &src[cuw..];
         }
-    //#if SIMD_CLIP
-    //        clip_simd(rec, s_rec, rec, s_rec, cuw, cuh, adapt_clip_min[adapt_clip_comp], adapt_clip_max[adapt_clip_comp]);
-    //#endif
-    } else
-    /* add b/w pred and coef and copy it into rec */
-    {
+    } else {
+        /* add b/w pred and coef and copy it into rec */
+        let mut src1 = coef;
+        let mut src2 = pred;
         for j in 0..cuh {
+            let dst = &mut rec[y + j];
             for i in 0..cuw {
-                let t0 = coef[j * cuw + i] as i32 + pred[j * cuw + i] as i32;
-                rec[y + j][x + i] = EVC_CLIP3(0i32, ((1 << BIT_DEPTH) - 1) as i32, t0) as u16;
+                let t0 = src1[i] as i32 + src2[i] as i32;
+                dst[x + i] = EVC_CLIP3(0i32, ((1 << BIT_DEPTH) - 1) as i32, t0) as u16;
             }
+            src1 = &src1[cuw..];
+            src2 = &src2[cuw..];
         }
-        //#if SIMD_CLIP
-        //        clip_simd(rec, s_rec, rec, s_rec, cuw, cuh, adapt_clip_min[adapt_clip_comp], adapt_clip_max[adapt_clip_comp]);
-        //#endif
     }
 
     TRACE_RECO_PLANE_REGION(tracer, ch_type, x, y, cuw, cuh, rec);
@@ -55,26 +54,22 @@ pub(crate) fn evc_recon(
 ) {
     if !is_coef {
         /* just copy pred to rec */
+        let cuwh = cuw * cuh;
+        rec[..cuwh].copy_from_slice(&pred[..cuwh]);
+    } else {
+        /* add b/w pred and coef and copy it into rec */
+        let mut src1 = coef;
+        let mut src2 = pred;
+        let mut dst = &mut rec[..];
         for j in 0..cuh {
             for i in 0..cuw {
-                rec[j * cuw + i] = EVC_CLIP3(0, (1 << BIT_DEPTH) - 1, pred[j * cuw + i]);
+                let t0 = src1[i] as i32 + src2[i] as i32;
+                dst[i] = EVC_CLIP3(0i32, ((1 << BIT_DEPTH) - 1) as i32, t0) as u16;
             }
+            src1 = &src1[cuw..];
+            src2 = &src2[cuw..];
+            dst = &mut dst[cuw..];
         }
-    //#if SIMD_CLIP
-    //        clip_simd(rec, s_rec, rec, s_rec, cuw, cuh, adapt_clip_min[adapt_clip_comp], adapt_clip_max[adapt_clip_comp]);
-    //#endif
-    } else
-    /* add b/w pred and coef and copy it into rec */
-    {
-        for j in 0..cuh {
-            for i in 0..cuw {
-                let t0 = coef[j * cuw + i] as i32 + pred[j * cuw + i] as i32;
-                rec[j * cuw + i] = EVC_CLIP3(0i32, ((1 << BIT_DEPTH) - 1) as i32, t0) as u16;
-            }
-        }
-        //#if SIMD_CLIP
-        //        clip_simd(rec, s_rec, rec, s_rec, cuw, cuh, adapt_clip_min[adapt_clip_comp], adapt_clip_max[adapt_clip_comp]);
-        //#endif
     }
 
     TRACE_RECO(tracer, ch_type, cuw, cuh, rec);
@@ -103,16 +98,13 @@ pub(crate) fn evc_recon_yuv(
     cuw >>= 1;
     cuh >>= 1;
 
-    {
-        let rec = &mut planes[U_C].as_region_mut();
-        evc_recon_plane_region(
-            tracer, &coef[U_C], &pred[U_C], nnz[U_C], x, y, cuw, cuh, rec, U_C,
-        );
-    }
-    {
-        let rec = &mut planes[V_C].as_region_mut();
-        evc_recon_plane_region(
-            tracer, &coef[V_C], &pred[V_C], nnz[V_C], x, y, cuw, cuh, rec, V_C,
-        );
-    }
+    let rec = &mut planes[U_C].as_region_mut();
+    evc_recon_plane_region(
+        tracer, &coef[U_C], &pred[U_C], nnz[U_C], x, y, cuw, cuh, rec, U_C,
+    );
+
+    let rec = &mut planes[V_C].as_region_mut();
+    evc_recon_plane_region(
+        tracer, &coef[V_C], &pred[V_C], nnz[V_C], x, y, cuw, cuh, rec, V_C,
+    );
 }

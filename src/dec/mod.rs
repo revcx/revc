@@ -29,74 +29,57 @@ use sbac::*;
  *****************************************************************************/
 #[derive(Default)]
 pub(crate) struct EvcdCore {
-    /************** current CU **************/
+    /************** LCU-based processing **************/
+    top_mcu: Vec<MCU>, //[Width/MIN_CU_SIZE]
+    lft_mcu: Vec<MCU>, //[MAX_CU_SIZE/MIN_CU_SIZE]
+    // intra prediction pixel line buffer
+    top_pel: Vec<Vec<pel>>, //[N_C][Width]
+    lft_pel: Vec<Vec<pel>>, //[N_C][MAX_CU_SIZE]
+
     /* coefficient buffer of current CU */
-    coef: CUBuffer<i16>, //[[i16; MAX_CU_DIM]; N_C], //[N_C][MAX_CU_DIM]
+    coef: CUBuffer<i16>, //[N_C][MAX_CU_DIM]
     /* pred buffer of current CU */
     /* [1] is used for bi-pred. */
-    pred: [CUBuffer<pel>; 2], //[[[pel; MAX_CU_DIM]; N_C]; 2], //[2][N_C][MAX_CU_DIM]
+    pred: [CUBuffer<pel>; 2], //[2][N_C][MAX_CU_DIM]
 
+    // deblocking line buffer
+    //TODO:
+
+    /************** Frame-based processing **************/
+
+    /************** current CU **************/
     /* neighbor pixel buffer for intra prediction */
     nb: NBBuffer<pel>, // [N_C][N_REF][MAX_CU_SIZE * 3];
+
+    /* prediction mode of current CU: INTRA, INTER, ... */
+    pred_mode: PredMode,
+
+    /* intra prediction direction of current CU */
+    ipm: [IntraPredDir; 2],
+
+    // inter prediction
+    inter_dir: InterPredDir,
     /* reference index for current CU */
     refi: [i8; REFP_NUM],
     /* motion vector for current CU */
     mv: [[i16; MV_D]; REFP_NUM],
+    mvp_idx: [u8; REFP_NUM],
+    mvd: [[i16; MV_D]; REFP_NUM],
 
-    /* CU position in current frame in SCU unit */
-    scup: u32,
-    /* CU position X in a frame in SCU unit */
-    x_scu: u16,
-    /* CU position Y in a frame in SCU unit */
-    y_scu: u16,
-    /* neighbor CUs availability of current CU */
-    avail_cu: u16,
-    /* Left, right availability of current CU */
-    avail_lr: u16,
-    /* intra prediction direction of current CU */
-    ipm: [IntraPredDir; 2],
-    /* most probable mode for intra prediction */
-    mpm_b_list: &'static [u8],
-    //mpm: [u8; 2],
-    //mpm_ext: [u8; 8],
-    //pims: [IntraPredDir; IntraPredDir::IPD_CNT_B as usize], /* probable intra mode set*/
-    /* prediction mode of current CU: INTRA, INTER, ... */
-    pred_mode: PredMode,
-    /* log2 of cuw */
-    log2_cuw: u8,
-    /* log2 of cuh */
-    log2_cuh: u8,
     /* is there coefficient? */
     is_coef: [bool; N_C],
 
-    /* QP for Luma of current encoding MB */
+    /* QP for current encoding MB */
+    qp: u8,
     qp_y: u8,
-    /* QP for Chroma of current encoding MB */
     qp_u: u8,
     qp_v: u8,
 
-    qp: u8,
-    cu_qp_delta_code: u8,
     cu_qp_delta_is_coded: bool,
 
     /************** current LCU *************/
-    /* address of current LCU,  */
-    lcu_num: u16,
-    /* X address of current LCU */
-    x_lcu: u16,
-    /* Y address of current LCU */
-    y_lcu: u16,
-    /* left pel position of current LCU */
-    x_pel: u16,
-    /* top pel position of current LCU */
-    y_pel: u16,
     /* split mode map for current LCU */
     split_mode: LcuSplitMode,
-
-    mvp_idx: [u8; REFP_NUM],
-    mvd: [[i16; MV_D]; REFP_NUM],
-    inter_dir: InterPredDir,
-    ctx_flags: [u8; NUM_CNID],
 
     evc_tbl_qp_chroma_dynamic_ext: Vec<Vec<i8>>, // [[i8; MAX_QP_TABLE_SIZE_EXT]; 2],
 }
@@ -110,44 +93,9 @@ pub(crate) struct EvcdCtx {
     /* input packet */
     pkt: Option<Packet>,
 
-    /* EVCD identifier */
-    //EVCD                    id;
     /* CORE information used for fast operation */
     core: EvcdCore,
-    /* current decoding bitstream */
-    bs: EvcdBsr,
-    /* current nalu header */
-    nalu: EvcNalu,
-    /* current slice header */
-    sh: EvcSh,
-    /* decoded picture buffer management */
-    dpm: Option<EvcPm>,
-    /* create descriptor */
-    //EVCD_CDSC               cdsc;
-    /* sequence parameter set */
-    sps: EvcSps,
-    /* picture parameter set */
-    pps: EvcPps,
-    /* current decoded (decoding) picture buffer */
-    pic: Option<Rc<RefCell<EvcPic>>>,
-    /* SBAC */
-    sbac_dec: EvcdSbac,
-    sbac_ctx: EvcSbacCtx,
-    /* decoding picture width */
-    w: u16,
-    /* decoding picture height */
-    h: u16,
-    /* decoding chroma sampling */
-    cs: ChromaSampling,
-    /* maximum CU width and height */
-    max_cuwh: u16,
-    /* log2 of maximum CU width and height */
-    log2_max_cuwh: u8,
 
-    /* minimum CU width and height */
-    min_cuwh: u16,
-    /* log2 of minimum CU width and height */
-    log2_min_cuwh: u8,
     /* MAPS *******************************************************************/
     /* SCU map for CU information */
     map_scu: Vec<MCU>,
@@ -159,8 +107,33 @@ pub(crate) struct EvcdCtx {
     map_refi: Option<Rc<RefCell<Vec<[i8; REFP_NUM]>>>>,
     /* intra prediction modes */
     map_ipm: Vec<IntraPredDir>,
-    /* new coding tool flag*/
-    map_cu_mode: Vec<MCU>,
+
+    /* *******************************************************************/
+    /* current decoding bitstream */
+    bs: EvcdBsr,
+    /* SBAC */
+    sbac_dec: EvcdSbac,
+    sbac_ctx: EvcSbacCtx,
+
+    /* current nalu header */
+    nalu: EvcNalu,
+    /* current slice header */
+    sh: EvcSh,
+    /* decoded picture buffer management */
+    dpm: Option<EvcPm>,
+    /* sequence parameter set */
+    sps: EvcSps,
+    /* picture parameter set */
+    pps: EvcPps,
+    /* current decoded (decoding) picture buffer */
+    pic: Option<Rc<RefCell<EvcPic>>>,
+    /* decoding picture width */
+    w: u16,
+    /* decoding picture height */
+    h: u16,
+    /* decoding chroma sampling */
+    cs: ChromaSampling,
+
     /**************************************************************************/
     /* current slice number, which is increased whenever decoding a slice.
     when receiving a slice for new picture, this value is set to zero.
@@ -184,11 +157,11 @@ pub(crate) struct EvcdCtx {
     poc: EvcPoc,
     /* the number of currently decoded pictures */
     pic_cnt: u32,
-    /* flag whether current picture is refecened picture or not */
+    /* flag whether current picture is referenced picture or not */
     slice_ref_flag: bool,
     /* distance between ref pics in addition to closest ref ref pic in LD*/
     ref_pic_gap_length: u32,
-    /* reference picture (0: foward, 1: backward) */
+    /* reference picture (0: forward, 1: backward) */
     refp: Vec<Vec<EvcRefP>>, //[[EvcRefP; REFP_NUM]; MAX_NUM_REF_PICS],
     /* flag to indicate opl decoder output */
     num_ctb: u32,
@@ -208,43 +181,9 @@ impl EvcdCtx {
         EvcdCtx {
             pkt: None,
 
-            /* EVCD identifier */
-            //EVCD                    id;
             /* CORE information used for fast operation */
             core: EvcdCore::default(),
-            /* current decoding bitstream */
-            bs: EvcdBsr::default(),
-            /* current nalu header */
-            nalu: EvcNalu::default(),
-            /* current slice header */
-            sh: EvcSh::default(),
-            /* decoded picture buffer management */
-            dpm: None,
-            /* create descriptor */
-            //EVCD_CDSC               cdsc;
-            /* sequence parameter set */
-            sps: EvcSps::default(),
-            /* picture parameter set */
-            pps: EvcPps::default(),
-            /* current decoded (decoding) picture buffer */
-            pic: None,
-            /* SBAC */
-            sbac_dec: EvcdSbac::default(),
-            sbac_ctx: EvcSbacCtx::default(),
-            /* decoding picture width */
-            w: 0,
-            /* decoding picture height */
-            h: 0,
-            cs: ChromaSampling::Cs400,
-            /* maximum CU width and height */
-            max_cuwh: 0,
-            /* log2 of maximum CU width and height */
-            log2_max_cuwh: 0,
 
-            /* minimum CU width and height */
-            min_cuwh: 0,
-            /* log2 of minimum CU width and height */
-            log2_min_cuwh: 0,
             /* MAPS *******************************************************************/
             /* SCU map for CU information */
             map_scu: vec![],
@@ -256,8 +195,32 @@ impl EvcdCtx {
             map_refi: None,
             /* intra prediction modes */
             map_ipm: vec![],
-            /* new coding tool flag*/
-            map_cu_mode: vec![],
+
+            /**************************************************************************/
+            /* current decoding bitstream */
+            bs: EvcdBsr::default(),
+            /* SBAC */
+            sbac_dec: EvcdSbac::default(),
+            sbac_ctx: EvcSbacCtx::default(),
+
+            /* current nalu header */
+            nalu: EvcNalu::default(),
+            /* current slice header */
+            sh: EvcSh::default(),
+            /* decoded picture buffer management */
+            dpm: None,
+            /* sequence parameter set */
+            sps: EvcSps::default(),
+            /* picture parameter set */
+            pps: EvcPps::default(),
+            /* current decoded (decoding) picture buffer */
+            pic: None,
+            /* decoding picture width */
+            w: 0,
+            /* decoding picture height */
+            h: 0,
+            cs: ChromaSampling::Cs400,
+
             /**************************************************************************/
             /* current slice number, which is increased whenever decoding a slice.
             when receiving a slice for new picture, this value is set to zero.
@@ -301,27 +264,31 @@ impl EvcdCtx {
             self.h = self.sps.pic_height_in_luma_samples;
             self.cs = self.sps.chroma_format_idc.into();
             assert_eq!(self.sps.sps_btt_flag, false);
-
-            self.max_cuwh = 1 << 6;
-            self.min_cuwh = 1 << 2;
-
-            self.log2_max_cuwh = CONV_LOG2(self.max_cuwh as usize);
-            self.log2_min_cuwh = CONV_LOG2(self.min_cuwh as usize);
         }
 
-        let size = self.max_cuwh;
-        self.w_lcu = (self.w + (size - 1)) / size;
-        self.h_lcu = (self.h + (size - 1)) / size;
+        self.w_lcu = (self.w + (MAX_CU_SIZE as u16 - 1)) / MAX_CU_SIZE as u16;
+        self.h_lcu = (self.h + (MAX_CU_SIZE as u16 - 1)) / MAX_CU_SIZE as u16;
         self.f_lcu = (self.w_lcu * self.h_lcu) as u32;
         self.w_scu = (self.w + ((1 << MIN_CU_LOG2) - 1) as u16) >> MIN_CU_LOG2 as u16;
         self.h_scu = (self.h + ((1 << MIN_CU_LOG2) - 1) as u16) >> MIN_CU_LOG2 as u16;
         self.f_scu = (self.w_scu * self.h_scu) as u32;
 
+        // Top/Left Line Buffer
+        self.core.top_mcu = vec![MCU::default(); self.w_scu as usize];
+        self.core.top_pel = vec![
+            vec![0; self.w as usize],
+            vec![0; (self.w >> 1) as usize],
+            vec![0; (self.w >> 1) as usize],
+        ];
+        self.core.lft_mcu = vec![MCU::default(); MAX_CU_SIZE / MIN_CU_SIZE];
+        self.core.lft_pel = vec![
+            vec![0; MAX_CU_SIZE],
+            vec![0; MAX_CU_SIZE >> 1],
+            vec![0; MAX_CU_SIZE >> 1],
+        ];
+
         /* alloc SCU map */
         self.map_scu = vec![MCU::default(); self.f_scu as usize];
-
-        /* alloc cu mode SCU map */
-        self.map_cu_mode = vec![MCU::default(); self.f_scu as usize];
 
         /* alloc map for CU split flag */
         self.map_split = vec![LcuSplitMode::default(); self.f_lcu as usize];
@@ -334,11 +301,7 @@ impl EvcdCtx {
 
         /* initialize decode picture manager */
         let mut dpm = EvcPm::new(self.w as usize, self.h as usize, self.cs);
-        dpm.evc_picman_init(
-            MAX_PB_SIZE as u8,
-            MAX_NUM_REF_PICS as u8,
-            //PICBUF_ALLOCATOR * pa
-        )?;
+        dpm.evc_picman_init(MAX_PB_SIZE as u8, MAX_NUM_REF_PICS as u8)?;
         self.dpm = Some(dpm);
 
         if self.sps.chroma_qp_table_struct.chroma_qp_table_present_flag {
@@ -357,11 +320,6 @@ impl EvcdCtx {
     }
 
     fn slice_init(&mut self) {
-        self.core.lcu_num = 0;
-        self.core.x_lcu = 0;
-        self.core.y_lcu = 0;
-        self.core.x_pel = 0;
-        self.core.y_pel = 0;
         self.core.qp = self.sh.qp;
         self.core.qp_y = self.sh.qp + (6 * (BIT_DEPTH - 8)) as u8;
         self.core.qp_u = (self.core.evc_tbl_qp_chroma_dynamic_ext[0]
@@ -374,7 +332,6 @@ impl EvcdCtx {
         /* clear maps */
         for i in 0..self.f_scu as usize {
             self.map_scu[i] = MCU::default();
-            self.map_cu_mode[i] = MCU::default();
         }
 
         if self.sh.slice_type == SliceType::EVC_ST_I {
@@ -382,669 +339,14 @@ impl EvcdCtx {
         }
     }
 
-    fn update_core_loc_param(&mut self) {
-        self.core.x_pel = self.core.x_lcu << self.log2_max_cuwh as u16; // entry point's x location in pixel
-        self.core.y_pel = self.core.y_lcu << self.log2_max_cuwh as u16; // entry point's y location in pixel
-        self.core.x_scu = self.core.x_lcu << (MAX_CU_LOG2 - MIN_CU_LOG2) as u16; // set x_scu location
-        self.core.y_scu = self.core.y_lcu << (MAX_CU_LOG2 - MIN_CU_LOG2) as u16; // set y_scu location
-        self.core.lcu_num = self.core.x_lcu + self.core.y_lcu * self.w_lcu; // Init the first lcu_num in tile
-    }
-
-    fn evcd_set_dec_info(&mut self) {
-        let w_scu = self.w_scu as usize;
-        let scup = self.core.scup as usize;
-        let w_cu = (1 << self.core.log2_cuw as usize) >> MIN_CU_LOG2;
-        let h_cu = (1 << self.core.log2_cuh as usize) >> MIN_CU_LOG2;
-        let flag = if self.core.pred_mode == PredMode::MODE_INTRA {
-            1
-        } else {
-            0
-        };
-
-        if let (Some(map_refi), Some(map_mv)) = (&mut self.map_refi, &mut self.map_mv) {
-            let (mut refis, mut mvs) = (map_refi.borrow_mut(), map_mv.borrow_mut());
-
-            for i in 0..h_cu {
-                let map_scu = &mut self.map_scu[scup + i * w_scu..];
-                let map_ipm = &mut self.map_ipm[scup + i * w_scu..];
-                let map_cu_mode = &mut self.map_cu_mode[scup + i * w_scu..];
-                let refi = &mut refis[scup + i * w_scu..];
-                let mv = &mut mvs[scup + i * w_scu..];
-
-                for j in 0..w_cu {
-                    if self.core.pred_mode == PredMode::MODE_SKIP {
-                        map_scu[j].SET_SF();
-                    } else {
-                        map_scu[j].CLR_SF();
-                    }
-                    if self.core.is_coef[Y_C] {
-                        map_scu[j].SET_CBFL();
-                    } else {
-                        map_scu[j].CLR_CBFL();
-                    }
-
-                    map_cu_mode[j].SET_LOGW(self.core.log2_cuw as u32);
-                    map_cu_mode[j].SET_LOGH(self.core.log2_cuh as u32);
-
-                    if self.pps.cu_qp_delta_enabled_flag {
-                        map_scu[j].RESET_QP();
-                    }
-                    map_scu[j].SET_IF_COD_SN_QP(flag, self.slice_num as u32, self.core.qp);
-
-                    map_ipm[j] = self.core.ipm[0];
-
-                    refi[j][REFP_0] = self.core.refi[REFP_0];
-                    refi[j][REFP_1] = self.core.refi[REFP_1];
-                    mv[j][REFP_0][MV_X] = self.core.mv[REFP_0][MV_X];
-                    mv[j][REFP_0][MV_Y] = self.core.mv[REFP_0][MV_Y];
-                    mv[j][REFP_1][MV_X] = self.core.mv[REFP_1][MV_X];
-                    mv[j][REFP_1][MV_Y] = self.core.mv[REFP_1][MV_Y];
-                }
-            }
-        }
-    }
-
-    fn evcd_eco_coef(&mut self) -> Result<(), EvcError> {
-        let core = &mut self.core;
-        let bs = &mut self.bs;
-        let sbac = &mut self.sbac_dec;
-        let sbac_ctx = &mut self.sbac_ctx;
-
-        let mut cbf = [false; N_C];
-        let mut b_no_cbf = false;
-
-        let log2_cuw = core.log2_cuw;
-        let log2_cuh = core.log2_cuh;
-
-        let mut tmp_coef = [0; N_C];
-        let is_sub = false;
-        let mut cbf_all = true;
-
-        if cbf_all {
-            eco_cbf(
-                bs,
-                sbac,
-                sbac_ctx,
-                core.pred_mode,
-                &mut cbf,
-                b_no_cbf,
-                is_sub,
-                0,
-                &mut cbf_all,
-            )?;
-        } else {
-            cbf[Y_C] = false;
-            cbf[U_C] = false;
-            cbf[V_C] = false;
-        }
-
-        let mut dqp = 0;
-        if self.pps.cu_qp_delta_enabled_flag
-            && (((!(self.sps.dquant_flag)
-                || (core.cu_qp_delta_code == 1 && !core.cu_qp_delta_is_coded))
-                && (cbf[Y_C] || cbf[U_C] || cbf[V_C]))
-                || (core.cu_qp_delta_code == 2 && !core.cu_qp_delta_is_coded))
-        {
-            dqp = evcd_eco_dqp(bs, sbac, sbac_ctx)?;
-            core.cu_qp_delta_is_coded = true;
-        } else {
-            dqp = 0;
-        }
-        core.qp = GET_QP(core.qp as i8, dqp) as u8;
-        core.qp_y = GET_LUMA_QP(core.qp as i8) as u8;
-
-        let qp_i_cb = EVC_CLIP3(
-            -6 * (BIT_DEPTH as i8 - 8),
-            57,
-            (core.qp as i8 + self.sh.qp_u_offset) as i8,
-        );
-        let qp_i_cr = EVC_CLIP3(
-            -6 * (BIT_DEPTH as i8 - 8),
-            57,
-            (core.qp as i8 + self.sh.qp_v_offset) as i8,
-        );
-        core.qp_u = (core.evc_tbl_qp_chroma_dynamic_ext[0]
-            [(EVC_TBL_CHROMA_QP_OFFSET + qp_i_cb) as usize]
-            + (6 * (BIT_DEPTH - 8)) as i8) as u8;
-        core.qp_v = (core.evc_tbl_qp_chroma_dynamic_ext[1]
-            [(EVC_TBL_CHROMA_QP_OFFSET + qp_i_cr) as usize]
-            + (6 * (BIT_DEPTH - 8)) as i8) as u8;
-
-        for c in 0..N_C {
-            if cbf[c] {
-                let chroma = if c > 0 { 1 } else { 0 };
-                evcd_eco_xcoef(
-                    bs,
-                    sbac,
-                    sbac_ctx,
-                    &mut core.coef.data[c],
-                    log2_cuw - chroma,
-                    log2_cuh - chroma,
-                    c,
-                )?;
-
-                tmp_coef[c] += 1;
-            } else {
-                tmp_coef[c] += 0;
-            }
-        }
-
-        for c in 0..N_C {
-            core.is_coef[c] = if tmp_coef[c] != 0 { true } else { false };
-        }
-
-        Ok(())
-    }
-
-    fn evcd_eco_cu(&mut self) -> Result<(), EvcError> {
-        let core = &mut self.core;
-        let bs = &mut self.bs;
-        let sbac = &mut self.sbac_dec;
-        let sbac_ctx = &mut self.sbac_ctx;
-
-        core.refi[REFP_0] = 0;
-        core.refi[REFP_1] = 0;
-        core.mv[REFP_0][MV_X] = 0;
-        core.mv[REFP_0][MV_Y] = 0;
-        core.mv[REFP_1][MV_X] = 0;
-        core.mv[REFP_1][MV_Y] = 0;
-
-        core.pred_mode = PredMode::MODE_INTRA;
-        core.mvp_idx[REFP_0] = 0;
-        core.mvp_idx[REFP_1] = 0;
-        core.inter_dir = InterPredDir::PRED_L0;
-        for i in 0..REFP_NUM {
-            for j in 0..MV_D {
-                core.mvd[i][j] = 0;
-            }
-        }
-
-        let cuw = 1 << core.log2_cuw as u16;
-        let cuh = 1 << core.log2_cuh as u16;
-        core.avail_lr = evc_check_nev_avail(
-            core.x_scu,
-            core.y_scu,
-            cuw,
-            //cuh,
-            self.w_scu,
-            //self.h_scu,
-            &self.map_scu,
-        );
-
-        if self.sh.slice_type != SliceType::EVC_ST_I {
-            /* CU skip flag */
-            let cu_skip_flag = evcd_eco_cu_skip_flag(bs, sbac, sbac_ctx, &core.ctx_flags)?;
-            if cu_skip_flag != 0 {
-                core.pred_mode = PredMode::MODE_SKIP;
-            }
-        }
-
-        /* parse prediction info */
-        if core.pred_mode == PredMode::MODE_SKIP {
-            core.mvp_idx[REFP_0] = evcd_eco_mvp_idx(bs, sbac, sbac_ctx)?;
-            if self.sh.slice_type == SliceType::EVC_ST_B {
-                core.mvp_idx[REFP_1] = evcd_eco_mvp_idx(bs, sbac, sbac_ctx)?;
-            }
-
-            core.is_coef[Y_C] = false;
-            core.is_coef[U_C] = false;
-            core.is_coef[V_C] = false;
-
-            core.qp = self.sh.qp;
-            core.qp_y = GET_LUMA_QP(core.qp as i8) as u8;
-            let qp_i_cb = EVC_CLIP3(
-                -6 * (BIT_DEPTH - 8) as i8,
-                57,
-                core.qp as i8 + self.sh.qp_u_offset,
-            );
-            let qp_i_cr = EVC_CLIP3(
-                -6 * (BIT_DEPTH - 8) as i8,
-                57,
-                core.qp as i8 + self.sh.qp_v_offset,
-            );
-
-            core.qp_u = (core.evc_tbl_qp_chroma_dynamic_ext[0]
-                [(EVC_TBL_CHROMA_QP_OFFSET + qp_i_cb) as usize]
-                + (6 * (BIT_DEPTH - 8)) as i8) as u8;
-            core.qp_v = (core.evc_tbl_qp_chroma_dynamic_ext[1]
-                [(EVC_TBL_CHROMA_QP_OFFSET + qp_i_cr) as usize]
-                + (6 * (BIT_DEPTH - 8)) as i8) as u8;
-        } else {
-            core.pred_mode =
-                evcd_eco_pred_mode(bs, sbac, sbac_ctx, &core.ctx_flags, self.sh.slice_type)?;
-
-            if core.pred_mode == PredMode::MODE_INTER {
-                //TODO: bugfix? missing SLICE_TYPE==B for direct_mode_flag?
-                core.inter_dir = evcd_eco_direct_mode_flag(bs, sbac, sbac_ctx)?;
-
-                if core.inter_dir != InterPredDir::PRED_DIR {
-                    /* inter_pred_idc */
-                    core.inter_dir =
-                        evcd_eco_inter_pred_idc(bs, sbac, sbac_ctx, self.sh.slice_type)?;
-
-                    for inter_dir_idx in 0..2 {
-                        /* 0: forward, 1: backward */
-                        if (((core.inter_dir as usize + 1) >> inter_dir_idx) & 1) != 0 {
-                            core.refi[inter_dir_idx] = evcd_eco_refi(
-                                bs,
-                                sbac,
-                                sbac_ctx,
-                                self.dpm.as_ref().unwrap().num_refp[inter_dir_idx],
-                            )? as i8;
-                            core.mvp_idx[inter_dir_idx] = evcd_eco_mvp_idx(bs, sbac, sbac_ctx)?;
-                            evcd_eco_get_mvd(bs, sbac, sbac_ctx, &mut core.mvd[inter_dir_idx])?;
-                        }
-                    }
-                }
-            } else if core.pred_mode == PredMode::MODE_INTRA {
-                core.mpm_b_list = evc_get_mpm_b(
-                    core.x_scu,
-                    core.y_scu,
-                    &self.map_scu,
-                    &self.map_ipm,
-                    core.scup,
-                    self.w_scu,
-                );
-
-                let mut luma_ipm = IntraPredDir::IPD_DC_B;
-                core.ipm[0] = evcd_eco_intra_dir_b(bs, sbac, sbac_ctx, core.mpm_b_list)?.into();
-                luma_ipm = core.ipm[0];
-                core.ipm[1] = luma_ipm;
-
-                core.refi[REFP_0] = REFI_INVALID;
-                core.refi[REFP_1] = REFI_INVALID;
-                core.mv[REFP_0][MV_X] = 0;
-                core.mv[REFP_0][MV_Y] = 0;
-                core.mv[REFP_1][MV_X] = 0;
-                core.mv[REFP_1][MV_Y] = 0;
-            } else {
-                evc_assert_rv(false, EvcError::EVC_ERR_MALFORMED_BITSTREAM)?;
-            }
-
-            /* clear coefficient buffer */
-            for i in 0..(cuw * cuh) as usize {
-                core.coef.data[Y_C][i] = 0;
-            }
-            for i in 0..((cuw >> 1) * (cuh >> 1)) as usize {
-                core.coef.data[U_C][i] = 0;
-                core.coef.data[V_C][i] = 0;
-            }
-
-            /* parse coefficients */
-            self.evcd_eco_coef()?;
-        }
-
-        Ok(())
-    }
-
-    fn evcd_itdq(&mut self) {
-        let mut core = &mut self.core;
-        evc_sub_block_itdq(
-            &mut self.bs.tracer,
-            &mut core.coef.data,
-            core.log2_cuw,
-            core.log2_cuh,
-            core.qp_y,
-            core.qp_u,
-            core.qp_v,
-            &core.is_coef,
-        );
-    }
-
-    fn get_nbr_yuv(&mut self, mut x: u16, mut y: u16, mut cuw: u8, mut cuh: u8) {
-        let constrained_intra_flag =
-            self.core.pred_mode == PredMode::MODE_INTRA && self.pps.constrained_intra_pred_flag;
-
-        if let Some(pic) = &self.pic {
-            let frame = &pic.borrow().frame;
-            let planes = &frame.borrow().planes;
-            /* Y */
-            evc_get_nbr_b(
-                x as usize,
-                y as usize,
-                cuw as usize,
-                cuh as usize,
-                &planes[Y_C].as_region(),
-                self.core.avail_cu,
-                &mut self.core.nb.data[Y_C],
-                self.core.scup as usize,
-                &self.map_scu,
-                self.w_scu as usize,
-                self.h_scu as usize,
-                Y_C,
-                constrained_intra_flag,
-            );
-
-            cuw >>= 1;
-            cuh >>= 1;
-            x >>= 1;
-            y >>= 1;
-
-            /* U */
-            evc_get_nbr_b(
-                x as usize,
-                y as usize,
-                cuw as usize,
-                cuh as usize,
-                &planes[U_C].as_region(),
-                self.core.avail_cu,
-                &mut self.core.nb.data[U_C],
-                self.core.scup as usize,
-                &self.map_scu,
-                self.w_scu as usize,
-                self.h_scu as usize,
-                U_C,
-                constrained_intra_flag,
-            );
-
-            /* V */
-            evc_get_nbr_b(
-                x as usize,
-                y as usize,
-                cuw as usize,
-                cuh as usize,
-                &planes[V_C].as_region(),
-                self.core.avail_cu,
-                &mut self.core.nb.data[V_C],
-                self.core.scup as usize,
-                &self.map_scu,
-                self.w_scu as usize,
-                self.h_scu as usize,
-                V_C,
-                constrained_intra_flag,
-            );
-        }
-    }
-
-    fn evcd_get_skip_motion(&mut self, cuw: u8, cuh: u8) {
-        let mut srefi = [[0i8; MAX_NUM_MVP]; REFP_NUM];
-        let mut smvp = [[[0i16; MV_D]; MAX_NUM_MVP]; REFP_NUM];
-
-        let core = &mut self.core;
-        let map_mv = self.map_mv.as_ref().unwrap().borrow();
-
-        evc_get_motion(
-            core.scup as usize,
-            REFP_0,
-            &*map_mv,
-            &self.refp,
-            cuw as usize,
-            cuh as usize,
-            self.w_scu as usize,
-            core.avail_cu,
-            &mut srefi[REFP_0],
-            &mut smvp[REFP_0],
-        );
-
-        core.refi[REFP_0] = srefi[REFP_0][core.mvp_idx[REFP_0] as usize];
-
-        core.mv[REFP_0][MV_X] = smvp[REFP_0][core.mvp_idx[REFP_0] as usize][MV_X];
-        core.mv[REFP_0][MV_Y] = smvp[REFP_0][core.mvp_idx[REFP_0] as usize][MV_Y];
-
-        if self.sh.slice_type == SliceType::EVC_ST_P {
-            core.refi[REFP_1] = REFI_INVALID;
-            core.mv[REFP_1][MV_X] = 0;
-            core.mv[REFP_1][MV_Y] = 0;
-        } else {
-            evc_get_motion(
-                core.scup as usize,
-                REFP_1,
-                &*map_mv,
-                &self.refp,
-                cuw as usize,
-                cuh as usize,
-                self.w_scu as usize,
-                core.avail_cu,
-                &mut srefi[REFP_1],
-                &mut smvp[REFP_1],
-            );
-
-            core.refi[REFP_1] = srefi[REFP_1][core.mvp_idx[REFP_1] as usize];
-            core.mv[REFP_1][MV_X] = smvp[REFP_1][core.mvp_idx[REFP_1] as usize][MV_X];
-            core.mv[REFP_1][MV_Y] = smvp[REFP_1][core.mvp_idx[REFP_1] as usize][MV_Y];
-        }
-    }
-
-    fn evcd_get_inter_motion(&mut self, cuw: u8, cuh: u8) {
-        let mut mvp = [[0i16; MV_D]; MAX_NUM_MVP];
-        let mut refi = [0i8; MAX_NUM_MVP];
-
-        let core = &mut self.core;
-        let map_mv = self.map_mv.as_ref().unwrap().borrow();
-
-        for inter_dir_idx in 0..2 {
-            /* 0: forward, 1: backward */
-            if (((core.inter_dir as usize + 1) >> inter_dir_idx) & 1) != 0 {
-                evc_get_motion(
-                    core.scup as usize,
-                    inter_dir_idx,
-                    &*map_mv,
-                    &self.refp,
-                    cuw as usize,
-                    cuh as usize,
-                    self.w_scu as usize,
-                    core.avail_cu,
-                    &mut refi,
-                    &mut mvp,
-                );
-                core.mv[inter_dir_idx][MV_X] =
-                    mvp[core.mvp_idx[inter_dir_idx] as usize][MV_X] + core.mvd[inter_dir_idx][MV_X];
-                core.mv[inter_dir_idx][MV_Y] =
-                    mvp[core.mvp_idx[inter_dir_idx] as usize][MV_Y] + core.mvd[inter_dir_idx][MV_Y];
-            } else {
-                core.refi[inter_dir_idx] = REFI_INVALID;
-                core.mv[inter_dir_idx][MV_X] = 0;
-                core.mv[inter_dir_idx][MV_Y] = 0;
-            }
-        }
-    }
-
-    fn evcd_eco_unit(
+    fn evcd_eco_tree(
         &mut self,
         x: u16,
         y: u16,
         log2_cuw: u8,
         log2_cuh: u8,
-    ) -> Result<(), EvcError> {
-        let cuw = 1 << log2_cuw;
-        let cuh = 1 << log2_cuh;
-
-        //entropy decoding
-        {
-            let core = &mut self.core;
-            let bs = &mut self.bs;
-            let sbac = &mut self.sbac_dec;
-
-            core.log2_cuw = log2_cuw;
-            core.log2_cuh = log2_cuh;
-            core.x_scu = PEL2SCU(x as usize) as u16;
-            core.y_scu = PEL2SCU(y as usize) as u16;
-            core.scup = core.x_scu as u32 + core.y_scu as u32 * self.w_scu as u32;
-
-            EVC_TRACE_COUNTER(&mut bs.tracer);
-            EVC_TRACE(&mut bs.tracer, "poc: ");
-            EVC_TRACE(&mut bs.tracer, self.poc.poc_val);
-            EVC_TRACE(&mut bs.tracer, " x pos ");
-            EVC_TRACE(&mut bs.tracer, x);
-            EVC_TRACE(&mut bs.tracer, " y pos ");
-            EVC_TRACE(&mut bs.tracer, y);
-            EVC_TRACE(&mut bs.tracer, " width ");
-            EVC_TRACE(&mut bs.tracer, cuw);
-            EVC_TRACE(&mut bs.tracer, " height ");
-            EVC_TRACE(&mut bs.tracer, cuh);
-            EVC_TRACE(&mut bs.tracer, " \n");
-
-            /* parse CU info */
-            self.evcd_eco_cu()?;
-        }
-
-        /* inverse transform and dequantization */
-        if self.core.pred_mode != PredMode::MODE_SKIP {
-            self.evcd_itdq();
-        }
-
-        /* prediction */
-        if self.core.pred_mode != PredMode::MODE_INTRA {
-            self.core.avail_cu = evc_get_avail_inter(
-                self.core.x_scu as usize,
-                self.core.y_scu as usize,
-                self.w_scu as usize,
-                self.h_scu as usize,
-                self.core.scup as usize,
-                cuw as usize,
-                cuh as usize,
-                &self.map_scu,
-            );
-            if self.core.pred_mode == PredMode::MODE_SKIP {
-                self.evcd_get_skip_motion(cuw, cuh);
-            } else {
-                if self.core.inter_dir == InterPredDir::PRED_DIR {
-                    evc_get_mv_dir(
-                        &self.refp[0],
-                        self.poc.poc_val,
-                        self.core.scup as usize
-                            + ((1 << (self.core.log2_cuw as usize - MIN_CU_LOG2)) - 1)
-                            + ((1 << (self.core.log2_cuh as usize - MIN_CU_LOG2)) - 1)
-                                * self.w_scu as usize,
-                        self.core.scup as usize,
-                        self.w_scu,
-                        self.h_scu,
-                        &mut self.core.mv,
-                    );
-                    self.core.refi[REFP_0] = 0;
-                    self.core.refi[REFP_1] = 0;
-                } else {
-                    self.evcd_get_inter_motion(cuw, cuh);
-                }
-            }
-
-            EVC_TRACE_COUNTER(&mut self.bs.tracer);
-            EVC_TRACE(&mut self.bs.tracer, "Inter: ");
-            EVC_TRACE(&mut self.bs.tracer, self.core.inter_dir as isize);
-            EVC_TRACE(&mut self.bs.tracer, " , mv[REFP_0]:( ");
-            EVC_TRACE(&mut self.bs.tracer, self.core.mv[REFP_0][MV_X]);
-            EVC_TRACE(&mut self.bs.tracer, " , ");
-            EVC_TRACE(&mut self.bs.tracer, self.core.mv[REFP_0][MV_Y]);
-            EVC_TRACE(&mut self.bs.tracer, " ), mv[REFP_1]:( ");
-            EVC_TRACE(&mut self.bs.tracer, self.core.mv[REFP_1][MV_X]);
-            EVC_TRACE(&mut self.bs.tracer, " , ");
-            EVC_TRACE(&mut self.bs.tracer, self.core.mv[REFP_1][MV_Y]);
-            EVC_TRACE(&mut self.bs.tracer, " )\n");
-
-            evc_mc(
-                x as i16,
-                y as i16,
-                self.w as i16,
-                self.h as i16,
-                cuw as i16,
-                cuh as i16,
-                &self.core.refi,
-                &self.core.mv,
-                &self.refp,
-                &mut self.core.pred,
-                self.poc.poc_val,
-            );
-        } else {
-            self.core.avail_cu = evc_get_avail_intra(
-                self.core.x_scu as usize,
-                self.core.y_scu as usize,
-                self.w_scu as usize,
-                self.h_scu as usize,
-                self.core.scup as usize,
-                self.core.log2_cuw,
-                self.core.log2_cuh,
-                &self.map_scu,
-            );
-            self.get_nbr_yuv(x, y, cuw, cuh);
-
-            EVC_TRACE_COUNTER(&mut self.bs.tracer);
-            EVC_TRACE(&mut self.bs.tracer, "Intra: ");
-            EVC_TRACE(&mut self.bs.tracer, self.core.ipm[0] as isize);
-            EVC_TRACE(&mut self.bs.tracer, " , ");
-            EVC_TRACE(&mut self.bs.tracer, self.core.ipm[1] as isize);
-            EVC_TRACE(&mut self.bs.tracer, " \n");
-
-            evc_ipred_b(
-                &self.core.nb.data[Y_C][0][2..],
-                &self.core.nb.data[Y_C][1][cuh as usize..],
-                self.core.nb.data[Y_C][1][cuh as usize - 1],
-                &mut self.core.pred[0].data[Y_C],
-                self.core.ipm[0],
-                cuw as usize,
-                cuh as usize,
-            );
-
-            evc_ipred_b(
-                &self.core.nb.data[U_C][0][2..],
-                &self.core.nb.data[U_C][1][(cuh >> 1) as usize..],
-                self.core.nb.data[U_C][1][(cuh >> 1) as usize - 1],
-                &mut self.core.pred[0].data[U_C],
-                self.core.ipm[1],
-                cuw as usize >> 1,
-                cuh as usize >> 1,
-            );
-            evc_ipred_b(
-                &self.core.nb.data[V_C][0][2..],
-                &self.core.nb.data[V_C][1][(cuh >> 1) as usize..],
-                self.core.nb.data[V_C][1][(cuh >> 1) as usize - 1],
-                &mut self.core.pred[0].data[V_C],
-                self.core.ipm[1],
-                cuw as usize >> 1,
-                cuh as usize >> 1,
-            );
-        }
-        self.evcd_set_dec_info();
-
-        TRACE_PRED(
-            &mut self.bs.tracer,
-            Y_C,
-            cuw as usize,
-            cuh as usize,
-            &self.core.pred[0].data[Y_C],
-        );
-        TRACE_PRED(
-            &mut self.bs.tracer,
-            U_C,
-            cuw as usize >> 1,
-            cuh as usize >> 1,
-            &self.core.pred[0].data[U_C],
-        );
-        TRACE_PRED(
-            &mut self.bs.tracer,
-            V_C,
-            cuw as usize >> 1,
-            cuh as usize >> 1,
-            &self.core.pred[0].data[V_C],
-        );
-
-        /* reconstruction */
-        if let Some(pic) = &self.pic {
-            evc_recon_yuv(
-                &mut self.bs.tracer,
-                x as usize,
-                y as usize,
-                cuw as usize,
-                cuh as usize,
-                &self.core.coef.data,
-                &self.core.pred[0].data,
-                &self.core.is_coef,
-                &mut pic.borrow().frame.borrow_mut().planes,
-            );
-        }
-
-        Ok(())
-    }
-
-    fn evcd_eco_tree(
-        &mut self,
-        x0: u16,
-        y0: u16,
-        log2_cuw: u8,
-        log2_cuh: u8,
         cup: u16,
         cud: u16,
-        next_split: bool,
-        qt_depth: u8,
         mut cu_qp_delta_code: u8,
     ) -> Result<(), EvcError> {
         let core = &mut self.core;
@@ -1052,59 +354,51 @@ impl EvcdCtx {
         let sbac = &mut self.sbac_dec;
         let sbac_ctx = &mut self.sbac_ctx;
 
-        let cuw = 1 << log2_cuw as u16;
-        let cuh = 1 << log2_cuh as u16;
+        let cuw = 1u16 << log2_cuw;
+        let cuh = 1u16 << log2_cuh;
         let mut split_mode = SplitMode::NO_SPLIT;
-        if cuw > self.min_cuwh || cuh > self.min_cuwh {
-            if x0 + cuw <= self.w && y0 + cuh <= self.h {
-                if next_split {
-                    split_mode = evcd_eco_split_mode(bs, sbac, sbac_ctx, cuw, cuh)?;
-                    EVC_TRACE_COUNTER(&mut bs.tracer);
-                    EVC_TRACE(&mut bs.tracer, "x pos ");
-                    EVC_TRACE(
-                        &mut bs.tracer,
-                        core.x_pel
-                            + (cup % (self.max_cuwh >> MIN_CU_LOG2 as u16) << MIN_CU_LOG2 as u16),
-                    );
-                    EVC_TRACE(&mut bs.tracer, " y pos ");
-                    EVC_TRACE(
-                        &mut bs.tracer,
-                        core.y_pel
-                            + (cup / (self.max_cuwh >> MIN_CU_LOG2 as u16) << MIN_CU_LOG2 as u16),
-                    );
-                    EVC_TRACE(&mut bs.tracer, " width ");
-                    EVC_TRACE(&mut bs.tracer, cuw);
-                    EVC_TRACE(&mut bs.tracer, " height ");
-                    EVC_TRACE(&mut bs.tracer, cuh);
-                    EVC_TRACE(&mut bs.tracer, " depth ");
-                    EVC_TRACE(&mut bs.tracer, cud);
-                    EVC_TRACE(&mut bs.tracer, " split mode ");
-                    EVC_TRACE(
-                        &mut bs.tracer,
-                        if split_mode == SplitMode::NO_SPLIT {
-                            0
-                        } else {
-                            5
-                        },
-                    );
-                    EVC_TRACE(&mut bs.tracer, " \n");
-                } else {
-                    split_mode = SplitMode::NO_SPLIT;
-                }
+        if cuw > MIN_CU_SIZE as u16 || cuh > MIN_CU_SIZE as u16 {
+            if x + cuw <= self.w && y + cuh <= self.h {
+                split_mode = evcd_eco_split_mode(bs, sbac, sbac_ctx, cuw, cuh)?;
+                EVC_TRACE_COUNTER(&mut bs.tracer);
+                EVC_TRACE(&mut bs.tracer, "x pos ");
+                EVC_TRACE(
+                    &mut bs.tracer,
+                    x + (cup % (MAX_CU_SIZE as u16 >> MIN_CU_LOG2) << MIN_CU_LOG2 as u16),
+                );
+                EVC_TRACE(&mut bs.tracer, " y pos ");
+                EVC_TRACE(
+                    &mut bs.tracer,
+                    y + (cup / (MAX_CU_SIZE as u16 >> MIN_CU_LOG2) << MIN_CU_LOG2 as u16),
+                );
+                EVC_TRACE(&mut bs.tracer, " width ");
+                EVC_TRACE(&mut bs.tracer, cuw);
+                EVC_TRACE(&mut bs.tracer, " height ");
+                EVC_TRACE(&mut bs.tracer, cuh);
+                EVC_TRACE(&mut bs.tracer, " depth ");
+                EVC_TRACE(&mut bs.tracer, cud);
+                EVC_TRACE(&mut bs.tracer, " split mode ");
+                EVC_TRACE(
+                    &mut bs.tracer,
+                    if split_mode == SplitMode::NO_SPLIT {
+                        0
+                    } else {
+                        5
+                    },
+                );
+                EVC_TRACE(&mut bs.tracer, " \n");
             } else {
                 split_mode = evcd_eco_split_mode(bs, sbac, sbac_ctx, cuw, cuh)?;
                 EVC_TRACE_COUNTER(&mut bs.tracer);
                 EVC_TRACE(&mut bs.tracer, "x pos ");
                 EVC_TRACE(
                     &mut bs.tracer,
-                    core.x_pel
-                        + (cup % (self.max_cuwh >> MIN_CU_LOG2 as u16) << MIN_CU_LOG2 as u16),
+                    x + (cup % (MAX_CU_SIZE as u16 >> MIN_CU_LOG2) << MIN_CU_LOG2 as u16),
                 );
                 EVC_TRACE(&mut bs.tracer, " y pos ");
                 EVC_TRACE(
                     &mut bs.tracer,
-                    core.y_pel
-                        + (cup / (self.max_cuwh >> MIN_CU_LOG2 as u16) << MIN_CU_LOG2 as u16),
+                    y + (cup / (MAX_CU_SIZE as u16 >> MIN_CU_LOG2) << MIN_CU_LOG2 as u16),
                 );
                 EVC_TRACE(&mut bs.tracer, " width ");
                 EVC_TRACE(&mut bs.tracer, cuw);
@@ -1130,13 +424,8 @@ impl EvcdCtx {
         if self.pps.cu_qp_delta_enabled_flag && self.sps.dquant_flag {
             if split_mode == SplitMode::NO_SPLIT
                 && (log2_cuh + log2_cuw >= self.pps.cu_qp_delta_area)
-                && cu_qp_delta_code != 2
             {
-                if log2_cuh == 7 || log2_cuw == 7 {
-                    cu_qp_delta_code = 2;
-                } else {
-                    cu_qp_delta_code = 1;
-                }
+                cu_qp_delta_code = 1;
                 core.cu_qp_delta_is_coded = false;
             }
         }
@@ -1148,19 +437,19 @@ impl EvcdCtx {
             cup,
             cuw,
             cuh,
-            self.max_cuwh,
+            MAX_CU_SIZE as u16,
         );
 
         if split_mode != SplitMode::NO_SPLIT {
             let split_struct = evc_split_get_part_structure(
                 split_mode,
-                x0,
-                y0,
+                x,
+                y,
                 cuw,
                 cuh,
                 cup,
                 cud,
-                self.log2_max_cuwh - MIN_CU_LOG2 as u8,
+                (MAX_CU_LOG2 - MIN_CU_LOG2) as u8,
             );
 
             for cur_part_num in 0..split_struct.part_count {
@@ -1177,15 +466,55 @@ impl EvcdCtx {
                         log2_sub_cuh,
                         split_struct.cup[cur_part_num],
                         split_struct.cud[cur_part_num],
-                        true,
-                        split_mode.inc_qt_depth(qt_depth),
                         cu_qp_delta_code,
                     )?;
                 }
             }
         } else {
-            core.cu_qp_delta_code = cu_qp_delta_code;
-            self.evcd_eco_unit(x0, y0, log2_cuw, log2_cuh)?;
+            evcd_eco_unit(
+                bs,
+                sbac,
+                sbac_ctx,
+                core,
+                x,
+                y,
+                log2_cuw,
+                log2_cuh,
+                self.w_scu,
+                self.h_scu,
+                self.w,
+                self.h,
+                &self.map_mv,
+                &self.refp,
+                &self.map_scu,
+                &self.map_ipm,
+                &self.dpm,
+                self.poc.poc_val,
+                &self.pic,
+                self.sps.dquant_flag,
+                self.pps.cu_qp_delta_enabled_flag,
+                cu_qp_delta_code,
+                self.pps.constrained_intra_pred_flag,
+                self.sh.slice_type,
+                self.sh.qp,
+                self.sh.qp_u_offset,
+                self.sh.qp_v_offset,
+            )?;
+
+            evcd_set_dec_info(
+                core,
+                x,
+                y,
+                log2_cuw,
+                log2_cuh,
+                self.w_scu as usize,
+                self.pps.cu_qp_delta_enabled_flag,
+                self.slice_num,
+                &mut self.map_refi,
+                &mut self.map_mv,
+                &mut self.map_scu,
+                &mut self.map_ipm,
+            );
         }
 
         Ok(())
@@ -1201,16 +530,13 @@ impl EvcdCtx {
         );
 
         //TODO: move x_lcu/y_lcu=0 to pic init
-        self.core.x_lcu = 0; //entry point lcu's x location
-        self.core.y_lcu = 0; // entry point lcu's y location
+        let mut x_lcu = 0; //entry point lcu's x location
+        let mut y_lcu = 0; // entry point lcu's y location
         while self.num_ctb > 0 {
-            self.update_core_loc_param();
+            let lcu_num = x_lcu + y_lcu * self.w_lcu; // Init the first lcu_num in tile
 
             //LCU decoding with in a tile
-            evc_assert_rv(
-                (self.core.lcu_num as u32) < self.f_lcu,
-                EvcError::EVC_ERR_UNEXPECTED,
-            )?;
+            evc_assert_rv((lcu_num as u32) < self.f_lcu, EvcError::EVC_ERR_UNEXPECTED)?;
 
             // invoke coding_tree() recursion
             for i in 0..NUM_CU_DEPTH {
@@ -1222,28 +548,26 @@ impl EvcdCtx {
             }
 
             self.evcd_eco_tree(
-                self.core.x_pel,
-                self.core.y_pel,
-                self.log2_max_cuwh,
-                self.log2_max_cuwh,
+                x_lcu << MAX_CU_LOG2,
+                y_lcu << MAX_CU_LOG2,
+                MAX_CU_LOG2 as u8,
+                MAX_CU_LOG2 as u8,
                 0,
-                0,
-                true,
                 0,
                 0,
             )?;
             // set split flags to map
-            self.map_split[self.core.lcu_num as usize].clone_from(&self.core.split_mode);
+            self.map_split[lcu_num as usize].clone_from(&self.core.split_mode);
 
             self.num_ctb -= 1;
             // read end_of_picture_flag
             if (self.num_ctb == 0) {
                 evcd_eco_tile_end_flag(&mut self.bs, &mut self.sbac_dec)?;
             } else {
-                self.core.x_lcu += 1;
-                if self.core.x_lcu >= self.w_lcu {
-                    self.core.x_lcu = 0;
-                    self.core.y_lcu += 1;
+                x_lcu += 1;
+                if x_lcu >= self.w_lcu {
+                    x_lcu = 0;
+                    y_lcu += 1;
                 }
             }
             //eprint!("{} ", self.num_ctb);
@@ -1291,13 +615,13 @@ impl EvcdCtx {
         cup: u16,
         is_hor_edge: bool,
     ) {
-        let lcu_num = (x >> self.log2_max_cuwh) + (y >> self.log2_max_cuwh) * self.w_lcu;
+        let lcu_num = (x >> MAX_CU_LOG2) + (y >> MAX_CU_LOG2) * self.w_lcu;
         let split_mode = evc_get_split_mode(
             cud,
             cup,
             cuw,
             cuh,
-            self.max_cuwh,
+            MAX_CU_SIZE as u16,
             &self.map_split[lcu_num as usize],
         );
 
@@ -1315,7 +639,7 @@ impl EvcdCtx {
                 cuh,
                 cup,
                 cud,
-                self.log2_max_cuwh - MIN_CU_LOG2 as u8,
+                (MAX_CU_LOG2 - MIN_CU_LOG2) as u8,
             );
 
             // In base profile we have small chroma blocks
@@ -1443,7 +767,7 @@ impl EvcdCtx {
             p.pic_qp_v_offset = self.sh.qp_v_offset;
         }
 
-        let scu_in_lcu_wh = 1 << (self.log2_max_cuwh - MIN_CU_LOG2 as u8);
+        let scu_in_lcu_wh = 1 << (MAX_CU_LOG2 - MIN_CU_LOG2);
 
         let x_l = 0; //entry point lcu's x location
         let y_l = 0; // entry point lcu's y location
@@ -1464,10 +788,10 @@ impl EvcdCtx {
         for j in y_l..y_r {
             for i in x_l..x_r {
                 self.deblock_tree(
-                    (i << self.log2_max_cuwh),
-                    (j << self.log2_max_cuwh),
-                    self.max_cuwh,
-                    self.max_cuwh,
+                    (i << MAX_CU_LOG2),
+                    (j << MAX_CU_LOG2),
+                    MAX_CU_SIZE as u16,
+                    MAX_CU_SIZE as u16,
                     0,
                     0,
                     false, /*horizontal filtering of vertical edge*/
@@ -1485,10 +809,10 @@ impl EvcdCtx {
         for j in y_l..y_r {
             for i in x_l..x_r {
                 self.deblock_tree(
-                    (i << self.log2_max_cuwh),
-                    (j << self.log2_max_cuwh),
-                    self.max_cuwh,
-                    self.max_cuwh,
+                    (i << MAX_CU_LOG2),
+                    (j << MAX_CU_LOG2),
+                    MAX_CU_SIZE as u16,
+                    MAX_CU_SIZE as u16,
                     0,
                     0,
                     true, /*vertical filtering of horizontal edge*/

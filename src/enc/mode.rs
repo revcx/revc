@@ -22,7 +22,6 @@ pub(crate) struct EvceCUData {
     pub(crate) mvd: Vec<Vec<Vec<i16>>>,          //[MAX_CU_CNT_IN_LCU][REFP_NUM][MV_D];
     pub(crate) nnz: Vec<Vec<u16>>,               //[N_C];
     pub(crate) map_scu: Vec<MCU>,
-    pub(crate) map_cu_mode: Vec<MCU>,
     pub(crate) depth: Vec<i8>,
     pub(crate) coef: Vec<Vec<i16>>, //[N_C];
     pub(crate) reco: Vec<Vec<pel>>, //[N_C];
@@ -58,7 +57,6 @@ impl EvceCUData {
             mvd: vec![vec![vec![0; MV_D]; REFP_NUM]; cu_cnt],
             nnz: vec![vec![0; cu_cnt]; N_C],
             map_scu: vec![MCU::default(); cu_cnt],
-            map_cu_mode: vec![MCU::default(); cu_cnt],
             depth: vec![0; cu_cnt],
             coef,
             reco,
@@ -130,8 +128,6 @@ impl EvceCUData {
                 .copy_from_slice(&src.depth[idx_src..idx_src + size]);
             self.map_scu[idx_dst..idx_dst + size]
                 .copy_from_slice(&src.map_scu[idx_src..idx_src + size]);
-            self.map_cu_mode[idx_dst..idx_dst + size]
-                .copy_from_slice(&src.map_cu_mode[idx_src..idx_src + size]);
             self.refi[idx_dst..idx_dst + size].clone_from_slice(&src.refi[idx_src..idx_src + size]);
             self.mvp_idx[idx_dst..idx_dst + size]
                 .clone_from_slice(&src.mvp_idx[idx_src..idx_src + size]);
@@ -305,9 +301,6 @@ impl EvceCUData {
                 }
 
                 self.depth[idx + i] = cud as i8;
-
-                self.map_cu_mode[idx + i].SET_LOGW(log2_cuw as u32);
-                self.map_cu_mode[idx + i].SET_LOGH(log2_cuh as u32);
 
                 if cu_mode == PredMode::MODE_INTRA {
                     self.ipm[0][idx + i] = ipm[0];
@@ -1447,10 +1440,6 @@ impl EvceCtx {
         let mut map_depth = &mut self.map_depth[pos..];
         let mut src_depth = &self.core.cu_data_best[log2_src_cuw - 2][log2_src_cuh - 2].depth[..];
 
-        let mut map_cu_mode = &mut self.map_cu_mode[pos..];
-        let mut src_map_cu_mode =
-            &self.core.cu_data_best[log2_src_cuw - 2][log2_src_cuh - 2].map_cu_mode[..];
-
         let w = if x + src_cuw > self.w {
             (self.w - x) >> MIN_CU_LOG2
         } else {
@@ -1477,7 +1466,6 @@ impl EvceCtx {
                 map_scu[..w].copy_from_slice(&src_map_scu[..w]);
                 map_ipm[..w].copy_from_slice(&src_map_ipm[..w]);
                 map_depth[..w].copy_from_slice(&src_depth[..w]);
-                map_cu_mode[..w].copy_from_slice(&src_map_cu_mode[..w]);
                 map_refi[..w].copy_from_slice(&src_map_refi[..w]);
                 map_mv[..w].copy_from_slice(&src_map_mv[..w]);
 
@@ -1496,17 +1484,12 @@ impl EvceCtx {
 
                     map_refi = &mut map_refi[self.w_scu as usize..];
                     src_map_refi = &src_map_refi[(src_cuw >> MIN_CU_LOG2) as usize..];
-
-                    map_cu_mode = &mut map_cu_mode[self.w_scu as usize..];
-                    src_map_cu_mode = &src_map_cu_mode[(src_cuw >> MIN_CU_LOG2) as usize..];
                 }
             }
         }
     }
 
     fn clear_map_scu(&mut self, x: u16, y: u16, mut cuw: u16, mut cuh: u16) {
-        let map_cu_mode = &mut self.map_cu_mode
-            [((y >> MIN_CU_LOG2) * self.w_scu + (x >> MIN_CU_LOG2)) as usize..];
         let map_scu =
             &mut self.map_scu[((y >> MIN_CU_LOG2) * self.w_scu + (x >> MIN_CU_LOG2)) as usize..];
 
@@ -1524,7 +1507,6 @@ impl EvceCtx {
         for j in 0..h {
             for i in 0..w {
                 map_scu[j * self.w_scu as usize + i] = MCU::default();
-                map_cu_mode[j * self.w_scu as usize + i] = MCU::default();
             }
         }
     }
@@ -1760,7 +1742,7 @@ impl EvceCtx {
         if slice_type != SliceType::EVC_ST_I {
             self.core.s_temp_run.encode_bin(
                 &mut self.core.bs_temp,
-                &mut self.core.c_temp_run.skip_flag[self.core.ctx_flags[CNID_SKIP_FLAG] as usize],
+                &mut self.core.c_temp_run.skip_flag[0],
                 0,
             ); /* skip_flag */
             evce_eco_pred_mode(
@@ -1768,7 +1750,6 @@ impl EvceCtx {
                 &mut self.core.s_temp_run,
                 &mut self.core.c_temp_run,
                 PredMode::MODE_INTRA,
-                self.core.ctx_flags[CNID_PRED_MODE] as usize,
             );
         }
 
@@ -1846,7 +1827,7 @@ impl EvceCtx {
         if slice_type != SliceType::EVC_ST_I {
             self.core.s_temp_run.encode_bin(
                 &mut self.core.bs_temp,
-                &mut self.core.c_temp_run.skip_flag[self.core.ctx_flags[CNID_SKIP_FLAG] as usize],
+                &mut self.core.c_temp_run.skip_flag[0],
                 0,
             ); /* skip_flag */
             evce_eco_pred_mode(
@@ -1854,7 +1835,6 @@ impl EvceCtx {
                 &mut self.core.s_temp_run,
                 &mut self.core.c_temp_run,
                 PredMode::MODE_INTRA,
-                self.core.ctx_flags[CNID_PRED_MODE] as usize,
             );
         }
 
@@ -1915,7 +1895,7 @@ impl EvceCtx {
         if slice_type != SliceType::EVC_ST_I {
             self.core.s_temp_run.encode_bin(
                 &mut self.core.bs_temp,
-                &mut self.core.c_temp_run.skip_flag[self.core.ctx_flags[CNID_SKIP_FLAG] as usize],
+                &mut self.core.c_temp_run.skip_flag[0],
                 0,
             ); /* skip_flag */
 
@@ -1924,7 +1904,6 @@ impl EvceCtx {
                 &mut self.core.s_temp_run,
                 &mut self.core.c_temp_run,
                 PredMode::MODE_INTER,
-                self.core.ctx_flags[CNID_PRED_MODE] as usize,
             );
 
             let dir_flag = pidx == InterPredDir::PRED_DIR as usize;
@@ -2073,7 +2052,7 @@ impl EvceCtx {
         if slice_type != SliceType::EVC_ST_I {
             self.core.s_temp_run.encode_bin(
                 &mut self.core.bs_temp,
-                &mut self.core.c_temp_run.skip_flag[self.core.ctx_flags[CNID_SKIP_FLAG] as usize],
+                &mut self.core.c_temp_run.skip_flag[0],
                 1,
             ); /* skip_flag */
 
