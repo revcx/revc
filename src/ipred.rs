@@ -36,7 +36,7 @@ pub(crate) fn evc_get_nbr_b(
     cuh: usize,
     src: &PlaneRegion<'_, pel>,
     avail_cu: u16,
-    nb: &mut Vec<Vec<pel>>, //[[pel; MAX_CU_SIZE * 3]; N_REF],
+    nb: &mut [pel], //[[pel; cu_size*2+1]
     scup: usize,
     map_scu: &[MCU],
     w_scu: usize,
@@ -63,7 +63,7 @@ pub(crate) fn evc_get_nbr_b(
     let y_scu = PEL2SCU(if ch_type == Y_C { y } else { y << 1 });
 
     {
-        let up_left = &mut nb[1][cuh - 1..];
+        let up_left = &mut nb[cuh << 1..];
         if IS_AVAIL(avail_cu, AVAIL_UP_LE)
             && (!constrained_intra_pred || map_scu[scup - w_scu - 1].GET_IF() != 0)
         {
@@ -74,7 +74,7 @@ pub(crate) fn evc_get_nbr_b(
     }
 
     {
-        let up = &mut nb[1][cuh..];
+        let up = &mut nb[(cuh << 1) + 1..];
         for i in 0..(scuw + scuh) {
             let is_avail = (y_scu > 0) && (x_scu + i < w_scu);
             if is_avail
@@ -92,7 +92,7 @@ pub(crate) fn evc_get_nbr_b(
     }
 
     {
-        let left = &mut nb[0][2..];
+        let left = &mut nb[..(cuh << 1)];
         for i in 0..(scuh + scuw) {
             let is_avail = (x_scu > 0) && (y_scu + i < h_scu);
             if is_avail
@@ -109,18 +109,13 @@ pub(crate) fn evc_get_nbr_b(
             }
         }
     }
-
-    {
-        //left[-1] = up[-1];
-        nb[0][1] = nb[1][cuh - 1];
-    }
 }
 
 /* intra prediction for baseline profile */
 pub(crate) fn evc_ipred_b(
     src_le: &[pel],
-    src_up: &[pel],
     src_tl: pel,
+    src_up: &[pel],
     dst: &mut [pel],
     ipm: IntraPredDir,
     cuw: usize,

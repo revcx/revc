@@ -1150,9 +1150,9 @@ pub(crate) fn evcd_eco_unit(
         EVC_TRACE(&mut bs.tracer, " \n");
 
         evc_ipred_b(
-            &core.nb.data[Y_C][0][2..],
-            &core.nb.data[Y_C][1][cuh as usize..],
-            core.nb.data[Y_C][1][cuh as usize - 1],
+            &core.nb.data[Y_C][..(cuh << 1) as usize],
+            core.nb.data[Y_C][(cuh << 1) as usize],
+            &core.nb.data[Y_C][(cuh << 1) as usize + 1..],
             &mut core.pred[0].data[Y_C],
             core.ipm[0],
             cuw as usize,
@@ -1160,18 +1160,18 @@ pub(crate) fn evcd_eco_unit(
         );
 
         evc_ipred_b(
-            &core.nb.data[U_C][0][2..],
-            &core.nb.data[U_C][1][(cuh >> 1) as usize..],
-            core.nb.data[U_C][1][(cuh >> 1) as usize - 1],
+            &core.nb.data[U_C][..cuh as usize],
+            core.nb.data[U_C][cuh as usize],
+            &core.nb.data[U_C][cuh as usize + 1..],
             &mut core.pred[0].data[U_C],
             core.ipm[1],
             cuw as usize >> 1,
             cuh as usize >> 1,
         );
         evc_ipred_b(
-            &core.nb.data[V_C][0][2..],
-            &core.nb.data[V_C][1][(cuh >> 1) as usize..],
-            core.nb.data[V_C][1][(cuh >> 1) as usize - 1],
+            &core.nb.data[V_C][..cuh as usize],
+            core.nb.data[V_C][cuh as usize],
+            &core.nb.data[V_C][cuh as usize + 1..],
             &mut core.pred[0].data[V_C],
             core.ipm[1],
             cuw as usize >> 1,
