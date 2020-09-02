@@ -11,7 +11,6 @@ const MC_IBUF_PAD_C: usize = 4;
 const MC_IBUF_PAD_L: usize = 8;
 const MC_IBUF_PAD_BL: usize = 2;
 
-const MC_PRECISION_ADD: usize = 2;
 const MAC_SFT_N0: i32 = (6);
 const MAC_ADD_N0: i32 = (1 << 5);
 const MAC_SFT_0N: i32 = MAC_SFT_N0;
@@ -22,59 +21,23 @@ const MAC_SFT_NN_S2: i32 = (10);
 const MAC_ADD_NN_S2: i32 = (1 << 9);
 
 #[rustfmt::skip]
-static tbl_mc_l_coeff:[[i16;8];4 << MC_PRECISION_ADD] = [
+static tbl_mc_l_coeff:[[i16;8];4] = [
     [  0, 0,   0, 64,  0,   0,  0,  0 ],
-    [  0, 0,   0,  0,  0,   0,  0,  0 ],
-    [  0, 0,   0,  0,  0,   0,  0,  0 ],
-    [  0, 0,   0,  0,  0,   0,  0,  0 ],
     [  0, 1,  -5, 52, 20,  -5,  1,  0 ],
-    [  0, 0,   0,  0,  0,   0,  0,  0 ],
-    [  0, 0,   0,  0,  0,   0,  0,  0 ],
-    [  0, 0,   0,  0,  0,   0,  0,  0 ],
     [  0, 2, -10, 40, 40, -10,  2,  0 ],
-    [  0, 0,   0,  0,  0,   0,  0,  0 ],
-    [  0, 0,   0,  0,  0,   0,  0,  0 ],
-    [  0, 0,   0,  0,  0,   0,  0,  0 ],
     [  0, 1,  -5, 20, 52,  -5,  1,  0 ],
-    [  0, 0,   0,  0,  0,   0,  0,  0 ],
-    [  0, 0,   0,  0,  0,   0,  0,  0 ],
-    [  0, 0,   0,  0,  0,   0,  0,  0 ],
 ];
 
 #[rustfmt::skip]
-static tbl_mc_c_coeff: [[i16;4];8 << MC_PRECISION_ADD] = [
+static tbl_mc_c_coeff: [[i16;4];8] = [
     [  0, 64,  0,  0 ],
-    [  0,  0,  0,  0 ],
-    [  0,  0,  0,  0 ],
-    [  0,  0,  0,  0 ],
     [ -2, 58, 10, -2 ],
-    [  0,  0,  0,  0 ],
-    [  0,  0,  0,  0 ],
-    [  0,  0,  0,  0 ],
     [ -4, 52, 20, -4 ],
-    [  0,  0,  0,  0 ],
-    [  0,  0,  0,  0 ],
-    [  0,  0,  0,  0 ],
     [ -6, 46, 30, -6 ],
-    [  0,  0,  0,  0 ],
-    [  0,  0,  0,  0 ],
-    [  0,  0,  0,  0 ],
     [ -8, 40, 40, -8 ],
-    [  0,  0,  0,  0 ],
-    [  0,  0,  0,  0 ],
-    [  0,  0,  0,  0 ],
     [ -6, 30, 46, -6 ],
-    [  0,  0,  0,  0 ],
-    [  0,  0,  0,  0 ],
-    [  0,  0,  0,  0 ],
     [ -4, 20, 52, -4 ],
-    [  0,  0,  0,  0 ],
-    [  0,  0,  0,  0 ],
-    [  0,  0,  0,  0 ],
     [ -2, 10, 58, -2 ],
-    [  0,  0,  0,  0 ],
-    [  0,  0,  0,  0 ],
-    [  0,  0,  0,  0 ],
 ];
 
 #[inline]
@@ -276,8 +239,8 @@ fn evc_mc_l_00(
     cuw: i16,
     cuh: i16,
 ) {
-    let gmv_x = gmv_x >> 4;
-    let gmv_y = gmv_y >> 4;
+    let gmv_x = gmv_x >> 2;
+    let gmv_y = gmv_y >> 2;
 
     for y in 0..cuh {
         for x in 0..cuw {
@@ -295,9 +258,9 @@ fn evc_mc_l_n0(
     cuw: i16,
     cuh: i16,
 ) {
-    let dx = gmv_x & 15;
-    let gmv_x = (gmv_x >> 4) - 3;
-    let gmv_y = gmv_y >> 4;
+    let dx = gmv_x & 3;
+    let gmv_x = (gmv_x >> 2) - 3;
+    let gmv_y = gmv_y >> 2;
 
     for y in 0..cuh {
         for x in 0..cuw {
@@ -336,9 +299,9 @@ fn evc_mc_l_0n(
     cuw: i16,
     cuh: i16,
 ) {
-    let dy = gmv_y & 15;
-    let gmv_x = gmv_x >> 4;
-    let gmv_y = (gmv_y >> 4) - 3;
+    let dy = gmv_y & 3;
+    let gmv_x = gmv_x >> 2;
+    let gmv_y = (gmv_y >> 2) - 3;
 
     for y in 0..cuh {
         for x in 0..cuw {
@@ -379,10 +342,10 @@ fn evc_mc_l_nn(
 ) {
     let mut buf = [0i16; (MAX_CU_SIZE + MC_IBUF_PAD_L) * MAX_CU_SIZE];
 
-    let dx = gmv_x & 15;
-    let dy = gmv_y & 15;
-    let gmv_x = (gmv_x >> 4) - 3;
-    let gmv_y = (gmv_y >> 4) - 3;
+    let dx = gmv_x & 3;
+    let dy = gmv_y & 3;
+    let gmv_x = (gmv_x >> 2) - 3;
+    let gmv_y = (gmv_y >> 2) - 3;
 
     for y in 0..(cuh + 7) {
         for x in 0..cuw {
@@ -437,8 +400,8 @@ fn evc_mc_c_00(
     cuw: i16,
     cuh: i16,
 ) {
-    let gmv_x = gmv_x >> 5;
-    let gmv_y = gmv_y >> 5;
+    let gmv_x = gmv_x >> 3;
+    let gmv_y = gmv_y >> 3;
 
     for y in 0..cuh {
         for x in 0..cuw {
@@ -456,9 +419,9 @@ fn evc_mc_c_n0(
     cuw: i16,
     cuh: i16,
 ) {
-    let dx = gmv_x & 31;
-    let gmv_x = (gmv_x >> 5) - 1;
-    let gmv_y = gmv_y >> 5;
+    let dx = gmv_x & 7;
+    let gmv_x = (gmv_x >> 3) - 1;
+    let gmv_y = gmv_y >> 3;
 
     for y in 0..cuh {
         for x in 0..cuw {
@@ -489,9 +452,9 @@ fn evc_mc_c_0n(
     cuw: i16,
     cuh: i16,
 ) {
-    let dy = gmv_y & 31;
-    let gmv_x = gmv_x >> 5;
-    let gmv_y = (gmv_y >> 5) - 1;
+    let dy = gmv_y & 7;
+    let gmv_x = gmv_x >> 3;
+    let gmv_y = (gmv_y >> 3) - 1;
 
     for y in 0..cuh {
         for x in 0..cuw {
@@ -524,10 +487,10 @@ fn evc_mc_c_nn(
 ) {
     let mut buf = [0i16; ((MAX_CU_SIZE >> 1) + MC_IBUF_PAD_C) * (MAX_CU_SIZE >> 1)];
 
-    let dx = gmv_x & 31;
-    let dy = gmv_y & 31;
-    let gmv_x = (gmv_x >> 5) - 1;
-    let gmv_y = (gmv_y >> 5) - 1;
+    let dx = gmv_x & 7;
+    let dy = gmv_y & 7;
+    let gmv_x = (gmv_x >> 3) - 1;
+    let gmv_y = (gmv_y >> 3) - 1;
 
     for y in 0..(cuh + 3) {
         for x in 0..cuw {
@@ -572,10 +535,8 @@ pub(crate) fn evc_mc_l(
     cuw: i16,
     cuh: i16,
 ) {
-    let x =
-        (((ori_mv_x) | ((ori_mv_x) >> 1) | ((ori_mv_x) >> 2) | ((ori_mv_x) >> 3)) & 0x1) as usize;
-    let y =
-        (((ori_mv_y) | ((ori_mv_y) >> 1) | ((ori_mv_y) >> 2) | ((ori_mv_y) >> 3)) & 0x1) as usize;
+    let x = ((ori_mv_x | (ori_mv_x >> 1)) & 0x1) as usize;
+    let y = ((ori_mv_y | (ori_mv_y >> 1)) & 0x1) as usize;
     evc_tbl_mc_l[x][y](r, gmv_x, gmv_y, pred, cuw, cuh)
 }
 
@@ -589,18 +550,8 @@ fn evc_mc_c(
     cuw: i16,
     cuh: i16,
 ) {
-    let x = (((ori_mv_x)
-        | ((ori_mv_x) >> 1)
-        | ((ori_mv_x) >> 2)
-        | ((ori_mv_x) >> 3)
-        | ((ori_mv_x) >> 4))
-        & 0x1) as usize;
-    let y = (((ori_mv_y)
-        | ((ori_mv_y) >> 1)
-        | ((ori_mv_y) >> 2)
-        | ((ori_mv_y) >> 3)
-        | ((ori_mv_y) >> 4))
-        & 0x1) as usize;
+    let x = ((ori_mv_x | (ori_mv_x >> 1) | (ori_mv_x >> 2)) & 0x1) as usize;
+    let y = ((ori_mv_y | (ori_mv_y >> 1) | (ori_mv_y >> 2)) & 0x1) as usize;
     evc_tbl_mc_c[x][y](r, gmv_x, gmv_y, pred, cuw, cuh)
 }
 
@@ -636,31 +587,31 @@ pub(crate) fn evc_mc(
             let planes = &pic.frame.borrow().planes;
 
             evc_mc_l(
-                mv_before_clipping[REFP_0][MV_X] << 2,
-                mv_before_clipping[REFP_0][MV_Y] << 2,
+                mv_before_clipping[REFP_0][MV_X],
+                mv_before_clipping[REFP_0][MV_Y],
                 &planes[Y_C].as_region(),
-                (qpel_gmv_x << 2),
-                (qpel_gmv_y << 2),
+                qpel_gmv_x,
+                qpel_gmv_y,
                 &mut pred[0].data[Y_C],
                 cuw,
                 cuh,
             );
             evc_mc_c(
-                mv_before_clipping[REFP_0][MV_X] << 2,
-                mv_before_clipping[REFP_0][MV_Y] << 2,
+                mv_before_clipping[REFP_0][MV_X],
+                mv_before_clipping[REFP_0][MV_Y],
                 &planes[U_C].as_region(),
-                (qpel_gmv_x << 2),
-                (qpel_gmv_y << 2),
+                qpel_gmv_x,
+                qpel_gmv_y,
                 &mut pred[0].data[U_C],
                 cuw >> 1,
                 cuh >> 1,
             );
             evc_mc_c(
-                mv_before_clipping[REFP_0][MV_X] << 2,
-                mv_before_clipping[REFP_0][MV_Y] << 2,
+                mv_before_clipping[REFP_0][MV_X],
+                mv_before_clipping[REFP_0][MV_Y],
                 &planes[V_C].as_region(),
-                (qpel_gmv_x << 2),
-                (qpel_gmv_y << 2),
+                qpel_gmv_x,
+                qpel_gmv_y,
                 &mut pred[0].data[V_C],
                 cuw >> 1,
                 cuh >> 1,
@@ -694,31 +645,31 @@ pub(crate) fn evc_mc(
             let planes = &pic.frame.borrow().planes;
 
             evc_mc_l(
-                mv_before_clipping[REFP_1][MV_X] << 2,
-                mv_before_clipping[REFP_1][MV_Y] << 2,
+                mv_before_clipping[REFP_1][MV_X],
+                mv_before_clipping[REFP_1][MV_Y],
                 &planes[Y_C].as_region(),
-                (qpel_gmv_x << 2),
-                (qpel_gmv_y << 2),
+                qpel_gmv_x,
+                qpel_gmv_y,
                 &mut pred[bidx].data[Y_C],
                 cuw,
                 cuh,
             );
             evc_mc_c(
-                mv_before_clipping[REFP_1][MV_X] << 2,
-                mv_before_clipping[REFP_1][MV_Y] << 2,
+                mv_before_clipping[REFP_1][MV_X],
+                mv_before_clipping[REFP_1][MV_Y],
                 &planes[U_C].as_region(),
-                (qpel_gmv_x << 2),
-                (qpel_gmv_y << 2),
+                qpel_gmv_x,
+                qpel_gmv_y,
                 &mut pred[bidx].data[U_C],
                 cuw >> 1,
                 cuh >> 1,
             );
             evc_mc_c(
-                mv_before_clipping[REFP_1][MV_X] << 2,
-                mv_before_clipping[REFP_1][MV_Y] << 2,
+                mv_before_clipping[REFP_1][MV_X],
+                mv_before_clipping[REFP_1][MV_Y],
                 &planes[V_C].as_region(),
-                (qpel_gmv_x << 2),
-                (qpel_gmv_y << 2),
+                qpel_gmv_x,
+                qpel_gmv_y,
                 &mut pred[bidx].data[V_C],
                 cuw >> 1,
                 cuh >> 1,
