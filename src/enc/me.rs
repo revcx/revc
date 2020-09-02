@@ -698,11 +698,11 @@ impl EvcePInter {
                 let frame_r = &pic_r.borrow().frame;
                 let plane_r = &frame_r.borrow().planes[Y_C];
                 evc_mc_l(
-                    (mv_x << 2),
-                    (mv_y << 2),
-                    &plane_r.as_region(),
-                    (mv_x << 2),
-                    (mv_y << 2),
+                    mv_x,
+                    mv_y,
+                    &plane_r,
+                    mv_x,
+                    mv_y,
                     &mut self.pred_buf.data[Y_C],
                     cuw as i16,
                     cuh as i16,
@@ -764,11 +764,11 @@ impl EvcePInter {
                     let frame_r = &pic_r.borrow().frame;
                     let plane_r = &frame_r.borrow().planes[Y_C];
                     evc_mc_l(
-                        (mv_x << 2),
-                        (mv_y << 2),
-                        &plane_r.as_region(),
-                        (mv_x << 2),
-                        (mv_y << 2),
+                        mv_x,
+                        mv_y,
+                        &plane_r,
+                        mv_x,
+                        mv_y,
                         &mut self.pred_buf.data[Y_C],
                         cuw as i16,
                         cuh as i16,

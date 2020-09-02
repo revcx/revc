@@ -1,161 +1,89 @@
 use super::def::*;
 use super::picman::*;
+use super::plane::*;
 use super::region::*;
 use super::util::*;
 
-use std::cmp::max;
+use num_traits::*;
 
 /* padding for store intermediate values, which should be larger than
 1+ half of filter tap */
-const MC_IBUF_PAD_C: usize = 4;
-const MC_IBUF_PAD_L: usize = 8;
-const MC_IBUF_PAD_BL: usize = 2;
+const MC_IBUF_PAD_L: usize = 5;
+const MC_IBUF_PAD_C: usize = 3;
 
-const MC_PRECISION_ADD: usize = 2;
 const MAC_SFT_N0: i32 = (6);
 const MAC_ADD_N0: i32 = (1 << 5);
 const MAC_SFT_0N: i32 = MAC_SFT_N0;
 const MAC_ADD_0N: i32 = MAC_ADD_N0;
 const MAC_SFT_NN_S1: i32 = (2);
-const MAC_ADD_NN_S1: i32 = (0);
+const MAC_ADD_NN_S1: i32 = (0); //TODO: Is MAC_ADD_NN_S1 = 0 a typo in ETM?
 const MAC_SFT_NN_S2: i32 = (10);
 const MAC_ADD_NN_S2: i32 = (1 << 9);
+const MAX_SAMPLE_VAL: i32 = ((1 << BIT_DEPTH) - 1);
 
 #[rustfmt::skip]
-static tbl_mc_l_coeff:[[i16;8];4 << MC_PRECISION_ADD] = [
-    [  0, 0,   0, 64,  0,   0,  0,  0 ],
-    [  0, 0,   0,  0,  0,   0,  0,  0 ],
-    [  0, 0,   0,  0,  0,   0,  0,  0 ],
-    [  0, 0,   0,  0,  0,   0,  0,  0 ],
-    [  0, 1,  -5, 52, 20,  -5,  1,  0 ],
-    [  0, 0,   0,  0,  0,   0,  0,  0 ],
-    [  0, 0,   0,  0,  0,   0,  0,  0 ],
-    [  0, 0,   0,  0,  0,   0,  0,  0 ],
-    [  0, 2, -10, 40, 40, -10,  2,  0 ],
-    [  0, 0,   0,  0,  0,   0,  0,  0 ],
-    [  0, 0,   0,  0,  0,   0,  0,  0 ],
-    [  0, 0,   0,  0,  0,   0,  0,  0 ],
-    [  0, 1,  -5, 20, 52,  -5,  1,  0 ],
-    [  0, 0,   0,  0,  0,   0,  0,  0 ],
-    [  0, 0,   0,  0,  0,   0,  0,  0 ],
-    [  0, 0,   0,  0,  0,   0,  0,  0 ],
+static tbl_mc_l_coeff:[[i32;6];4] = [
+    [  0,   0, 64,  0,   0,  0, ],
+    [  1,  -5, 52, 20,  -5,  1, ],
+    [  2, -10, 40, 40, -10,  2, ],
+    [  1,  -5, 20, 52,  -5,  1, ],
 ];
 
 #[rustfmt::skip]
-static tbl_mc_c_coeff: [[i16;4];8 << MC_PRECISION_ADD] = [
+static tbl_mc_c_coeff: [[i32;4];8] = [
     [  0, 64,  0,  0 ],
-    [  0,  0,  0,  0 ],
-    [  0,  0,  0,  0 ],
-    [  0,  0,  0,  0 ],
     [ -2, 58, 10, -2 ],
-    [  0,  0,  0,  0 ],
-    [  0,  0,  0,  0 ],
-    [  0,  0,  0,  0 ],
     [ -4, 52, 20, -4 ],
-    [  0,  0,  0,  0 ],
-    [  0,  0,  0,  0 ],
-    [  0,  0,  0,  0 ],
     [ -6, 46, 30, -6 ],
-    [  0,  0,  0,  0 ],
-    [  0,  0,  0,  0 ],
-    [  0,  0,  0,  0 ],
     [ -8, 40, 40, -8 ],
-    [  0,  0,  0,  0 ],
-    [  0,  0,  0,  0 ],
-    [  0,  0,  0,  0 ],
     [ -6, 30, 46, -6 ],
-    [  0,  0,  0,  0 ],
-    [  0,  0,  0,  0 ],
-    [  0,  0,  0,  0 ],
     [ -4, 20, 52, -4 ],
-    [  0,  0,  0,  0 ],
-    [  0,  0,  0,  0 ],
-    [  0,  0,  0,  0 ],
     [ -2, 10, 58, -2 ],
-    [  0,  0,  0,  0 ],
-    [  0,  0,  0,  0 ],
-    [  0,  0,  0,  0 ],
 ];
+
+#[inline(always)]
+pub const fn round_shift(value: i32, add: i32, shift: i32) -> i32 {
+    (value + add) >> shift
+}
+
+unsafe fn run_filter<T: AsPrimitive<i32>>(src: *const T, stride: usize, filter: &[i32]) -> i32 {
+    filter
+        .iter()
+        .enumerate()
+        .map(|(i, f)| {
+            let p = src.add(i * stride);
+            f * (*p).as_()
+        })
+        .sum::<i32>()
+}
 
 #[inline]
-fn MAC_8TAP(
-    c: &[i16],
-    r0: i16,
-    r1: i16,
-    r2: i16,
-    r3: i16,
-    r4: i16,
-    r5: i16,
-    r6: i16,
-    r7: i16,
-) -> i32 {
+fn MAC_6TAP(c: &[i16], r0: i16, r1: i16, r2: i16, r3: i16, r4: i16, r5: i16) -> i32 {
     c[0] as i32 * r0 as i32
         + c[1] as i32 * r1 as i32
         + c[2] as i32 * r2 as i32
         + c[3] as i32 * r3 as i32
         + c[4] as i32 * r4 as i32
         + c[5] as i32 * r5 as i32
-        + c[6] as i32 * r6 as i32
-        + c[7] as i32 * r7 as i32
 }
 #[inline]
-fn MAC_8TAP_N0(
-    c: &[i16],
-    r0: i16,
-    r1: i16,
-    r2: i16,
-    r3: i16,
-    r4: i16,
-    r5: i16,
-    r6: i16,
-    r7: i16,
-) -> i32 {
-    (MAC_8TAP(c, r0, r1, r2, r3, r4, r5, r6, r7) + MAC_ADD_N0) >> MAC_SFT_N0
+fn MAC_6TAP_N0(c: &[i16], r0: i16, r1: i16, r2: i16, r3: i16, r4: i16, r5: i16) -> i32 {
+    (MAC_6TAP(c, r0, r1, r2, r3, r4, r5) + MAC_ADD_N0) >> MAC_SFT_N0
 }
 
 #[inline]
-fn MAC_8TAP_0N(
-    c: &[i16],
-    r0: i16,
-    r1: i16,
-    r2: i16,
-    r3: i16,
-    r4: i16,
-    r5: i16,
-    r6: i16,
-    r7: i16,
-) -> i32 {
-    (MAC_8TAP(c, r0, r1, r2, r3, r4, r5, r6, r7) + MAC_ADD_0N) >> MAC_SFT_0N
+fn MAC_6TAP_0N(c: &[i16], r0: i16, r1: i16, r2: i16, r3: i16, r4: i16, r5: i16) -> i32 {
+    (MAC_6TAP(c, r0, r1, r2, r3, r4, r5) + MAC_ADD_0N) >> MAC_SFT_0N
 }
 
 #[inline]
-fn MAC_8TAP_NN_S1(
-    c: &[i16],
-    r0: i16,
-    r1: i16,
-    r2: i16,
-    r3: i16,
-    r4: i16,
-    r5: i16,
-    r6: i16,
-    r7: i16,
-) -> i32 {
-    (MAC_8TAP(c, r0, r1, r2, r3, r4, r5, r6, r7) + MAC_ADD_NN_S1) >> MAC_SFT_NN_S1
+fn MAC_6TAP_NN_S1(c: &[i16], r0: i16, r1: i16, r2: i16, r3: i16, r4: i16, r5: i16) -> i32 {
+    (MAC_6TAP(c, r0, r1, r2, r3, r4, r5) + MAC_ADD_NN_S1) >> MAC_SFT_NN_S1
 }
 
 #[inline]
-fn MAC_8TAP_NN_S2(
-    c: &[i16],
-    r0: i16,
-    r1: i16,
-    r2: i16,
-    r3: i16,
-    r4: i16,
-    r5: i16,
-    r6: i16,
-    r7: i16,
-) -> i32 {
-    (MAC_8TAP(c, r0, r1, r2, r3, r4, r5, r6, r7) + MAC_ADD_NN_S2) >> MAC_SFT_NN_S2
+fn MAC_6TAP_NN_S2(c: &[i16], r0: i16, r1: i16, r2: i16, r3: i16, r4: i16, r5: i16) -> i32 {
+    (MAC_6TAP(c, r0, r1, r2, r3, r4, r5) + MAC_ADD_NN_S2) >> MAC_SFT_NN_S2
 }
 
 #[inline]
@@ -243,8 +171,7 @@ fn mv_clip(
     }
 }
 
-type EVC_MC_FN =
-    fn(r: &PlaneRegion<'_, pel>, gmv_x: i16, gmv_y: i16, pred: &mut [pel], cuw: i16, cuh: i16);
+type EVC_MC_FN = fn(p: &Plane<pel>, gmv_x: i16, gmv_y: i16, pred: &mut [pel], cuw: i16, cuh: i16);
 
 static evc_tbl_mc_l: [[EVC_MC_FN; 2]; 2] = [
     [
@@ -268,296 +195,218 @@ static evc_tbl_mc_c: [[EVC_MC_FN; 2]; 2] = [
     ],
 ];
 
-fn evc_mc_l_00(
-    r: &PlaneRegion<'_, pel>,
-    gmv_x: i16,
-    gmv_y: i16,
-    pred: &mut [pel],
-    cuw: i16,
-    cuh: i16,
-) {
-    let gmv_x = gmv_x >> 4;
-    let gmv_y = gmv_y >> 4;
+fn evc_mc_l_00(p: &Plane<pel>, gmv_x: i16, gmv_y: i16, pred: &mut [pel], cuw: i16, cuh: i16) {
+    let po = PlaneOffset {
+        x: (gmv_x >> 2) as isize,
+        y: (gmv_y >> 2) as isize,
+    };
+    let r = p.slice(po).clamp();
 
-    for y in 0..cuh {
-        for x in 0..cuw {
-            let ry0 = max(0, y + gmv_y) as usize;
-            let rx0 = max(0, x + gmv_x) as usize;
-            pred[(y * cuw + x) as usize] = r[ry0][rx0];
-        }
+    let mut dst = pred;
+    for y in 0..cuh as usize {
+        let src = &r[y];
+        dst[..cuw as usize].copy_from_slice(&src[..cuw as usize]);
+        dst = &mut dst[cuw as usize..];
     }
 }
-fn evc_mc_l_n0(
-    r: &PlaneRegion<'_, pel>,
-    gmv_x: i16,
-    gmv_y: i16,
-    pred: &mut [pel],
-    cuw: i16,
-    cuh: i16,
-) {
-    let dx = gmv_x & 15;
-    let gmv_x = (gmv_x >> 4) - 3;
-    let gmv_y = gmv_y >> 4;
+fn evc_mc_l_n0(p: &Plane<pel>, gmv_x: i16, gmv_y: i16, pred: &mut [pel], cuw: i16, cuh: i16) {
+    let dx = gmv_x & 3;
+    let po = PlaneOffset {
+        x: (gmv_x >> 2) as isize - 2,
+        y: (gmv_y >> 2) as isize,
+    };
+    let r = p.slice(po).clamp();
 
-    for y in 0..cuh {
-        for x in 0..cuw {
-            let ry0 = max(0, y + gmv_y + 0) as usize;
-            let rx0 = max(0, x + gmv_x + 0) as usize;
-            let rx1 = max(0, x + gmv_x + 1) as usize;
-            let rx2 = max(0, x + gmv_x + 2) as usize;
-            let rx3 = max(0, x + gmv_x + 3) as usize;
-            let rx4 = max(0, x + gmv_x + 4) as usize;
-            let rx5 = max(0, x + gmv_x + 5) as usize;
-            let rx6 = max(0, x + gmv_x + 6) as usize;
-            let rx7 = max(0, x + gmv_x + 7) as usize;
-
-            let pt = MAC_8TAP_N0(
-                &tbl_mc_l_coeff[dx as usize],
-                r[ry0][rx0] as i16,
-                r[ry0][rx1] as i16,
-                r[ry0][rx2] as i16,
-                r[ry0][rx3] as i16,
-                r[ry0][rx4] as i16,
-                r[ry0][rx5] as i16,
-                r[ry0][rx6] as i16,
-                r[ry0][rx7] as i16,
-            );
-            pred[(y * cuw + x) as usize] =
-                EVC_CLIP3(0i32, ((1 << BIT_DEPTH) - 1) as i32, pt) as pel;
+    let mut dst = pred;
+    for y in 0..cuh as usize {
+        let src = &r[y];
+        for x in 0..cuw as usize {
+            dst[x] = round_shift(
+                unsafe { run_filter(src[x..].as_ptr(), 1, &tbl_mc_l_coeff[dx as usize]) },
+                MAC_ADD_N0,
+                MAC_SFT_N0,
+            )
+            .max(0)
+            .min(MAX_SAMPLE_VAL) as pel;
         }
+        dst = &mut dst[cuw as usize..];
     }
 }
 
-fn evc_mc_l_0n(
-    r: &PlaneRegion<'_, pel>,
-    gmv_x: i16,
-    gmv_y: i16,
-    pred: &mut [pel],
-    cuw: i16,
-    cuh: i16,
-) {
-    let dy = gmv_y & 15;
-    let gmv_x = gmv_x >> 4;
-    let gmv_y = (gmv_y >> 4) - 3;
+fn evc_mc_l_0n(p: &Plane<pel>, gmv_x: i16, gmv_y: i16, pred: &mut [pel], cuw: i16, cuh: i16) {
+    let dy = gmv_y & 3;
+    let po = PlaneOffset {
+        x: (gmv_x >> 2) as isize,
+        y: (gmv_y >> 2) as isize - 2,
+    };
+    let r = p.slice(po).clamp();
+    let stride = p.cfg.stride;
 
-    for y in 0..cuh {
-        for x in 0..cuw {
-            let rx0 = max(0, x + gmv_x + 0) as usize;
-            let ry0 = max(0, y + gmv_y + 0) as usize;
-            let ry1 = max(0, y + gmv_y + 1) as usize;
-            let ry2 = max(0, y + gmv_y + 2) as usize;
-            let ry3 = max(0, y + gmv_y + 3) as usize;
-            let ry4 = max(0, y + gmv_y + 4) as usize;
-            let ry5 = max(0, y + gmv_y + 5) as usize;
-            let ry6 = max(0, y + gmv_y + 6) as usize;
-            let ry7 = max(0, y + gmv_y + 7) as usize;
-
-            let pt = MAC_8TAP_0N(
-                &tbl_mc_l_coeff[dy as usize],
-                r[ry0][rx0] as i16,
-                r[ry1][rx0] as i16,
-                r[ry2][rx0] as i16,
-                r[ry3][rx0] as i16,
-                r[ry4][rx0] as i16,
-                r[ry5][rx0] as i16,
-                r[ry6][rx0] as i16,
-                r[ry7][rx0] as i16,
-            );
-            pred[(y * cuw + x) as usize] =
-                EVC_CLIP3(0i32, ((1 << BIT_DEPTH) - 1) as i32, pt) as pel;
+    let mut dst = pred;
+    for y in 0..cuh as usize {
+        let src = &r[y];
+        for x in 0..cuw as usize {
+            dst[x] = round_shift(
+                unsafe { run_filter(src[x..].as_ptr(), stride, &tbl_mc_l_coeff[dy as usize]) },
+                MAC_ADD_0N,
+                MAC_SFT_0N,
+            )
+            .max(0)
+            .min(MAX_SAMPLE_VAL) as pel;
         }
+        dst = &mut dst[cuw as usize..];
     }
 }
 
-fn evc_mc_l_nn(
-    r: &PlaneRegion<'_, pel>,
-    gmv_x: i16,
-    gmv_y: i16,
-    pred: &mut [pel],
-    cuw: i16,
-    cuh: i16,
-) {
-    let mut buf = [0i16; (MAX_CU_SIZE + MC_IBUF_PAD_L) * MAX_CU_SIZE];
+fn evc_mc_l_nn(p: &Plane<pel>, gmv_x: i16, gmv_y: i16, pred: &mut [pel], cuw: i16, cuh: i16) {
+    let mut intermediate = [0i16; (MAX_CU_SIZE + MC_IBUF_PAD_L) * 8];
 
-    let dx = gmv_x & 15;
-    let dy = gmv_y & 15;
-    let gmv_x = (gmv_x >> 4) - 3;
-    let gmv_y = (gmv_y >> 4) - 3;
+    let dx = gmv_x & 3;
+    let dy = gmv_y & 3;
+    let po = PlaneOffset {
+        x: (gmv_x >> 2) as isize - 2,
+        y: (gmv_y >> 2) as isize - 2,
+    };
+    let r = p.slice(po).clamp();
 
-    for y in 0..(cuh + 7) {
-        for x in 0..cuw {
-            let ry0 = max(0, y + gmv_y + 0) as usize;
-            let rx0 = max(0, x + gmv_x + 0) as usize;
-            let rx1 = max(0, x + gmv_x + 1) as usize;
-            let rx2 = max(0, x + gmv_x + 2) as usize;
-            let rx3 = max(0, x + gmv_x + 3) as usize;
-            let rx4 = max(0, x + gmv_x + 4) as usize;
-            let rx5 = max(0, x + gmv_x + 5) as usize;
-            let rx6 = max(0, x + gmv_x + 6) as usize;
-            let rx7 = max(0, x + gmv_x + 7) as usize;
-
-            buf[(y * cuw + x) as usize] = MAC_8TAP_NN_S1(
-                &tbl_mc_l_coeff[dx as usize],
-                r[ry0][rx0] as i16,
-                r[ry0][rx1] as i16,
-                r[ry0][rx2] as i16,
-                r[ry0][rx3] as i16,
-                r[ry0][rx4] as i16,
-                r[ry0][rx5] as i16,
-                r[ry0][rx6] as i16,
-                r[ry0][rx7] as i16,
-            ) as i16;
+    for cg in (0..cuw as usize).step_by(8) {
+        for y in 0..(cuh + MC_IBUF_PAD_L as i16) as usize {
+            let src = &r[y];
+            for x in cg..(cg + 8).min(cuw as usize) {
+                intermediate[8 * y + x - cg] = round_shift(
+                    unsafe { run_filter(src[x..].as_ptr(), 1, &tbl_mc_l_coeff[dx as usize]) },
+                    MAC_ADD_NN_S1,
+                    MAC_SFT_NN_S1,
+                ) as i16;
+            }
         }
-    }
 
-    for y in 0..cuh {
-        for x in 0..cuw {
-            let pt = MAC_8TAP_NN_S2(
-                &tbl_mc_l_coeff[dy as usize],
-                buf[((y + 0) * cuw + x) as usize],
-                buf[((y + 1) * cuw + x) as usize],
-                buf[((y + 2) * cuw + x) as usize],
-                buf[((y + 3) * cuw + x) as usize],
-                buf[((y + 4) * cuw + x) as usize],
-                buf[((y + 5) * cuw + x) as usize],
-                buf[((y + 6) * cuw + x) as usize],
-                buf[((y + 7) * cuw + x) as usize],
-            );
-            pred[(y * cuw + x) as usize] =
-                EVC_CLIP3(0i32, ((1 << BIT_DEPTH) - 1) as i32, pt) as pel;
+        let mut dst = &mut pred[..];
+        for y in 0..cuh as usize {
+            for x in cg..(cg + 8).min(cuw as usize) {
+                dst[x] = round_shift(
+                    unsafe {
+                        run_filter(
+                            intermediate[8 * y + x - cg..].as_ptr(),
+                            8,
+                            &tbl_mc_l_coeff[dy as usize],
+                        )
+                    },
+                    MAC_ADD_NN_S2,
+                    MAC_SFT_NN_S2,
+                )
+                .max(0)
+                .min(MAX_SAMPLE_VAL) as pel;
+            }
+            dst = &mut dst[cuw as usize..];
         }
     }
 }
 
-fn evc_mc_c_00(
-    r: &PlaneRegion<'_, pel>,
-    gmv_x: i16,
-    gmv_y: i16,
-    pred: &mut [pel],
-    cuw: i16,
-    cuh: i16,
-) {
-    let gmv_x = gmv_x >> 5;
-    let gmv_y = gmv_y >> 5;
+fn evc_mc_c_00(p: &Plane<pel>, gmv_x: i16, gmv_y: i16, pred: &mut [pel], cuw: i16, cuh: i16) {
+    let po = PlaneOffset {
+        x: (gmv_x >> 3) as isize,
+        y: (gmv_y >> 3) as isize,
+    };
+    let r = p.slice(po).clamp();
 
-    for y in 0..cuh {
-        for x in 0..cuw {
-            let ry0 = max(0, y + gmv_y) as usize;
-            let rx0 = max(0, x + gmv_x) as usize;
-            pred[(y * cuw + x) as usize] = r[ry0][rx0];
-        }
+    let mut dst = pred;
+    for y in 0..cuh as usize {
+        let src = &r[y];
+        dst[..cuw as usize].copy_from_slice(&src[..cuw as usize]);
+        dst = &mut dst[cuw as usize..];
     }
 }
-fn evc_mc_c_n0(
-    r: &PlaneRegion<'_, pel>,
-    gmv_x: i16,
-    gmv_y: i16,
-    pred: &mut [pel],
-    cuw: i16,
-    cuh: i16,
-) {
-    let dx = gmv_x & 31;
-    let gmv_x = (gmv_x >> 5) - 1;
-    let gmv_y = gmv_y >> 5;
+fn evc_mc_c_n0(p: &Plane<pel>, gmv_x: i16, gmv_y: i16, pred: &mut [pel], cuw: i16, cuh: i16) {
+    let dx = gmv_x & 7;
+    let po = PlaneOffset {
+        x: (gmv_x >> 3) as isize - 1,
+        y: (gmv_y >> 3) as isize,
+    };
+    let r = p.slice(po).clamp();
 
-    for y in 0..cuh {
-        for x in 0..cuw {
-            let ry0 = max(0, y + gmv_y + 0) as usize;
-            let rx0 = max(0, x + gmv_x + 0) as usize;
-            let rx1 = max(0, x + gmv_x + 1) as usize;
-            let rx2 = max(0, x + gmv_x + 2) as usize;
-            let rx3 = max(0, x + gmv_x + 3) as usize;
-
-            let pt = MAC_4TAP_N0(
-                &tbl_mc_c_coeff[dx as usize],
-                r[ry0][rx0] as i16,
-                r[ry0][rx1] as i16,
-                r[ry0][rx2] as i16,
-                r[ry0][rx3] as i16,
-            );
-            pred[(y * cuw + x) as usize] =
-                EVC_CLIP3(0i32, ((1 << BIT_DEPTH) - 1) as i32, pt) as pel;
+    let mut dst = pred;
+    for y in 0..cuh as usize {
+        let src = &r[y];
+        for x in 0..cuw as usize {
+            dst[x] = round_shift(
+                unsafe { run_filter(src[x..].as_ptr(), 1, &tbl_mc_c_coeff[dx as usize]) },
+                MAC_ADD_N0,
+                MAC_SFT_N0,
+            )
+            .max(0)
+            .min(MAX_SAMPLE_VAL) as pel;
         }
+        dst = &mut dst[cuw as usize..];
     }
 }
 
-fn evc_mc_c_0n(
-    r: &PlaneRegion<'_, pel>,
-    gmv_x: i16,
-    gmv_y: i16,
-    pred: &mut [pel],
-    cuw: i16,
-    cuh: i16,
-) {
-    let dy = gmv_y & 31;
-    let gmv_x = gmv_x >> 5;
-    let gmv_y = (gmv_y >> 5) - 1;
+fn evc_mc_c_0n(p: &Plane<pel>, gmv_x: i16, gmv_y: i16, pred: &mut [pel], cuw: i16, cuh: i16) {
+    let dy = gmv_y & 7;
+    let po = PlaneOffset {
+        x: (gmv_x >> 3) as isize,
+        y: (gmv_y >> 3) as isize - 1,
+    };
+    let r = p.slice(po).clamp();
+    let stride = p.cfg.stride;
 
-    for y in 0..cuh {
-        for x in 0..cuw {
-            let rx0 = max(0, x + gmv_x + 0) as usize;
-            let ry0 = max(0, y + gmv_y + 0) as usize;
-            let ry1 = max(0, y + gmv_y + 1) as usize;
-            let ry2 = max(0, y + gmv_y + 2) as usize;
-            let ry3 = max(0, y + gmv_y + 3) as usize;
-
-            let pt = MAC_4TAP_0N(
-                &tbl_mc_c_coeff[dy as usize],
-                r[ry0][rx0] as i16,
-                r[ry1][rx0] as i16,
-                r[ry2][rx0] as i16,
-                r[ry3][rx0] as i16,
-            );
-            pred[(y * cuw + x) as usize] =
-                EVC_CLIP3(0i32, ((1 << BIT_DEPTH) - 1) as i32, pt) as pel;
+    let mut dst = pred;
+    for y in 0..cuh as usize {
+        let src = &r[y];
+        for x in 0..cuw as usize {
+            dst[x] = round_shift(
+                unsafe { run_filter(src[x..].as_ptr(), stride, &tbl_mc_c_coeff[dy as usize]) },
+                MAC_ADD_0N,
+                MAC_SFT_0N,
+            )
+            .max(0)
+            .min(MAX_SAMPLE_VAL) as pel;
         }
+        dst = &mut dst[cuw as usize..];
     }
 }
 
-fn evc_mc_c_nn(
-    r: &PlaneRegion<'_, pel>,
-    gmv_x: i16,
-    gmv_y: i16,
-    pred: &mut [pel],
-    cuw: i16,
-    cuh: i16,
-) {
-    let mut buf = [0i16; ((MAX_CU_SIZE >> 1) + MC_IBUF_PAD_C) * (MAX_CU_SIZE >> 1)];
+fn evc_mc_c_nn(p: &Plane<pel>, gmv_x: i16, gmv_y: i16, pred: &mut [pel], cuw: i16, cuh: i16) {
+    let mut intermediate = [0i16; ((MAX_CU_SIZE >> 1) + MC_IBUF_PAD_C) * 8];
 
-    let dx = gmv_x & 31;
-    let dy = gmv_y & 31;
-    let gmv_x = (gmv_x >> 5) - 1;
-    let gmv_y = (gmv_y >> 5) - 1;
+    let dx = gmv_x & 7;
+    let dy = gmv_y & 7;
+    let po = PlaneOffset {
+        x: (gmv_x >> 3) as isize - 1,
+        y: (gmv_y >> 3) as isize - 1,
+    };
+    let r = p.slice(po).clamp();
 
-    for y in 0..(cuh + 3) {
-        for x in 0..cuw {
-            let ry0 = max(0, y + gmv_y + 0) as usize;
-            let rx0 = max(0, x + gmv_x + 0) as usize;
-            let rx1 = max(0, x + gmv_x + 1) as usize;
-            let rx2 = max(0, x + gmv_x + 2) as usize;
-            let rx3 = max(0, x + gmv_x + 3) as usize;
-
-            buf[(y * cuw + x) as usize] = MAC_4TAP_NN_S1(
-                &tbl_mc_c_coeff[dx as usize],
-                r[ry0][rx0] as i16,
-                r[ry0][rx1] as i16,
-                r[ry0][rx2] as i16,
-                r[ry0][rx3] as i16,
-            ) as i16;
+    for cg in (0..cuw as usize).step_by(8) {
+        for y in 0..(cuh + MC_IBUF_PAD_C as i16) as usize {
+            let src = &r[y];
+            for x in cg..(cg + 8).min(cuw as usize) {
+                intermediate[8 * y + x - cg] = round_shift(
+                    unsafe { run_filter(src[x..].as_ptr(), 1, &tbl_mc_c_coeff[dx as usize]) },
+                    MAC_ADD_NN_S1,
+                    MAC_SFT_NN_S1,
+                ) as i16;
+            }
         }
-    }
 
-    for y in 0..cuh {
-        for x in 0..cuw {
-            let pt = MAC_4TAP_NN_S2(
-                &tbl_mc_c_coeff[dy as usize],
-                buf[((y + 0) * cuw + x) as usize],
-                buf[((y + 1) * cuw + x) as usize],
-                buf[((y + 2) * cuw + x) as usize],
-                buf[((y + 3) * cuw + x) as usize],
-            );
-            pred[(y * cuw + x) as usize] =
-                EVC_CLIP3(0i32, ((1 << BIT_DEPTH) - 1) as i32, pt) as pel;
+        let mut dst = &mut pred[..];
+        for y in 0..cuh as usize {
+            for x in cg..(cg + 8).min(cuw as usize) {
+                dst[x] = round_shift(
+                    unsafe {
+                        run_filter(
+                            intermediate[8 * y + x - cg..].as_ptr(),
+                            8,
+                            &tbl_mc_c_coeff[dy as usize],
+                        )
+                    },
+                    MAC_ADD_NN_S2,
+                    MAC_SFT_NN_S2,
+                )
+                .max(0)
+                .min(MAX_SAMPLE_VAL) as pel;
+            }
+            dst = &mut dst[cuw as usize..];
         }
     }
 }
@@ -565,42 +414,30 @@ fn evc_mc_c_nn(
 pub(crate) fn evc_mc_l(
     ori_mv_x: i16,
     ori_mv_y: i16,
-    r: &PlaneRegion<'_, pel>,
+    r: &Plane<pel>,
     gmv_x: i16,
     gmv_y: i16,
     pred: &mut [pel],
     cuw: i16,
     cuh: i16,
 ) {
-    let x =
-        (((ori_mv_x) | ((ori_mv_x) >> 1) | ((ori_mv_x) >> 2) | ((ori_mv_x) >> 3)) & 0x1) as usize;
-    let y =
-        (((ori_mv_y) | ((ori_mv_y) >> 1) | ((ori_mv_y) >> 2) | ((ori_mv_y) >> 3)) & 0x1) as usize;
+    let x = ((ori_mv_x | (ori_mv_x >> 1)) & 0x1) as usize;
+    let y = ((ori_mv_y | (ori_mv_y >> 1)) & 0x1) as usize;
     evc_tbl_mc_l[x][y](r, gmv_x, gmv_y, pred, cuw, cuh)
 }
 
 fn evc_mc_c(
     ori_mv_x: i16,
     ori_mv_y: i16,
-    r: &PlaneRegion<'_, pel>,
+    r: &Plane<pel>,
     gmv_x: i16,
     gmv_y: i16,
     pred: &mut [pel],
     cuw: i16,
     cuh: i16,
 ) {
-    let x = (((ori_mv_x)
-        | ((ori_mv_x) >> 1)
-        | ((ori_mv_x) >> 2)
-        | ((ori_mv_x) >> 3)
-        | ((ori_mv_x) >> 4))
-        & 0x1) as usize;
-    let y = (((ori_mv_y)
-        | ((ori_mv_y) >> 1)
-        | ((ori_mv_y) >> 2)
-        | ((ori_mv_y) >> 3)
-        | ((ori_mv_y) >> 4))
-        & 0x1) as usize;
+    let x = ((ori_mv_x | (ori_mv_x >> 1) | (ori_mv_x >> 2)) & 0x1) as usize;
+    let y = ((ori_mv_y | (ori_mv_y >> 1) | (ori_mv_y >> 2)) & 0x1) as usize;
     evc_tbl_mc_c[x][y](r, gmv_x, gmv_y, pred, cuw, cuh)
 }
 
@@ -636,31 +473,31 @@ pub(crate) fn evc_mc(
             let planes = &pic.frame.borrow().planes;
 
             evc_mc_l(
-                mv_before_clipping[REFP_0][MV_X] << 2,
-                mv_before_clipping[REFP_0][MV_Y] << 2,
-                &planes[Y_C].as_region(),
-                (qpel_gmv_x << 2),
-                (qpel_gmv_y << 2),
+                mv_before_clipping[REFP_0][MV_X],
+                mv_before_clipping[REFP_0][MV_Y],
+                &planes[Y_C],
+                qpel_gmv_x,
+                qpel_gmv_y,
                 &mut pred[0].data[Y_C],
                 cuw,
                 cuh,
             );
             evc_mc_c(
-                mv_before_clipping[REFP_0][MV_X] << 2,
-                mv_before_clipping[REFP_0][MV_Y] << 2,
-                &planes[U_C].as_region(),
-                (qpel_gmv_x << 2),
-                (qpel_gmv_y << 2),
+                mv_before_clipping[REFP_0][MV_X],
+                mv_before_clipping[REFP_0][MV_Y],
+                &planes[U_C],
+                qpel_gmv_x,
+                qpel_gmv_y,
                 &mut pred[0].data[U_C],
                 cuw >> 1,
                 cuh >> 1,
             );
             evc_mc_c(
-                mv_before_clipping[REFP_0][MV_X] << 2,
-                mv_before_clipping[REFP_0][MV_Y] << 2,
-                &planes[V_C].as_region(),
-                (qpel_gmv_x << 2),
-                (qpel_gmv_y << 2),
+                mv_before_clipping[REFP_0][MV_X],
+                mv_before_clipping[REFP_0][MV_Y],
+                &planes[V_C],
+                qpel_gmv_x,
+                qpel_gmv_y,
                 &mut pred[0].data[V_C],
                 cuw >> 1,
                 cuh >> 1,
@@ -694,31 +531,31 @@ pub(crate) fn evc_mc(
             let planes = &pic.frame.borrow().planes;
 
             evc_mc_l(
-                mv_before_clipping[REFP_1][MV_X] << 2,
-                mv_before_clipping[REFP_1][MV_Y] << 2,
-                &planes[Y_C].as_region(),
-                (qpel_gmv_x << 2),
-                (qpel_gmv_y << 2),
+                mv_before_clipping[REFP_1][MV_X],
+                mv_before_clipping[REFP_1][MV_Y],
+                &planes[Y_C],
+                qpel_gmv_x,
+                qpel_gmv_y,
                 &mut pred[bidx].data[Y_C],
                 cuw,
                 cuh,
             );
             evc_mc_c(
-                mv_before_clipping[REFP_1][MV_X] << 2,
-                mv_before_clipping[REFP_1][MV_Y] << 2,
-                &planes[U_C].as_region(),
-                (qpel_gmv_x << 2),
-                (qpel_gmv_y << 2),
+                mv_before_clipping[REFP_1][MV_X],
+                mv_before_clipping[REFP_1][MV_Y],
+                &planes[U_C],
+                qpel_gmv_x,
+                qpel_gmv_y,
                 &mut pred[bidx].data[U_C],
                 cuw >> 1,
                 cuh >> 1,
             );
             evc_mc_c(
-                mv_before_clipping[REFP_1][MV_X] << 2,
-                mv_before_clipping[REFP_1][MV_Y] << 2,
-                &planes[V_C].as_region(),
-                (qpel_gmv_x << 2),
-                (qpel_gmv_y << 2),
+                mv_before_clipping[REFP_1][MV_X],
+                mv_before_clipping[REFP_1][MV_Y],
+                &planes[V_C],
+                qpel_gmv_x,
+                qpel_gmv_y,
                 &mut pred[bidx].data[V_C],
                 cuw >> 1,
                 cuh >> 1,
