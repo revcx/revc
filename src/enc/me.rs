@@ -700,7 +700,7 @@ impl EvcePInter {
                 evc_mc_l(
                     (mv_x << 2),
                     (mv_y << 2),
-                    &plane_r.as_region(),
+                    &plane_r,
                     (mv_x << 2),
                     (mv_y << 2),
                     &mut self.pred_buf.data[Y_C],
@@ -766,7 +766,7 @@ impl EvcePInter {
                     evc_mc_l(
                         (mv_x << 2),
                         (mv_y << 2),
-                        &plane_r.as_region(),
+                        &plane_r,
                         (mv_x << 2),
                         (mv_y << 2),
                         &mut self.pred_buf.data[Y_C],

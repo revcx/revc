@@ -362,15 +362,9 @@ impl EvcdCtx {
                 split_mode = evcd_eco_split_mode(bs, sbac, sbac_ctx, cuw, cuh)?;
                 EVC_TRACE_COUNTER(&mut bs.tracer);
                 EVC_TRACE(&mut bs.tracer, "x pos ");
-                EVC_TRACE(
-                    &mut bs.tracer,
-                    x + (cup % (MAX_CU_SIZE as u16 >> MIN_CU_LOG2) << MIN_CU_LOG2 as u16),
-                );
+                EVC_TRACE(&mut bs.tracer, x);
                 EVC_TRACE(&mut bs.tracer, " y pos ");
-                EVC_TRACE(
-                    &mut bs.tracer,
-                    y + (cup / (MAX_CU_SIZE as u16 >> MIN_CU_LOG2) << MIN_CU_LOG2 as u16),
-                );
+                EVC_TRACE(&mut bs.tracer, y);
                 EVC_TRACE(&mut bs.tracer, " width ");
                 EVC_TRACE(&mut bs.tracer, cuw);
                 EVC_TRACE(&mut bs.tracer, " height ");
@@ -391,15 +385,9 @@ impl EvcdCtx {
                 split_mode = evcd_eco_split_mode(bs, sbac, sbac_ctx, cuw, cuh)?;
                 EVC_TRACE_COUNTER(&mut bs.tracer);
                 EVC_TRACE(&mut bs.tracer, "x pos ");
-                EVC_TRACE(
-                    &mut bs.tracer,
-                    x + (cup % (MAX_CU_SIZE as u16 >> MIN_CU_LOG2) << MIN_CU_LOG2 as u16),
-                );
+                EVC_TRACE(&mut bs.tracer, x);
                 EVC_TRACE(&mut bs.tracer, " y pos ");
-                EVC_TRACE(
-                    &mut bs.tracer,
-                    y + (cup / (MAX_CU_SIZE as u16 >> MIN_CU_LOG2) << MIN_CU_LOG2 as u16),
-                );
+                EVC_TRACE(&mut bs.tracer, y);
                 EVC_TRACE(&mut bs.tracer, " width ");
                 EVC_TRACE(&mut bs.tracer, cuw);
                 EVC_TRACE(&mut bs.tracer, " height ");
@@ -627,7 +615,14 @@ impl EvcdCtx {
 
         EVC_TRACE_COUNTER(&mut self.bs.tracer);
         EVC_TRACE(&mut self.bs.tracer, "split_mod ");
-        EVC_TRACE(&mut self.bs.tracer, split_mode as u8);
+        EVC_TRACE(
+            &mut self.bs.tracer,
+            if split_mode == SplitMode::NO_SPLIT {
+                0
+            } else {
+                5
+            },
+        );
         EVC_TRACE(&mut self.bs.tracer, " \n");
 
         if split_mode != SplitMode::NO_SPLIT {

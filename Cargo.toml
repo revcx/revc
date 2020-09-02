@@ -46,3 +46,6 @@ required-features = ["binaries"]
 
 [profile.dev]
 opt-level = 0
+
+[profile.release]
+debug = true
