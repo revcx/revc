@@ -5,7 +5,6 @@ use super::region::*;
 use super::util::*;
 
 use num_traits::*;
-use std::cmp::max;
 
 /* padding for store intermediate values, which should be larger than
 1+ half of filter tap */
