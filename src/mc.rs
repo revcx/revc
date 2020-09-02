@@ -7,8 +7,8 @@ use std::cmp::max;
 
 /* padding for store intermediate values, which should be larger than
 1+ half of filter tap */
-const MC_IBUF_PAD_C: usize = 4;
-const MC_IBUF_PAD_L: usize = 8;
+const MC_IBUF_PAD_L: usize = 5;
+const MC_IBUF_PAD_C: usize = 3;
 
 const MAC_SFT_N0: i32 = (6);
 const MAC_ADD_N0: i32 = (1 << 5);
@@ -286,7 +286,7 @@ fn evc_mc_l_nn(
     let gmv_x = (gmv_x >> 2) - 2;
     let gmv_y = (gmv_y >> 2) - 2;
 
-    for y in 0..(cuh + 7) {
+    for y in 0..(cuh + MC_IBUF_PAD_L as i16) {
         for x in 0..cuw {
             let ry0 = max(0, y + gmv_y + 0) as usize;
             let rx0 = max(0, x + gmv_x + 0) as usize;
@@ -425,7 +425,7 @@ fn evc_mc_c_nn(
     let gmv_x = (gmv_x >> 3) - 1;
     let gmv_y = (gmv_y >> 3) - 1;
 
-    for y in 0..(cuh + 3) {
+    for y in 0..(cuh + MC_IBUF_PAD_C as i16) {
         for x in 0..cuw {
             let ry0 = max(0, y + gmv_y + 0) as usize;
             let rx0 = max(0, x + gmv_x + 0) as usize;
