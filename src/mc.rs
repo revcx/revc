@@ -9,7 +9,6 @@ use std::cmp::max;
 1+ half of filter tap */
 const MC_IBUF_PAD_C: usize = 4;
 const MC_IBUF_PAD_L: usize = 8;
-const MC_IBUF_PAD_BL: usize = 2;
 
 const MAC_SFT_N0: i32 = (6);
 const MAC_ADD_N0: i32 = (1 << 5);
@@ -21,11 +20,11 @@ const MAC_SFT_NN_S2: i32 = (10);
 const MAC_ADD_NN_S2: i32 = (1 << 9);
 
 #[rustfmt::skip]
-static tbl_mc_l_coeff:[[i16;8];4] = [
-    [  0, 0,   0, 64,  0,   0,  0,  0 ],
-    [  0, 1,  -5, 52, 20,  -5,  1,  0 ],
-    [  0, 2, -10, 40, 40, -10,  2,  0 ],
-    [  0, 1,  -5, 20, 52,  -5,  1,  0 ],
+static tbl_mc_l_coeff:[[i16;6];4] = [
+    [  0,   0, 64,  0,   0,  0, ],
+    [  1,  -5, 52, 20,  -5,  1, ],
+    [  2, -10, 40, 40, -10,  2, ],
+    [  1,  -5, 20, 52,  -5,  1, ],
 ];
 
 #[rustfmt::skip]
@@ -41,84 +40,32 @@ static tbl_mc_c_coeff: [[i16;4];8] = [
 ];
 
 #[inline]
-fn MAC_8TAP(
-    c: &[i16],
-    r0: i16,
-    r1: i16,
-    r2: i16,
-    r3: i16,
-    r4: i16,
-    r5: i16,
-    r6: i16,
-    r7: i16,
-) -> i32 {
+fn MAC_6TAP(c: &[i16], r0: i16, r1: i16, r2: i16, r3: i16, r4: i16, r5: i16) -> i32 {
     c[0] as i32 * r0 as i32
         + c[1] as i32 * r1 as i32
         + c[2] as i32 * r2 as i32
         + c[3] as i32 * r3 as i32
         + c[4] as i32 * r4 as i32
         + c[5] as i32 * r5 as i32
-        + c[6] as i32 * r6 as i32
-        + c[7] as i32 * r7 as i32
 }
 #[inline]
-fn MAC_8TAP_N0(
-    c: &[i16],
-    r0: i16,
-    r1: i16,
-    r2: i16,
-    r3: i16,
-    r4: i16,
-    r5: i16,
-    r6: i16,
-    r7: i16,
-) -> i32 {
-    (MAC_8TAP(c, r0, r1, r2, r3, r4, r5, r6, r7) + MAC_ADD_N0) >> MAC_SFT_N0
+fn MAC_6TAP_N0(c: &[i16], r0: i16, r1: i16, r2: i16, r3: i16, r4: i16, r5: i16) -> i32 {
+    (MAC_6TAP(c, r0, r1, r2, r3, r4, r5) + MAC_ADD_N0) >> MAC_SFT_N0
 }
 
 #[inline]
-fn MAC_8TAP_0N(
-    c: &[i16],
-    r0: i16,
-    r1: i16,
-    r2: i16,
-    r3: i16,
-    r4: i16,
-    r5: i16,
-    r6: i16,
-    r7: i16,
-) -> i32 {
-    (MAC_8TAP(c, r0, r1, r2, r3, r4, r5, r6, r7) + MAC_ADD_0N) >> MAC_SFT_0N
+fn MAC_6TAP_0N(c: &[i16], r0: i16, r1: i16, r2: i16, r3: i16, r4: i16, r5: i16) -> i32 {
+    (MAC_6TAP(c, r0, r1, r2, r3, r4, r5) + MAC_ADD_0N) >> MAC_SFT_0N
 }
 
 #[inline]
-fn MAC_8TAP_NN_S1(
-    c: &[i16],
-    r0: i16,
-    r1: i16,
-    r2: i16,
-    r3: i16,
-    r4: i16,
-    r5: i16,
-    r6: i16,
-    r7: i16,
-) -> i32 {
-    (MAC_8TAP(c, r0, r1, r2, r3, r4, r5, r6, r7) + MAC_ADD_NN_S1) >> MAC_SFT_NN_S1
+fn MAC_6TAP_NN_S1(c: &[i16], r0: i16, r1: i16, r2: i16, r3: i16, r4: i16, r5: i16) -> i32 {
+    (MAC_6TAP(c, r0, r1, r2, r3, r4, r5) + MAC_ADD_NN_S1) >> MAC_SFT_NN_S1
 }
 
 #[inline]
-fn MAC_8TAP_NN_S2(
-    c: &[i16],
-    r0: i16,
-    r1: i16,
-    r2: i16,
-    r3: i16,
-    r4: i16,
-    r5: i16,
-    r6: i16,
-    r7: i16,
-) -> i32 {
-    (MAC_8TAP(c, r0, r1, r2, r3, r4, r5, r6, r7) + MAC_ADD_NN_S2) >> MAC_SFT_NN_S2
+fn MAC_6TAP_NN_S2(c: &[i16], r0: i16, r1: i16, r2: i16, r3: i16, r4: i16, r5: i16) -> i32 {
+    (MAC_6TAP(c, r0, r1, r2, r3, r4, r5) + MAC_ADD_NN_S2) >> MAC_SFT_NN_S2
 }
 
 #[inline]
@@ -259,7 +206,7 @@ fn evc_mc_l_n0(
     cuh: i16,
 ) {
     let dx = gmv_x & 3;
-    let gmv_x = (gmv_x >> 2) - 3;
+    let gmv_x = (gmv_x >> 2) - 2;
     let gmv_y = gmv_y >> 2;
 
     for y in 0..cuh {
@@ -271,10 +218,8 @@ fn evc_mc_l_n0(
             let rx3 = max(0, x + gmv_x + 3) as usize;
             let rx4 = max(0, x + gmv_x + 4) as usize;
             let rx5 = max(0, x + gmv_x + 5) as usize;
-            let rx6 = max(0, x + gmv_x + 6) as usize;
-            let rx7 = max(0, x + gmv_x + 7) as usize;
 
-            let pt = MAC_8TAP_N0(
+            let pt = MAC_6TAP_N0(
                 &tbl_mc_l_coeff[dx as usize],
                 r[ry0][rx0] as i16,
                 r[ry0][rx1] as i16,
@@ -282,8 +227,6 @@ fn evc_mc_l_n0(
                 r[ry0][rx3] as i16,
                 r[ry0][rx4] as i16,
                 r[ry0][rx5] as i16,
-                r[ry0][rx6] as i16,
-                r[ry0][rx7] as i16,
             );
             pred[(y * cuw + x) as usize] =
                 EVC_CLIP3(0i32, ((1 << BIT_DEPTH) - 1) as i32, pt) as pel;
@@ -301,7 +244,7 @@ fn evc_mc_l_0n(
 ) {
     let dy = gmv_y & 3;
     let gmv_x = gmv_x >> 2;
-    let gmv_y = (gmv_y >> 2) - 3;
+    let gmv_y = (gmv_y >> 2) - 2;
 
     for y in 0..cuh {
         for x in 0..cuw {
@@ -312,10 +255,8 @@ fn evc_mc_l_0n(
             let ry3 = max(0, y + gmv_y + 3) as usize;
             let ry4 = max(0, y + gmv_y + 4) as usize;
             let ry5 = max(0, y + gmv_y + 5) as usize;
-            let ry6 = max(0, y + gmv_y + 6) as usize;
-            let ry7 = max(0, y + gmv_y + 7) as usize;
 
-            let pt = MAC_8TAP_0N(
+            let pt = MAC_6TAP_0N(
                 &tbl_mc_l_coeff[dy as usize],
                 r[ry0][rx0] as i16,
                 r[ry1][rx0] as i16,
@@ -323,8 +264,6 @@ fn evc_mc_l_0n(
                 r[ry3][rx0] as i16,
                 r[ry4][rx0] as i16,
                 r[ry5][rx0] as i16,
-                r[ry6][rx0] as i16,
-                r[ry7][rx0] as i16,
             );
             pred[(y * cuw + x) as usize] =
                 EVC_CLIP3(0i32, ((1 << BIT_DEPTH) - 1) as i32, pt) as pel;
@@ -344,8 +283,8 @@ fn evc_mc_l_nn(
 
     let dx = gmv_x & 3;
     let dy = gmv_y & 3;
-    let gmv_x = (gmv_x >> 2) - 3;
-    let gmv_y = (gmv_y >> 2) - 3;
+    let gmv_x = (gmv_x >> 2) - 2;
+    let gmv_y = (gmv_y >> 2) - 2;
 
     for y in 0..(cuh + 7) {
         for x in 0..cuw {
@@ -356,10 +295,8 @@ fn evc_mc_l_nn(
             let rx3 = max(0, x + gmv_x + 3) as usize;
             let rx4 = max(0, x + gmv_x + 4) as usize;
             let rx5 = max(0, x + gmv_x + 5) as usize;
-            let rx6 = max(0, x + gmv_x + 6) as usize;
-            let rx7 = max(0, x + gmv_x + 7) as usize;
 
-            buf[(y * cuw + x) as usize] = MAC_8TAP_NN_S1(
+            buf[(y * cuw + x) as usize] = MAC_6TAP_NN_S1(
                 &tbl_mc_l_coeff[dx as usize],
                 r[ry0][rx0] as i16,
                 r[ry0][rx1] as i16,
@@ -367,15 +304,13 @@ fn evc_mc_l_nn(
                 r[ry0][rx3] as i16,
                 r[ry0][rx4] as i16,
                 r[ry0][rx5] as i16,
-                r[ry0][rx6] as i16,
-                r[ry0][rx7] as i16,
             ) as i16;
         }
     }
 
     for y in 0..cuh {
         for x in 0..cuw {
-            let pt = MAC_8TAP_NN_S2(
+            let pt = MAC_6TAP_NN_S2(
                 &tbl_mc_l_coeff[dy as usize],
                 buf[((y + 0) * cuw + x) as usize],
                 buf[((y + 1) * cuw + x) as usize],
@@ -383,8 +318,6 @@ fn evc_mc_l_nn(
                 buf[((y + 3) * cuw + x) as usize],
                 buf[((y + 4) * cuw + x) as usize],
                 buf[((y + 5) * cuw + x) as usize],
-                buf[((y + 6) * cuw + x) as usize],
-                buf[((y + 7) * cuw + x) as usize],
             );
             pred[(y * cuw + x) as usize] =
                 EVC_CLIP3(0i32, ((1 << BIT_DEPTH) - 1) as i32, pt) as pel;
