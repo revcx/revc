@@ -4,6 +4,7 @@ use super::plane::*;
 use super::region::*;
 use super::util::*;
 
+use num_traits::*;
 use std::cmp::max;
 
 /* padding for store intermediate values, which should be larger than
@@ -46,13 +47,13 @@ pub const fn round_shift(value: i32, add: i32, shift: i32) -> i32 {
     (value + add) >> shift
 }
 
-unsafe fn run_filter(src: *const pel, stride: usize, filter: &[i32]) -> i32 {
+unsafe fn run_filter<T: AsPrimitive<i32>>(src: *const T, stride: usize, filter: &[i32]) -> i32 {
     filter
         .iter()
         .enumerate()
         .map(|(i, f)| {
             let p = src.add(i * stride);
-            f * (*p) as i32
+            f * (*p).as_()
         })
         .sum::<i32>()
 }
@@ -259,7 +260,7 @@ fn evc_mc_l_0n(p: &Plane<pel>, gmv_x: i16, gmv_y: i16, pred: &mut [pel], cuw: i1
 }
 
 fn evc_mc_l_nn(p: &Plane<pel>, gmv_x: i16, gmv_y: i16, pred: &mut [pel], cuw: i16, cuh: i16) {
-    let mut intermediate = [0u16; (MAX_CU_SIZE + MC_IBUF_PAD_L) * 8];
+    let mut intermediate = [0i16; (MAX_CU_SIZE + MC_IBUF_PAD_L) * 8];
 
     let dx = gmv_x & 3;
     let dy = gmv_y & 3;
@@ -277,9 +278,7 @@ fn evc_mc_l_nn(p: &Plane<pel>, gmv_x: i16, gmv_y: i16, pred: &mut [pel], cuw: i1
                     unsafe { run_filter(src[x..].as_ptr(), 1, &tbl_mc_l_coeff[dx as usize]) },
                     MAC_ADD_NN_S1,
                     MAC_SFT_NN_S1,
-                )
-                .max(0)
-                .min(MAX_SAMPLE_VAL) as pel;
+                ) as i16;
             }
         }
 
@@ -369,7 +368,7 @@ fn evc_mc_c_0n(p: &Plane<pel>, gmv_x: i16, gmv_y: i16, pred: &mut [pel], cuw: i1
 }
 
 fn evc_mc_c_nn(p: &Plane<pel>, gmv_x: i16, gmv_y: i16, pred: &mut [pel], cuw: i16, cuh: i16) {
-    let mut intermediate = [0u16; ((MAX_CU_SIZE >> 1) + MC_IBUF_PAD_C) * 8];
+    let mut intermediate = [0i16; ((MAX_CU_SIZE >> 1) + MC_IBUF_PAD_C) * 8];
 
     let dx = gmv_x & 7;
     let dy = gmv_y & 7;
@@ -387,9 +386,7 @@ fn evc_mc_c_nn(p: &Plane<pel>, gmv_x: i16, gmv_y: i16, pred: &mut [pel], cuw: i1
                     unsafe { run_filter(src[x..].as_ptr(), 1, &tbl_mc_c_coeff[dx as usize]) },
                     MAC_ADD_NN_S1,
                     MAC_SFT_NN_S1,
-                )
-                .max(0)
-                .min(MAX_SAMPLE_VAL) as pel;
+                ) as i16;
             }
         }
 
