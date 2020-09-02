@@ -155,7 +155,7 @@ pub(crate) struct EvceCore {
     /* pred buffer of current CU. [1][x][x] is used for bi-pred */
     pred: [CUBuffer<pel>; 2], //[2][N_C][MAX_CU_DIM];
     /* neighbor pixel buffer for intra prediction */
-    nb: NBBuffer<pel>, //[N_C][N_REF][MAX_CU_SIZE * 3];
+    nb: NBBuffer<pel>, // [N_C][MAX_CU_SIZE*4+1];
     /* current encoding LCU number */
     lcu_num: u16,
     /*QP for current encoding CU. Used to derive Luma and chroma qp*/

@@ -180,7 +180,6 @@ pub(crate) fn evc_get_avail_inter(
     let mut avail = 0;
     let scuw = cuw >> MIN_CU_LOG2;
     let scuh = cuh >> MIN_CU_LOG2;
-    let curr_scup = x_scu + y_scu * w_scu;
 
     if x_scu > 0 && map_scu[scup - 1].GET_IF() == 0 && map_scu[scup - 1].GET_COD() != 0 {
         SET_AVAIL(&mut avail, AVAIL_LE);
@@ -285,21 +284,6 @@ pub(crate) fn evc_get_avail_intra(
     }
 
     return avail;
-}
-
-pub(crate) fn evc_block_copy(
-    src: &[i16],
-    src_stride: usize,
-    dst: &mut [i16],
-    dst_stride: usize,
-    log2_copy_w: u8,
-    log2_copy_h: u8,
-) {
-    for h in 0..(1 << log2_copy_h as usize) {
-        for w in 0..(1 << log2_copy_w as usize) {
-            dst[h * dst_stride + w] = src[h * src_stride + w];
-        }
-    }
 }
 
 #[inline]

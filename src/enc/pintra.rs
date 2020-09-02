@@ -334,9 +334,9 @@ impl EvceCtx {
             let pred_buf = &mut pi.pred_cache[i as usize];
 
             evc_ipred_b(
-                &core.nb.data[Y_C][0][2..],
-                &core.nb.data[Y_C][1][cuh..],
-                core.nb.data[Y_C][1][cuh - 1],
+                &core.nb.data[Y_C][..cuh << 1],
+                core.nb.data[Y_C][cuh << 1],
+                &core.nb.data[Y_C][(cuh << 1) + 1..],
                 pred_buf,
                 i.into(),
                 cuw,
@@ -517,9 +517,9 @@ impl EvceCtx {
             cost += (self.lambda[0] * bit_cnt as f64);
         } else {
             evc_ipred_b(
-                &self.core.nb.data[U_C][0][2..],
-                &self.core.nb.data[U_C][1][(cuh >> 1) as usize..],
-                self.core.nb.data[U_C][1][(cuh >> 1) as usize - 1],
+                &self.core.nb.data[U_C][..cuh as usize],
+                self.core.nb.data[U_C][cuh as usize],
+                &self.core.nb.data[U_C][cuh as usize + 1..],
                 &mut self.pintra.pred.data[U_C],
                 self.core.ipm[1],
                 cuw as usize >> 1,
@@ -527,9 +527,9 @@ impl EvceCtx {
             );
 
             evc_ipred_b(
-                &self.core.nb.data[V_C][0][2..],
-                &self.core.nb.data[V_C][1][(cuh >> 1) as usize..],
-                self.core.nb.data[V_C][1][(cuh >> 1) as usize - 1],
+                &self.core.nb.data[V_C][..cuh as usize],
+                self.core.nb.data[V_C][cuh as usize],
+                &self.core.nb.data[V_C][cuh as usize + 1..],
                 &mut self.pintra.pred.data[V_C],
                 self.core.ipm[1],
                 cuw as usize >> 1,

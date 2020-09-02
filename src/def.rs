@@ -52,9 +52,6 @@ pub(crate) const MV_D: usize = 2;
 /* Reference index indicator */
 pub(crate) const REFI: usize = 2;
 
-pub(crate) const N_REF: usize = 2; /* left, up */
-pub(crate) const NUM_NEIB: usize = 4; /* LR: 00, 10, 01, 11*/
-
 pub(crate) const MAX_CU_LOG2: usize = 6; // baseline: 64x64
 pub(crate) const MIN_CU_LOG2: usize = 2;
 pub(crate) const MAX_CU_SIZE: usize = (1 << MAX_CU_LOG2);
@@ -70,8 +67,6 @@ pub(crate) const MAX_TR_SIZE: usize = (1 << MAX_TR_LOG2);
 pub(crate) const MIN_TR_SIZE: usize = (1 << MIN_TR_LOG2);
 pub(crate) const MAX_TR_DIM: usize = (1 << (MAX_TR_LOG2 + MAX_TR_LOG2));
 pub(crate) const MIN_TR_DIM: usize = (1 << (MIN_TR_LOG2 + MIN_TR_LOG2));
-
-pub(crate) const MAX_BEF_DATA_NUM: usize = (NUM_NEIB << 1);
 
 /* maximum CB count in a LCB */
 pub(crate) const MAX_CU_CNT_IN_LCU: usize = (MAX_CU_DIM / MIN_CU_DIM);
@@ -742,13 +737,17 @@ impl<T: Default + Copy> Default for CUBuffer<T> {
 
 #[derive(Clone)]
 pub(crate) struct NBBuffer<T: Default + Copy> {
-    pub(crate) data: Vec<Vec<Vec<T>>>,
+    pub(crate) data: Vec<Vec<T>>,
 }
 
 impl<T: Default + Copy> Default for NBBuffer<T> {
     fn default() -> Self {
         NBBuffer {
-            data: vec![vec![vec![T::default(); MAX_CU_SIZE * 3]; N_REF]; N_C],
+            data: vec![
+                vec![T::default(); (MAX_CU_SIZE << 2) + 1], //left*2 + top_left + top*2
+                vec![T::default(); (MAX_CU_SIZE << 1) + 1],
+                vec![T::default(); (MAX_CU_SIZE << 1) + 1],
+            ],
         }
     }
 }

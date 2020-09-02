@@ -1150,9 +1150,9 @@ pub(crate) fn evcd_eco_unit(
         EVC_TRACE(&mut bs.tracer, " \n");
 
         evc_ipred_b(
-            &core.nb.data[Y_C][0][2..],
-            &core.nb.data[Y_C][1][cuh as usize..],
-            core.nb.data[Y_C][1][cuh as usize - 1],
+            &core.nb.data[Y_C][..(cuh << 1) as usize],
+            core.nb.data[Y_C][(cuh << 1) as usize],
+            &core.nb.data[Y_C][(cuh << 1) as usize + 1..],
             &mut core.pred[0].data[Y_C],
             core.ipm[0],
             cuw as usize,
@@ -1160,18 +1160,18 @@ pub(crate) fn evcd_eco_unit(
         );
 
         evc_ipred_b(
-            &core.nb.data[U_C][0][2..],
-            &core.nb.data[U_C][1][(cuh >> 1) as usize..],
-            core.nb.data[U_C][1][(cuh >> 1) as usize - 1],
+            &core.nb.data[U_C][..cuh as usize],
+            core.nb.data[U_C][cuh as usize],
+            &core.nb.data[U_C][cuh as usize + 1..],
             &mut core.pred[0].data[U_C],
             core.ipm[1],
             cuw as usize >> 1,
             cuh as usize >> 1,
         );
         evc_ipred_b(
-            &core.nb.data[V_C][0][2..],
-            &core.nb.data[V_C][1][(cuh >> 1) as usize..],
-            core.nb.data[V_C][1][(cuh >> 1) as usize - 1],
+            &core.nb.data[V_C][..cuh as usize],
+            core.nb.data[V_C][cuh as usize],
+            &core.nb.data[V_C][cuh as usize + 1..],
             &mut core.pred[0].data[V_C],
             core.ipm[1],
             cuw as usize >> 1,
@@ -1333,12 +1333,10 @@ fn evcd_get_nbr_yuv(
     pic: &Option<Rc<RefCell<EvcPic>>>,
     pps_constrained_intra_pred_flag: bool,
 ) {
-    let constrained_intra_flag =
-        core.pred_mode == PredMode::MODE_INTRA && pps_constrained_intra_pred_flag;
-
     if let Some(pic) = &pic {
         let frame = &pic.borrow().frame;
         let planes = &frame.borrow().planes;
+
         /* Y */
         evc_get_nbr_b(
             x as usize,
@@ -1353,7 +1351,7 @@ fn evcd_get_nbr_yuv(
             w_scu as usize,
             h_scu as usize,
             Y_C,
-            constrained_intra_flag,
+            pps_constrained_intra_pred_flag,
         );
 
         cuw >>= 1;
@@ -1375,7 +1373,7 @@ fn evcd_get_nbr_yuv(
             w_scu as usize,
             h_scu as usize,
             U_C,
-            constrained_intra_flag,
+            pps_constrained_intra_pred_flag,
         );
 
         /* V */
@@ -1392,7 +1390,7 @@ fn evcd_get_nbr_yuv(
             w_scu as usize,
             h_scu as usize,
             V_C,
-            constrained_intra_flag,
+            pps_constrained_intra_pred_flag,
         );
     }
 }
