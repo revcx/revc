@@ -57,62 +57,6 @@ unsafe fn run_filter<T: AsPrimitive<i32>>(src: *const T, stride: usize, filter: 
         .sum::<i32>()
 }
 
-#[inline]
-fn MAC_6TAP(c: &[i16], r0: i16, r1: i16, r2: i16, r3: i16, r4: i16, r5: i16) -> i32 {
-    c[0] as i32 * r0 as i32
-        + c[1] as i32 * r1 as i32
-        + c[2] as i32 * r2 as i32
-        + c[3] as i32 * r3 as i32
-        + c[4] as i32 * r4 as i32
-        + c[5] as i32 * r5 as i32
-}
-#[inline]
-fn MAC_6TAP_N0(c: &[i16], r0: i16, r1: i16, r2: i16, r3: i16, r4: i16, r5: i16) -> i32 {
-    (MAC_6TAP(c, r0, r1, r2, r3, r4, r5) + MAC_ADD_N0) >> MAC_SFT_N0
-}
-
-#[inline]
-fn MAC_6TAP_0N(c: &[i16], r0: i16, r1: i16, r2: i16, r3: i16, r4: i16, r5: i16) -> i32 {
-    (MAC_6TAP(c, r0, r1, r2, r3, r4, r5) + MAC_ADD_0N) >> MAC_SFT_0N
-}
-
-#[inline]
-fn MAC_6TAP_NN_S1(c: &[i16], r0: i16, r1: i16, r2: i16, r3: i16, r4: i16, r5: i16) -> i32 {
-    (MAC_6TAP(c, r0, r1, r2, r3, r4, r5) + MAC_ADD_NN_S1) >> MAC_SFT_NN_S1
-}
-
-#[inline]
-fn MAC_6TAP_NN_S2(c: &[i16], r0: i16, r1: i16, r2: i16, r3: i16, r4: i16, r5: i16) -> i32 {
-    (MAC_6TAP(c, r0, r1, r2, r3, r4, r5) + MAC_ADD_NN_S2) >> MAC_SFT_NN_S2
-}
-
-#[inline]
-fn MAC_4TAP(c: &[i16], r0: i16, r1: i16, r2: i16, r3: i16) -> i32 {
-    c[0] as i32 * r0 as i32
-        + c[1] as i32 * r1 as i32
-        + c[2] as i32 * r2 as i32
-        + c[3] as i32 * r3 as i32
-}
-
-#[inline]
-fn MAC_4TAP_N0(c: &[i16], r0: i16, r1: i16, r2: i16, r3: i16) -> i32 {
-    (MAC_4TAP(c, r0, r1, r2, r3) + MAC_ADD_N0) >> MAC_SFT_N0
-}
-#[inline]
-fn MAC_4TAP_0N(c: &[i16], r0: i16, r1: i16, r2: i16, r3: i16) -> i32 {
-    (MAC_4TAP(c, r0, r1, r2, r3) + MAC_ADD_0N) >> MAC_SFT_0N
-}
-
-#[inline]
-fn MAC_4TAP_NN_S1(c: &[i16], r0: i16, r1: i16, r2: i16, r3: i16) -> i32 {
-    (MAC_4TAP(c, r0, r1, r2, r3) + MAC_ADD_NN_S1) >> MAC_SFT_NN_S1
-}
-
-#[inline]
-fn MAC_4TAP_NN_S2(c: &[i16], r0: i16, r1: i16, r2: i16, r3: i16) -> i32 {
-    (MAC_4TAP(c, r0, r1, r2, r3) + MAC_ADD_NN_S2) >> MAC_SFT_NN_S2
-}
-
 fn mv_clip(
     mut x: i16,
     mut y: i16,
@@ -411,7 +355,7 @@ fn evc_mc_c_nn(p: &Plane<pel>, gmv_x: i16, gmv_y: i16, pred: &mut [pel], cuw: i1
     }
 }
 
-pub(crate) fn evc_mc_l(
+pub fn evc_mc_l(
     ori_mv_x: i16,
     ori_mv_y: i16,
     r: &Plane<pel>,
