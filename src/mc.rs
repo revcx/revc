@@ -355,6 +355,8 @@ fn evc_mc_c_nn(p: &Plane<pel>, gmv_x: i16, gmv_y: i16, pred: &mut [pel], cuw: i1
     }
 }
 
+//TODO: evc_mc_l should be pub(crate), but in order to be visible for benchmark,
+// change it to pub. Need to figure out a way to hide visible for API caller
 pub fn evc_mc_l(
     ori_mv_x: i16,
     ori_mv_y: i16,
@@ -370,7 +372,9 @@ pub fn evc_mc_l(
     evc_tbl_mc_l[x][y](r, gmv_x, gmv_y, pred, cuw, cuh)
 }
 
-fn evc_mc_c(
+//TODO: evc_mc_l should be private, but in order to be visible for benchmark,
+// change it to pub. Need to figure out a way to hide visible for API caller
+pub fn evc_mc_c(
     ori_mv_x: i16,
     ori_mv_y: i16,
     r: &Plane<pel>,

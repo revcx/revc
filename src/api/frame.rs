@@ -3,42 +3,153 @@ use crate::def::*;
 use crate::plane::*;
 use crate::region::*;
 
-use std::fmt;
-
 use num_traits::*;
-use std::fmt::{Debug, Display};
-use std::mem::size_of;
-use std::mem::MaybeUninit;
+
+use std::fmt;
 use std::{cmp, io};
 
-#[derive(Clone)]
-#[repr(align(32))]
-pub struct Align32;
+use std::alloc::{alloc, dealloc, Layout};
+use std::fmt::{Debug, Display};
+use std::mem::MaybeUninit;
+use std::{mem, ptr};
 
-/// A 16 byte aligned array.
-#[derive(Clone, Default)]
-pub struct AlignedArray<ARRAY> {
-    _alignment: [Align32; 0],
-    pub array: ARRAY,
+#[repr(align(64))]
+pub struct Align64;
+
+// A 64 byte aligned piece of data.
+// # Examples
+// ```
+// let mut x: Aligned<[i16; 64 * 64]> = Aligned::new([0; 64 * 64]);
+// assert!(x.data.as_ptr() as usize % 16 == 0);
+//
+// let mut x: Aligned<[i16; 64 * 64]> = Aligned::uninitialized();
+// assert!(x.data.as_ptr() as usize % 16 == 0);
+// ```
+pub struct Aligned<T> {
+    _alignment: [Align64; 0],
+    pub data: T,
 }
 
-#[allow(non_snake_case)]
-pub fn AlignedArray<ARRAY>(array: ARRAY) -> AlignedArray<ARRAY> {
-    AlignedArray {
-        _alignment: [],
-        array,
+impl<T> Aligned<T> {
+    pub const fn new(data: T) -> Self {
+        Aligned {
+            _alignment: [],
+            data,
+        }
+    }
+    #[allow(clippy::uninit_assumed_init)]
+    pub fn uninitialized() -> Self {
+        Self::new(unsafe { MaybeUninit::uninit().assume_init() })
     }
 }
 
-#[allow(non_snake_case)]
-pub fn UninitializedAlignedArray<ARRAY>() -> AlignedArray<ARRAY> {
-    AlignedArray(unsafe { MaybeUninit::uninit().assume_init() })
+/// An analog to a Box<[T]> where the underlying slice is aligned.
+/// Alignment is according to the architecture-specific SIMD constraints.
+pub struct AlignedBoxedSlice<T> {
+    ptr: std::ptr::NonNull<T>,
+    len: usize,
 }
 
-#[test]
-fn sanity() {
-    let a: AlignedArray<_> = AlignedArray([0u8; 3]);
-    assert!(is_aligned(a.array.as_ptr(), 4));
+impl<T> AlignedBoxedSlice<T> {
+    // Data alignment in bytes.
+    cfg_if::cfg_if! {
+      if #[cfg(target_arch = "wasm32")] {
+        // FIXME: wasm32 allocator fails for alignment larger than 3
+        const DATA_ALIGNMENT_LOG2: usize = 3;
+      } else {
+        const DATA_ALIGNMENT_LOG2: usize = 5;
+      }
+    }
+
+    unsafe fn layout(len: usize) -> Layout {
+        Layout::from_size_align_unchecked(len * mem::size_of::<T>(), 1 << Self::DATA_ALIGNMENT_LOG2)
+    }
+
+    unsafe fn alloc(len: usize) -> std::ptr::NonNull<T> {
+        ptr::NonNull::new_unchecked(alloc(Self::layout(len)) as *mut T)
+    }
+
+    /// Creates a ['AlignedBoxedSlice'] with a slice of length ['len'] filled with
+    /// ['val'].
+    pub fn new(len: usize, val: T) -> Self
+    where
+        T: Clone,
+    {
+        let mut output = Self {
+            ptr: unsafe { Self::alloc(len) },
+            len,
+        };
+
+        for a in output.iter_mut() {
+            *a = val.clone();
+        }
+
+        output
+    }
+}
+
+impl<T: fmt::Debug> fmt::Debug for AlignedBoxedSlice<T> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        fmt::Debug::fmt(&**self, f)
+    }
+}
+
+impl<T> std::ops::Deref for AlignedBoxedSlice<T> {
+    type Target = [T];
+
+    fn deref(&self) -> &[T] {
+        unsafe {
+            let p = self.ptr.as_ptr();
+
+            std::slice::from_raw_parts(p, self.len)
+        }
+    }
+}
+
+impl<T> std::ops::DerefMut for AlignedBoxedSlice<T> {
+    fn deref_mut(&mut self) -> &mut [T] {
+        unsafe {
+            let p = self.ptr.as_ptr();
+
+            std::slice::from_raw_parts_mut(p, self.len)
+        }
+    }
+}
+
+impl<T> std::ops::Drop for AlignedBoxedSlice<T> {
+    fn drop(&mut self) {
+        unsafe {
+            for a in self.iter_mut() {
+                ptr::drop_in_place(a)
+            }
+
+            dealloc(self.ptr.as_ptr() as *mut u8, Self::layout(self.len));
+        }
+    }
+}
+
+unsafe impl<T> Send for AlignedBoxedSlice<T> where T: Send {}
+unsafe impl<T> Sync for AlignedBoxedSlice<T> where T: Sync {}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    fn is_aligned<T>(ptr: *const T, n: usize) -> bool {
+        ((ptr as usize) & ((1 << n) - 1)) == 0
+    }
+
+    #[test]
+    fn sanity_stack() {
+        let a: Aligned<_> = Aligned::new([0u8; 3]);
+        assert!(is_aligned(a.data.as_ptr(), 4));
+    }
+
+    #[test]
+    fn sanity_heap() {
+        let a: AlignedBoxedSlice<_> = AlignedBoxedSlice::new(3, 0u8);
+        assert!(is_aligned(a.as_ptr(), 4));
+    }
 }
 
 pub trait Fixed {
@@ -67,21 +178,7 @@ impl Fixed for usize {
     }
 }
 
-/// Check alignment.
-pub fn is_aligned<T>(ptr: *const T, n: usize) -> bool {
-    ((ptr as usize) & ((1 << n) - 1)) == 0
-}
-
-pub fn clamp<T: PartialOrd>(input: T, min: T, max: T) -> T {
-    if input < min {
-        min
-    } else if input > max {
-        max
-    } else {
-        input
-    }
-}
-
+////////////////////////////////////////////////////////////////////////////////////////////////////
 pub trait CastFromPrimitive<T>: Copy + 'static {
     fn cast_from(v: T) -> Self;
 }
@@ -155,7 +252,7 @@ impl_cast_from_pixel_to_primitive!(u32);
 
 pub trait ILog: PrimInt {
     fn ilog(self) -> Self {
-        Self::from(size_of::<Self>() * 8 - self.leading_zeros() as usize).unwrap()
+        Self::from(mem::size_of::<Self>() * 8 - self.leading_zeros() as usize).unwrap()
     }
 }
 
