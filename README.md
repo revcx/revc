@@ -74,6 +74,12 @@ cargo run --release --bin revcd -- -i scripts/tmp/test_ld_p.evc -o scripts/tmp/t
 cargo run --release --bin revcd -- -i scripts/tmp/test_ld_b.evc -o scripts/tmp/test.y4m -v
 ```
 
+## Benchmark
+Benchmark each component witch [Criterion](https://bheisler.github.io/criterion.rs/book/index.html).
+
+```sh
+cargo bench --features bench
+```
 
 ## Contributing
 Contributors or Pull Requests are Welcome!!!

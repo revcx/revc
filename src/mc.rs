@@ -3,6 +3,7 @@ use super::picman::*;
 use super::plane::*;
 use super::region::*;
 use super::util::*;
+use crate::api::frame::Aligned;
 
 use num_traits::*;
 
@@ -55,62 +56,6 @@ unsafe fn run_filter<T: AsPrimitive<i32>>(src: *const T, stride: usize, filter: 
             f * (*p).as_()
         })
         .sum::<i32>()
-}
-
-#[inline]
-fn MAC_6TAP(c: &[i16], r0: i16, r1: i16, r2: i16, r3: i16, r4: i16, r5: i16) -> i32 {
-    c[0] as i32 * r0 as i32
-        + c[1] as i32 * r1 as i32
-        + c[2] as i32 * r2 as i32
-        + c[3] as i32 * r3 as i32
-        + c[4] as i32 * r4 as i32
-        + c[5] as i32 * r5 as i32
-}
-#[inline]
-fn MAC_6TAP_N0(c: &[i16], r0: i16, r1: i16, r2: i16, r3: i16, r4: i16, r5: i16) -> i32 {
-    (MAC_6TAP(c, r0, r1, r2, r3, r4, r5) + MAC_ADD_N0) >> MAC_SFT_N0
-}
-
-#[inline]
-fn MAC_6TAP_0N(c: &[i16], r0: i16, r1: i16, r2: i16, r3: i16, r4: i16, r5: i16) -> i32 {
-    (MAC_6TAP(c, r0, r1, r2, r3, r4, r5) + MAC_ADD_0N) >> MAC_SFT_0N
-}
-
-#[inline]
-fn MAC_6TAP_NN_S1(c: &[i16], r0: i16, r1: i16, r2: i16, r3: i16, r4: i16, r5: i16) -> i32 {
-    (MAC_6TAP(c, r0, r1, r2, r3, r4, r5) + MAC_ADD_NN_S1) >> MAC_SFT_NN_S1
-}
-
-#[inline]
-fn MAC_6TAP_NN_S2(c: &[i16], r0: i16, r1: i16, r2: i16, r3: i16, r4: i16, r5: i16) -> i32 {
-    (MAC_6TAP(c, r0, r1, r2, r3, r4, r5) + MAC_ADD_NN_S2) >> MAC_SFT_NN_S2
-}
-
-#[inline]
-fn MAC_4TAP(c: &[i16], r0: i16, r1: i16, r2: i16, r3: i16) -> i32 {
-    c[0] as i32 * r0 as i32
-        + c[1] as i32 * r1 as i32
-        + c[2] as i32 * r2 as i32
-        + c[3] as i32 * r3 as i32
-}
-
-#[inline]
-fn MAC_4TAP_N0(c: &[i16], r0: i16, r1: i16, r2: i16, r3: i16) -> i32 {
-    (MAC_4TAP(c, r0, r1, r2, r3) + MAC_ADD_N0) >> MAC_SFT_N0
-}
-#[inline]
-fn MAC_4TAP_0N(c: &[i16], r0: i16, r1: i16, r2: i16, r3: i16) -> i32 {
-    (MAC_4TAP(c, r0, r1, r2, r3) + MAC_ADD_0N) >> MAC_SFT_0N
-}
-
-#[inline]
-fn MAC_4TAP_NN_S1(c: &[i16], r0: i16, r1: i16, r2: i16, r3: i16) -> i32 {
-    (MAC_4TAP(c, r0, r1, r2, r3) + MAC_ADD_NN_S1) >> MAC_SFT_NN_S1
-}
-
-#[inline]
-fn MAC_4TAP_NN_S2(c: &[i16], r0: i16, r1: i16, r2: i16, r3: i16) -> i32 {
-    (MAC_4TAP(c, r0, r1, r2, r3) + MAC_ADD_NN_S2) >> MAC_SFT_NN_S2
 }
 
 fn mv_clip(
@@ -259,7 +204,7 @@ fn evc_mc_l_0n(p: &Plane<pel>, gmv_x: i16, gmv_y: i16, pred: &mut [pel], cuw: i1
 }
 
 fn evc_mc_l_nn(p: &Plane<pel>, gmv_x: i16, gmv_y: i16, pred: &mut [pel], cuw: i16, cuh: i16) {
-    let mut intermediate = [0i16; (MAX_CU_SIZE + MC_IBUF_PAD_L) * 8];
+    let mut intermediate = Aligned::<[i16; (MAX_CU_SIZE + MC_IBUF_PAD_L) * 8]>::uninitialized();
 
     let dx = gmv_x & 3;
     let dy = gmv_y & 3;
@@ -273,7 +218,7 @@ fn evc_mc_l_nn(p: &Plane<pel>, gmv_x: i16, gmv_y: i16, pred: &mut [pel], cuw: i1
         for y in 0..(cuh + MC_IBUF_PAD_L as i16) as usize {
             let src = &r[y];
             for x in cg..(cg + 8).min(cuw as usize) {
-                intermediate[8 * y + x - cg] = round_shift(
+                intermediate.data[8 * y + x - cg] = round_shift(
                     unsafe { run_filter(src[x..].as_ptr(), 1, &tbl_mc_l_coeff[dx as usize]) },
                     MAC_ADD_NN_S1,
                     MAC_SFT_NN_S1,
@@ -287,7 +232,7 @@ fn evc_mc_l_nn(p: &Plane<pel>, gmv_x: i16, gmv_y: i16, pred: &mut [pel], cuw: i1
                 dst[x] = round_shift(
                     unsafe {
                         run_filter(
-                            intermediate[8 * y + x - cg..].as_ptr(),
+                            intermediate.data[8 * y + x - cg..].as_ptr(),
                             8,
                             &tbl_mc_l_coeff[dy as usize],
                         )
@@ -367,7 +312,8 @@ fn evc_mc_c_0n(p: &Plane<pel>, gmv_x: i16, gmv_y: i16, pred: &mut [pel], cuw: i1
 }
 
 fn evc_mc_c_nn(p: &Plane<pel>, gmv_x: i16, gmv_y: i16, pred: &mut [pel], cuw: i16, cuh: i16) {
-    let mut intermediate = [0i16; ((MAX_CU_SIZE >> 1) + MC_IBUF_PAD_C) * 8];
+    let mut intermediate =
+        Aligned::<[i16; ((MAX_CU_SIZE >> 1) + MC_IBUF_PAD_C) * 8]>::uninitialized();
 
     let dx = gmv_x & 7;
     let dy = gmv_y & 7;
@@ -381,7 +327,7 @@ fn evc_mc_c_nn(p: &Plane<pel>, gmv_x: i16, gmv_y: i16, pred: &mut [pel], cuw: i1
         for y in 0..(cuh + MC_IBUF_PAD_C as i16) as usize {
             let src = &r[y];
             for x in cg..(cg + 8).min(cuw as usize) {
-                intermediate[8 * y + x - cg] = round_shift(
+                intermediate.data[8 * y + x - cg] = round_shift(
                     unsafe { run_filter(src[x..].as_ptr(), 1, &tbl_mc_c_coeff[dx as usize]) },
                     MAC_ADD_NN_S1,
                     MAC_SFT_NN_S1,
@@ -395,7 +341,7 @@ fn evc_mc_c_nn(p: &Plane<pel>, gmv_x: i16, gmv_y: i16, pred: &mut [pel], cuw: i1
                 dst[x] = round_shift(
                     unsafe {
                         run_filter(
-                            intermediate[8 * y + x - cg..].as_ptr(),
+                            intermediate.data[8 * y + x - cg..].as_ptr(),
                             8,
                             &tbl_mc_c_coeff[dy as usize],
                         )
@@ -411,7 +357,9 @@ fn evc_mc_c_nn(p: &Plane<pel>, gmv_x: i16, gmv_y: i16, pred: &mut [pel], cuw: i1
     }
 }
 
-pub(crate) fn evc_mc_l(
+//TODO: evc_mc_l should be pub(crate), but in order to be visible for benchmark,
+// change it to pub. Need to figure out a way to hide visible for API caller
+pub fn evc_mc_l(
     ori_mv_x: i16,
     ori_mv_y: i16,
     r: &Plane<pel>,
@@ -426,7 +374,9 @@ pub(crate) fn evc_mc_l(
     evc_tbl_mc_l[x][y](r, gmv_x, gmv_y, pred, cuw, cuh)
 }
 
-fn evc_mc_c(
+//TODO: evc_mc_l should be private, but in order to be visible for benchmark,
+// change it to pub. Need to figure out a way to hide visible for API caller
+pub fn evc_mc_c(
     ori_mv_x: i16,
     ori_mv_y: i16,
     r: &Plane<pel>,
@@ -567,31 +517,34 @@ pub(crate) fn evc_mc(
 
     if bidx == 2 {
         let (pred0, pred1) = pred.split_at_mut(1);
-        let mut p0 = &mut pred0[0].data[Y_C];
-        let mut p1 = &mut pred1[0].data[Y_C];
-        for y in 0..cuh {
-            for x in 0..cuw {
-                let pos = (y * cuw + x) as usize;
-                p0[pos] = (p0[pos] + p1[pos] + 1) >> 1;
+        let mut p0 = pred0[0].data[Y_C].as_mut_slice();
+        let mut p1 = pred1[0].data[Y_C].as_slice();
+        for _ in 0..cuh {
+            for x in 0..cuw as usize {
+                p0[x] = (p0[x] + p1[x] + 1) >> 1;
             }
+            p0 = &mut p0[cuw as usize..];
+            p1 = &p1[cuw as usize..];
         }
 
-        let mut p0 = &mut pred0[0].data[U_C];
-        let mut p1 = &mut pred1[0].data[U_C];
-        for y in 0..cuh >> 1 {
-            for x in 0..cuw >> 1 {
-                let pos = (y * (cuw >> 1) + x) as usize;
-                p0[pos] = (p0[pos] + p1[pos] + 1) >> 1;
+        let mut p0 = pred0[0].data[U_C].as_mut_slice();
+        let mut p1 = pred1[0].data[U_C].as_slice();
+        for _ in 0..cuh >> 1 {
+            for x in 0..cuw as usize >> 1 {
+                p0[x] = (p0[x] + p1[x] + 1) >> 1;
             }
+            p0 = &mut p0[cuw as usize >> 1..];
+            p1 = &p1[cuw as usize >> 1..];
         }
 
-        let mut p0 = &mut pred0[0].data[V_C];
-        let mut p1 = &mut pred1[0].data[V_C];
-        for y in 0..cuh >> 1 {
-            for x in 0..cuw >> 1 {
-                let pos = (y * (cuw >> 1) + x) as usize;
-                p0[pos] = (p0[pos] + p1[pos] + 1) >> 1;
+        let mut p0 = pred0[0].data[V_C].as_mut_slice();
+        let mut p1 = pred1[0].data[V_C].as_slice();
+        for _ in 0..cuh >> 1 {
+            for x in 0..cuw as usize >> 1 {
+                p0[x] = (p0[x] + p1[x] + 1) >> 1;
             }
+            p0 = &mut p0[cuw as usize >> 1..];
+            p1 = &p1[cuw as usize >> 1..];
         }
     }
 }

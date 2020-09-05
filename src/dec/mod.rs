@@ -593,231 +593,6 @@ impl EvcdCtx {
         stat
     }
 
-    fn deblock_tree(
-        &mut self,
-        x: u16,
-        y: u16,
-        cuw: u16,
-        cuh: u16,
-        cud: u16,
-        cup: u16,
-        is_hor_edge: bool,
-    ) {
-        let lcu_num = (x >> MAX_CU_LOG2) + (y >> MAX_CU_LOG2) * self.w_lcu;
-        let split_mode = evc_get_split_mode(
-            cud,
-            cup,
-            cuw,
-            cuh,
-            MAX_CU_SIZE as u16,
-            &self.map_split[lcu_num as usize],
-        );
-
-        EVC_TRACE_COUNTER(&mut self.bs.tracer);
-        EVC_TRACE(&mut self.bs.tracer, "split_mod ");
-        EVC_TRACE(
-            &mut self.bs.tracer,
-            if split_mode == SplitMode::NO_SPLIT {
-                0
-            } else {
-                5
-            },
-        );
-        EVC_TRACE(&mut self.bs.tracer, " \n");
-
-        if split_mode != SplitMode::NO_SPLIT {
-            let split_struct = evc_split_get_part_structure(
-                split_mode,
-                x,
-                y,
-                cuw,
-                cuh,
-                cup,
-                cud,
-                (MAX_CU_LOG2 - MIN_CU_LOG2) as u8,
-            );
-
-            // In base profile we have small chroma blocks
-            for part_num in 0..split_struct.part_count {
-                let cur_part_num = part_num;
-                let sub_cuw = split_struct.width[cur_part_num];
-                let sub_cuh = split_struct.height[cur_part_num];
-                let x_pos = split_struct.x_pos[cur_part_num];
-                let y_pos = split_struct.y_pos[cur_part_num];
-
-                if x_pos < self.w && y_pos < self.h {
-                    self.deblock_tree(
-                        x_pos,
-                        y_pos,
-                        sub_cuw,
-                        sub_cuh,
-                        split_struct.cud[cur_part_num],
-                        split_struct.cup[cur_part_num],
-                        is_hor_edge,
-                    );
-                }
-            }
-        } else if let (Some(pic), Some(map_refi), Some(map_mv)) =
-            (&self.pic, &self.map_refi, &self.map_mv)
-        {
-            // deblock
-            if is_hor_edge {
-                if cuh > MAX_TR_SIZE as u16 {
-                    evc_deblock_cu_hor(
-                        &mut self.bs.tracer,
-                        &*pic.borrow(),
-                        x as usize,
-                        y as usize,
-                        cuw as usize,
-                        cuh as usize >> 1,
-                        &mut self.map_scu,
-                        &*map_refi.borrow(),
-                        &*map_mv.borrow(),
-                        self.w_scu as usize,
-                        &self.core.evc_tbl_qp_chroma_dynamic_ext,
-                    );
-
-                    evc_deblock_cu_hor(
-                        &mut self.bs.tracer,
-                        &*pic.borrow(),
-                        x as usize,
-                        y as usize + MAX_TR_SIZE,
-                        cuw as usize,
-                        cuh as usize >> 1,
-                        &mut self.map_scu,
-                        &*map_refi.borrow(),
-                        &*map_mv.borrow(),
-                        self.w_scu as usize,
-                        &self.core.evc_tbl_qp_chroma_dynamic_ext,
-                    );
-                } else {
-                    evc_deblock_cu_hor(
-                        &mut self.bs.tracer,
-                        &*pic.borrow(),
-                        x as usize,
-                        y as usize,
-                        cuw as usize,
-                        cuh as usize,
-                        &mut self.map_scu,
-                        &*map_refi.borrow(),
-                        &*map_mv.borrow(),
-                        self.w_scu as usize,
-                        &self.core.evc_tbl_qp_chroma_dynamic_ext,
-                    );
-                }
-            } else {
-                if cuw > MAX_TR_SIZE as u16 {
-                    evc_deblock_cu_ver(
-                        &mut self.bs.tracer,
-                        &*pic.borrow(),
-                        x as usize,
-                        y as usize,
-                        cuw as usize >> 1,
-                        cuh as usize,
-                        &mut self.map_scu,
-                        &*map_refi.borrow(),
-                        &*map_mv.borrow(),
-                        self.w_scu as usize,
-                        &self.core.evc_tbl_qp_chroma_dynamic_ext,
-                        self.w as usize,
-                    );
-                    evc_deblock_cu_ver(
-                        &mut self.bs.tracer,
-                        &*pic.borrow(),
-                        x as usize + MAX_TR_SIZE,
-                        y as usize,
-                        cuw as usize >> 1,
-                        cuh as usize,
-                        &mut self.map_scu,
-                        &*map_refi.borrow(),
-                        &*map_mv.borrow(),
-                        self.w_scu as usize,
-                        &self.core.evc_tbl_qp_chroma_dynamic_ext,
-                        self.w as usize,
-                    );
-                } else {
-                    evc_deblock_cu_ver(
-                        &mut self.bs.tracer,
-                        &*pic.borrow(),
-                        x as usize,
-                        y as usize,
-                        cuw as usize,
-                        cuh as usize,
-                        &mut self.map_scu,
-                        &*map_refi.borrow(),
-                        &*map_mv.borrow(),
-                        self.w_scu as usize,
-                        &self.core.evc_tbl_qp_chroma_dynamic_ext,
-                        self.w as usize,
-                    );
-                }
-            }
-        }
-    }
-
-    fn evcd_deblock(&mut self) -> Result<(), EvcError> {
-        if let Some(pic) = &self.pic {
-            let mut p = pic.borrow_mut();
-            p.pic_qp_u_offset = self.sh.qp_u_offset;
-            p.pic_qp_v_offset = self.sh.qp_v_offset;
-        }
-
-        let scu_in_lcu_wh = 1 << (MAX_CU_LOG2 - MIN_CU_LOG2);
-
-        let x_l = 0; //entry point lcu's x location
-        let y_l = 0; // entry point lcu's y location
-        let x_r = x_l + self.w_lcu;
-        let y_r = y_l + self.h_lcu;
-        let l_scu = x_l * scu_in_lcu_wh;
-        let r_scu = EVC_CLIP3(0, self.w_scu, x_r * scu_in_lcu_wh);
-        let t_scu = y_l * scu_in_lcu_wh;
-        let b_scu = EVC_CLIP3(0, self.h_scu, y_r * scu_in_lcu_wh);
-
-        for j in t_scu..b_scu {
-            for i in l_scu..r_scu {
-                self.map_scu[(i + j * self.w_scu) as usize].CLR_COD();
-            }
-        }
-
-        /* horizontal filtering */
-        for j in y_l..y_r {
-            for i in x_l..x_r {
-                self.deblock_tree(
-                    (i << MAX_CU_LOG2),
-                    (j << MAX_CU_LOG2),
-                    MAX_CU_SIZE as u16,
-                    MAX_CU_SIZE as u16,
-                    0,
-                    0,
-                    false, /*horizontal filtering of vertical edge*/
-                );
-            }
-        }
-
-        for j in t_scu..b_scu {
-            for i in l_scu..r_scu {
-                self.map_scu[(i + j * self.w_scu) as usize].CLR_COD();
-            }
-        }
-
-        /* vertical filtering */
-        for j in y_l..y_r {
-            for i in x_l..x_r {
-                self.deblock_tree(
-                    (i << MAX_CU_LOG2),
-                    (j << MAX_CU_LOG2),
-                    MAX_CU_SIZE as u16,
-                    MAX_CU_SIZE as u16,
-                    0,
-                    0,
-                    true, /*vertical filtering of horizontal edge*/
-                );
-            }
-        }
-
-        Ok(())
-    }
-
     pub(crate) fn push_pkt(&mut self, pkt: &mut Option<Packet>) -> Result<(), EvcError> {
         self.pkt = pkt.take();
         Ok(())
@@ -908,7 +683,23 @@ impl EvcdCtx {
 
             /* deblocking filter */
             if self.sh.deblocking_filter_on {
-                self.evcd_deblock()?;
+                evc_deblock(
+                    self.sh.qp_u_offset,
+                    self.sh.qp_v_offset,
+                    self.w_lcu,
+                    self.h_lcu,
+                    self.w_scu,
+                    self.h_scu,
+                    self.w,
+                    self.h,
+                    &mut self.bs.tracer,
+                    &self.pic,
+                    &mut self.map_scu,
+                    &self.map_split,
+                    &self.map_mv,
+                    &self.map_refi,
+                    &self.core.evc_tbl_qp_chroma_dynamic_ext,
+                );
             }
 
             if self.num_ctb == 0 {

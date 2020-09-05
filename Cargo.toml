@@ -12,6 +12,7 @@ repository = "https://github.com/revcx/revc"
 [features]
 binaries = ["clap", "y4m"]
 default = ["binaries"]
+bench = []
 trace = []
 trace_bin = ["trace"]
 trace_coef = ["trace"]
@@ -33,19 +34,41 @@ cfg-if = "0.1"
 clap = { version = "2", optional = true, default-features = false }
 y4m = { version = "0.6", optional = true }
 
+[dev-dependencies]
+assert_cmd = "1.0"
+criterion = "0.3"
+pretty_assertions = "0.6"
+interpolate_name = "0.2.2"
+rand = "0.7"
+rand_chacha = "0.2"
+semver = "0.10"
 
 [[bin]]
 name = "revcd"
 path = "src/bin/revcd.rs"
 required-features = ["binaries"]
+bench = false
 
 [[bin]]
 name = "revce"
 path = "src/bin/revce.rs"
 required-features = ["binaries"]
+bench = false
+
+[lib]
+bench = false
+
+[[bench]]
+name = "bench"
+path = "benches/bench.rs"
+harness = false
 
 [profile.dev]
 opt-level = 0
 
 [profile.release]
 debug = true
+incremental = true
+
+[profile.bench]
+incremental = true

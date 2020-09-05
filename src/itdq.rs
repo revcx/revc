@@ -2,6 +2,7 @@ use super::def::*;
 use super::tbl::*;
 use super::tracer::*;
 use super::util::*;
+use crate::api::frame::Aligned;
 
 use std::ops::{Add, Sub};
 
@@ -742,12 +743,14 @@ static tbl_itxb1: [EVC_ITXB1; MAX_TR_LOG2] = [
 ];
 
 fn evc_itrans(coef: &mut [i16], log2_cuw: usize, log2_cuh: usize) {
-    let mut tb = [0i32; MAX_TR_DIM]; /* temp buffer */
-    tbl_itxb0[log2_cuh - 1](coef, &mut tb, log2_cuw);
-    tbl_itxb1[log2_cuw - 1](&tb, coef, (ITX_SHIFT1 + ITX_SHIFT2), log2_cuh);
+    let mut tb = Aligned::<[i32; MAX_TR_DIM]>::uninitialized(); /* temp buffer */
+    tbl_itxb0[log2_cuh - 1](coef, &mut tb.data, log2_cuw);
+    tbl_itxb1[log2_cuw - 1](&tb.data, coef, (ITX_SHIFT1 + ITX_SHIFT2), log2_cuh);
 }
 
-fn evc_itdq(coef: &mut [i16], log2_w: usize, log2_h: usize, scale: i32) {
+//TODO: evc_mc_l should be private, but in order to be visible for benchmark,
+// change it to pub. Need to figure out a way to hide visible for API caller
+pub fn evc_itdq(coef: &mut [i16], log2_w: usize, log2_h: usize, scale: i32) {
     let log2_size = (log2_w + log2_h) >> 1;
     let ns_shift = if (log2_w + log2_h) & 1 != 0 { 8 } else { 0 };
 
