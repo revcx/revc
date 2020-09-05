@@ -29,7 +29,7 @@ fn fill_plane<T: Pixel>(ra: &mut ChaChaRng, plane: &mut Plane<T>) {
 }
 
 fn new_plane<T: Pixel>(ra: &mut ChaChaRng, width: usize, height: usize) -> Plane<T> {
-    let mut p = Plane::new(width, height, 0, 0, 128 + 8, 128 + 8);
+    let mut p = Plane::new(width, height, 0, 0, 64 + 16, 64 + 16);
 
     fill_plane(ra, &mut p);
 

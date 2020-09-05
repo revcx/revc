@@ -3,7 +3,7 @@ use super::picman::*;
 use super::plane::*;
 use super::region::*;
 use super::util::*;
-use crate::api::frame::*;
+use crate::api::frame::Aligned;
 
 use num_traits::*;
 
