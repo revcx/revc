@@ -11,6 +11,7 @@ The fastest and safest EVC encoder and decoder
 - [Usage](#usage)
   - [Compressing video](#compressing-video)
   - [Decompressing video](#decompressing-video)
+  - [Benchmark](#benchmark)
 - [Contributing](#contributing)
 </details>
 
@@ -75,7 +76,7 @@ cargo run --release --bin revcd -- -i scripts/tmp/test_ld_b.evc -o scripts/tmp/t
 ```
 
 ## Benchmark
-Benchmark each component witch [Criterion](https://bheisler.github.io/criterion.rs/book/index.html).
+Benchmark each component with [Criterion](https://bheisler.github.io/criterion.rs/book/index.html).
 
 ```sh
 cargo bench --features bench
