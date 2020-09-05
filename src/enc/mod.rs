@@ -457,17 +457,21 @@ pub(crate) struct EvceCtx {
     /* inter prediction analysis */
     pinter: EvcePInter,
     /* MAPS *******************************************************************/
-    /* CU map (width in SCU x height in SCU) of raster scan order in a frame */
-    map_scu: Vec<MCU>,
     /* cu data for current LCU */
     map_cu_data: Vec<EvceCUData>,
+    /* CU map (width in SCU x height in SCU) of raster scan order in a frame */
+    map_scu: Vec<MCU>,
+    /* LCU split information */
+    map_split: Vec<LcuSplitMode>, // for deblocking
     /* map for encoded motion vectors in SCU */
     map_mv: Option<Rc<RefCell<Vec<[[i16; MV_D]; REFP_NUM]>>>>,
     /* map for reference indices */
     map_refi: Option<Rc<RefCell<Vec<[i8; REFP_NUM]>>>>,
     /* map for intra pred mode */
     map_ipm: Vec<IntraPredDir>,
+
     map_depth: Vec<i8>,
+
     pic_dbk: Option<Rc<RefCell<EvcPic>>>, //one picture that arranges cu pixels and neighboring pixels for deblocking (just to match the interface of deblocking functions)
     lambda: [f64; 3],
     sqrt_lambda: [f64; 3],
@@ -518,10 +522,9 @@ impl EvceCtx {
 
         /* allocate maps */
         let map_scu = vec![MCU::default(); f_scu as usize];
-
+        let map_split = vec![LcuSplitMode::default(); f_lcu as usize];
         let map_ipm = vec![IntraPredDir::default(); f_scu as usize];
         let map_depth = vec![-1; f_scu as usize];
-        let map_cu_mode = vec![MCU::default(); f_scu as usize];
 
         let pico_max_cnt = 1 + ((param.max_b_frames as usize) << 1);
         /* initialize decode picture manager */
@@ -653,10 +656,11 @@ impl EvceCtx {
             /* inter prediction analysis */
             pinter: EvcePInter::new(w, h, param.max_b_frames),
             /* MAPS *******************************************************************/
-            /* CU map (width in SCU x height in SCU) of raster scan order in a frame */
-            map_scu,
             /* cu data for current LCU */
             map_cu_data,
+            /* CU map (width in SCU x height in SCU) of raster scan order in a frame */
+            map_scu,
+            map_split,
             /* map for encoded motion vectors in SCU */
             map_mv: None,
             /* map for reference indices */
@@ -998,7 +1002,23 @@ impl EvceCtx {
 
             /* deblocking filter */
             if self.sh.deblocking_filter_on {
-                self.evce_deblock();
+                evc_deblock(
+                    self.sh.qp_u_offset,
+                    self.sh.qp_v_offset,
+                    self.w_lcu,
+                    self.h_lcu,
+                    self.w_scu,
+                    self.h_scu,
+                    self.w,
+                    self.h,
+                    &mut self.bs.tracer,
+                    &self.pic[PIC_IDX_MODE],
+                    &mut self.map_scu,
+                    &self.map_split,
+                    &self.map_mv,
+                    &self.map_refi,
+                    &self.core.evc_tbl_qp_chroma_dynamic_ext,
+                );
             }
         }
 
@@ -1418,8 +1438,6 @@ impl EvceCtx {
             &self.map_cu_data[core.lcu_num as usize].split_mode,
         );
 
-        //same_layer_split[node_idx] = split_mode;
-
         if self.pps.cu_qp_delta_enabled_flag && self.sps.dquant_flag {
             if split_mode == SplitMode::NO_SPLIT
                 && (CONV_LOG2(cuw as usize) + CONV_LOG2(cuh as usize) >= self.pps.cu_qp_delta_area)
@@ -1833,222 +1851,6 @@ impl EvceCtx {
         if let Some(bs_pkt) = self.bs.pkt.take() {
             if let Some(pkt) = &mut self.pkt {
                 pkt.data.extend_from_slice(&bs_pkt.data);
-            }
-        }
-    }
-
-    fn deblock_tree(
-        &mut self,
-        x: u16,
-        y: u16,
-        cuw: u16,
-        cuh: u16,
-        cud: u16,
-        cup: u16,
-        is_hor_edge: bool,
-    ) {
-        let lcu_num = (x >> self.log2_max_cuwh) + (y >> self.log2_max_cuwh) * self.w_lcu;
-        let split_mode = evc_get_split_mode(
-            cud,
-            cup,
-            cuw,
-            cuh,
-            self.max_cuwh,
-            &self.map_cu_data[lcu_num as usize].split_mode,
-        );
-
-        /*EVC_TRACE_COUNTER(&mut self.bs.tracer);
-        EVC_TRACE(&mut self.bs.tracer, "split_mod ");
-        EVC_TRACE(&mut self.bs.tracer, split_mode as u8);
-        EVC_TRACE(&mut self.bs.tracer, " \n");*/
-
-        if split_mode != SplitMode::NO_SPLIT {
-            let split_struct = evc_split_get_part_structure(
-                split_mode,
-                x,
-                y,
-                cuw,
-                cuh,
-                cup,
-                cud,
-                self.log2_max_cuwh - MIN_CU_LOG2 as u8,
-            );
-
-            // In base profile we have small chroma blocks
-            for part_num in 0..split_struct.part_count {
-                let cur_part_num = part_num;
-                let sub_cuw = split_struct.width[cur_part_num];
-                let sub_cuh = split_struct.height[cur_part_num];
-                let x_pos = split_struct.x_pos[cur_part_num];
-                let y_pos = split_struct.y_pos[cur_part_num];
-
-                if x_pos < self.w && y_pos < self.h {
-                    self.deblock_tree(
-                        x_pos,
-                        y_pos,
-                        sub_cuw,
-                        sub_cuh,
-                        split_struct.cud[cur_part_num],
-                        split_struct.cup[cur_part_num],
-                        is_hor_edge,
-                    );
-                }
-            }
-        } else if let (Some(pic), Some(map_refi), Some(map_mv)) =
-            (&self.pic[PIC_IDX_MODE], &self.map_refi, &self.map_mv)
-        {
-            // deblock
-            if is_hor_edge {
-                if cuh > MAX_TR_SIZE as u16 {
-                    evc_deblock_cu_hor(
-                        &mut self.bs.tracer,
-                        &*pic.borrow(),
-                        x as usize,
-                        y as usize,
-                        cuw as usize,
-                        cuh as usize >> 1,
-                        &mut self.map_scu,
-                        &*map_refi.borrow(),
-                        &*map_mv.borrow(),
-                        self.w_scu as usize,
-                        &self.core.evc_tbl_qp_chroma_dynamic_ext,
-                    );
-
-                    evc_deblock_cu_hor(
-                        &mut self.bs.tracer,
-                        &*pic.borrow(),
-                        x as usize,
-                        y as usize + MAX_TR_SIZE,
-                        cuw as usize,
-                        cuh as usize >> 1,
-                        &mut self.map_scu,
-                        &*map_refi.borrow(),
-                        &*map_mv.borrow(),
-                        self.w_scu as usize,
-                        &self.core.evc_tbl_qp_chroma_dynamic_ext,
-                    );
-                } else {
-                    evc_deblock_cu_hor(
-                        &mut self.bs.tracer,
-                        &*pic.borrow(),
-                        x as usize,
-                        y as usize,
-                        cuw as usize,
-                        cuh as usize,
-                        &mut self.map_scu,
-                        &*map_refi.borrow(),
-                        &*map_mv.borrow(),
-                        self.w_scu as usize,
-                        &self.core.evc_tbl_qp_chroma_dynamic_ext,
-                    );
-                }
-            } else {
-                if cuw > MAX_TR_SIZE as u16 {
-                    evc_deblock_cu_ver(
-                        &mut self.bs.tracer,
-                        &*pic.borrow(),
-                        x as usize,
-                        y as usize,
-                        cuw as usize >> 1,
-                        cuh as usize,
-                        &mut self.map_scu,
-                        &*map_refi.borrow(),
-                        &*map_mv.borrow(),
-                        self.w_scu as usize,
-                        &self.core.evc_tbl_qp_chroma_dynamic_ext,
-                        self.w as usize,
-                    );
-                    evc_deblock_cu_ver(
-                        &mut self.bs.tracer,
-                        &*pic.borrow(),
-                        x as usize + MAX_TR_SIZE,
-                        y as usize,
-                        cuw as usize >> 1,
-                        cuh as usize,
-                        &mut self.map_scu,
-                        &*map_refi.borrow(),
-                        &*map_mv.borrow(),
-                        self.w_scu as usize,
-                        &self.core.evc_tbl_qp_chroma_dynamic_ext,
-                        self.w as usize,
-                    );
-                } else {
-                    evc_deblock_cu_ver(
-                        &mut self.bs.tracer,
-                        &*pic.borrow(),
-                        x as usize,
-                        y as usize,
-                        cuw as usize,
-                        cuh as usize,
-                        &mut self.map_scu,
-                        &*map_refi.borrow(),
-                        &*map_mv.borrow(),
-                        self.w_scu as usize,
-                        &self.core.evc_tbl_qp_chroma_dynamic_ext,
-                        self.w as usize,
-                    );
-                }
-            }
-        }
-    }
-
-    fn evce_deblock(&mut self) {
-        if let Some(pic) = &self.pic[PIC_IDX_MODE] {
-            let mut p = pic.borrow_mut();
-            p.pic_qp_u_offset = self.sh.qp_u_offset;
-            p.pic_qp_v_offset = self.sh.qp_v_offset;
-        }
-
-        let scu_in_lcu_wh = 1 << (self.log2_max_cuwh - MIN_CU_LOG2 as u8);
-
-        let x_l = 0; //entry point lcu's x location
-        let y_l = 0; // entry point lcu's y location
-        let x_r = x_l + self.w_lcu;
-        let y_r = y_l + self.h_lcu;
-        let l_scu = x_l * scu_in_lcu_wh;
-        let r_scu = EVC_CLIP3(0, self.w_scu, x_r * scu_in_lcu_wh);
-        let t_scu = y_l * scu_in_lcu_wh;
-        let b_scu = EVC_CLIP3(0, self.h_scu, y_r * scu_in_lcu_wh);
-
-        for j in t_scu..b_scu {
-            for i in l_scu..r_scu {
-                self.map_scu[(i + j * self.w_scu) as usize].CLR_COD();
-            }
-        }
-
-        /* horizontal filtering */
-        for j in y_l..y_r {
-            for i in x_l..x_r {
-                self.deblock_tree(
-                    (i << self.log2_max_cuwh),
-                    (j << self.log2_max_cuwh),
-                    self.max_cuwh,
-                    self.max_cuwh,
-                    0,
-                    0,
-                    false, /*horizontal filtering of vertical edge*/
-                );
-            }
-        }
-
-        for j in t_scu..b_scu {
-            for i in l_scu..r_scu {
-                self.map_scu[(i + j * self.w_scu) as usize].CLR_COD();
-            }
-        }
-
-        /* vertical filtering */
-        for j in y_l..y_r {
-            for i in x_l..x_r {
-                self.deblock_tree(
-                    (i << self.log2_max_cuwh),
-                    (j << self.log2_max_cuwh),
-                    self.max_cuwh,
-                    self.max_cuwh,
-                    0,
-                    0,
-                    true, /*vertical filtering of horizontal edge*/
-                );
             }
         }
     }
