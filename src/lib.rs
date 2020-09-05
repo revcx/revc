@@ -29,6 +29,9 @@ pub mod bench {
     pub mod api {
         pub use crate::api::*;
     }
+    pub mod df {
+        pub use crate::df::*;
+    }
     pub mod ipred {
         pub use crate::ipred::*;
     }

@@ -583,7 +583,9 @@ fn evc_get_tbl_qp_to_st(
     return &evc_tbl_df_st[idx];
 }
 
-fn deblock_scu_hor(
+//TODO: evc_mc_l should be private, but in order to be visible for benchmark,
+// change it to pub. Need to figure out a way to hide visible for API caller
+pub fn deblock_scu_hor(
     tracer: &mut Option<Tracer>,
     buf: &mut PlaneRegionMut<'_, pel>,
     qp: usize,
@@ -608,7 +610,7 @@ fn deblock_scu_hor(
 
             let d = (A - (B << 2) + (C << 2) - D) / 8;
 
-            let abs: i16 = d.abs();
+            let abs = d.abs();
             let sign = d < 0;
 
             let t16 = max(0, ((abs - st) << 1));
@@ -631,7 +633,9 @@ fn deblock_scu_hor(
     }
 }
 
-fn deblock_scu_hor_chroma(
+//TODO: evc_mc_l should be private, but in order to be visible for benchmark,
+// change it to pub. Need to figure out a way to hide visible for API caller
+pub fn deblock_scu_hor_chroma(
     tracer: &mut Option<Tracer>,
     buf: &mut PlaneRegionMut<'_, pel>,
     qp: usize,
@@ -673,7 +677,9 @@ fn deblock_scu_hor_chroma(
     }
 }
 
-fn deblock_scu_ver(
+//TODO: evc_mc_l should be private, but in order to be visible for benchmark,
+// change it to pub. Need to figure out a way to hide visible for API caller
+pub fn deblock_scu_ver(
     tracer: &mut Option<Tracer>,
     buf: &mut PlaneRegionMut<'_, pel>,
     qp: usize,
@@ -698,7 +704,7 @@ fn deblock_scu_ver(
 
             let d = (A - (B << 2) + (C << 2) - D) / 8;
 
-            let abs: i16 = d.abs();
+            let abs = d.abs();
             let sign = d < 0;
 
             let t16 = max(0, ((abs - st) << 1));
@@ -721,7 +727,9 @@ fn deblock_scu_ver(
     }
 }
 
-fn deblock_scu_ver_chroma(
+//TODO: evc_mc_l should be private, but in order to be visible for benchmark,
+// change it to pub. Need to figure out a way to hide visible for API caller
+pub fn deblock_scu_ver_chroma(
     tracer: &mut Option<Tracer>,
     buf: &mut PlaneRegionMut<'_, pel>,
     qp: usize,
@@ -746,7 +754,7 @@ fn deblock_scu_ver_chroma(
 
             let d = (A - (B << 2) + (C << 2) - D) / 8;
 
-            let abs: i16 = d.abs();
+            let abs = d.abs();
             let sign = d < 0;
 
             let t16 = max(0, ((abs - st) << 1));
