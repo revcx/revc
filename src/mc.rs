@@ -517,31 +517,34 @@ pub(crate) fn evc_mc(
 
     if bidx == 2 {
         let (pred0, pred1) = pred.split_at_mut(1);
-        let mut p0 = &mut pred0[0].data[Y_C];
-        let mut p1 = &mut pred1[0].data[Y_C];
-        for y in 0..cuh {
-            for x in 0..cuw {
-                let pos = (y * cuw + x) as usize;
-                p0[pos] = (p0[pos] + p1[pos] + 1) >> 1;
+        let mut p0 = pred0[0].data[Y_C].as_mut_slice();
+        let mut p1 = pred1[0].data[Y_C].as_slice();
+        for _ in 0..cuh {
+            for x in 0..cuw as usize {
+                p0[x] = (p0[x] + p1[x] + 1) >> 1;
             }
+            p0 = &mut p0[cuw as usize..];
+            p1 = &p1[cuw as usize..];
         }
 
-        let mut p0 = &mut pred0[0].data[U_C];
-        let mut p1 = &mut pred1[0].data[U_C];
-        for y in 0..cuh >> 1 {
-            for x in 0..cuw >> 1 {
-                let pos = (y * (cuw >> 1) + x) as usize;
-                p0[pos] = (p0[pos] + p1[pos] + 1) >> 1;
+        let mut p0 = pred0[0].data[U_C].as_mut_slice();
+        let mut p1 = pred1[0].data[U_C].as_slice();
+        for _ in 0..cuh >> 1 {
+            for x in 0..cuw as usize >> 1 {
+                p0[x] = (p0[x] + p1[x] + 1) >> 1;
             }
+            p0 = &mut p0[cuw as usize >> 1..];
+            p1 = &p1[cuw as usize >> 1..];
         }
 
-        let mut p0 = &mut pred0[0].data[V_C];
-        let mut p1 = &mut pred1[0].data[V_C];
-        for y in 0..cuh >> 1 {
-            for x in 0..cuw >> 1 {
-                let pos = (y * (cuw >> 1) + x) as usize;
-                p0[pos] = (p0[pos] + p1[pos] + 1) >> 1;
+        let mut p0 = pred0[0].data[V_C].as_mut_slice();
+        let mut p1 = pred1[0].data[V_C].as_slice();
+        for _ in 0..cuh >> 1 {
+            for x in 0..cuw as usize >> 1 {
+                p0[x] = (p0[x] + p1[x] + 1) >> 1;
             }
+            p0 = &mut p0[cuw as usize >> 1..];
+            p1 = &p1[cuw as usize >> 1..];
         }
     }
 }
