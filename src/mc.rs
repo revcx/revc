@@ -3,6 +3,7 @@ use super::picman::*;
 use super::plane::*;
 use super::region::*;
 use super::util::*;
+use crate::api::frame::*;
 
 use num_traits::*;
 
@@ -203,7 +204,7 @@ fn evc_mc_l_0n(p: &Plane<pel>, gmv_x: i16, gmv_y: i16, pred: &mut [pel], cuw: i1
 }
 
 fn evc_mc_l_nn(p: &Plane<pel>, gmv_x: i16, gmv_y: i16, pred: &mut [pel], cuw: i16, cuh: i16) {
-    let mut intermediate = [0i16; (MAX_CU_SIZE + MC_IBUF_PAD_L) * 8];
+    let mut intermediate = Aligned::<[i16; (MAX_CU_SIZE + MC_IBUF_PAD_L) * 8]>::uninitialized();
 
     let dx = gmv_x & 3;
     let dy = gmv_y & 3;
@@ -217,7 +218,7 @@ fn evc_mc_l_nn(p: &Plane<pel>, gmv_x: i16, gmv_y: i16, pred: &mut [pel], cuw: i1
         for y in 0..(cuh + MC_IBUF_PAD_L as i16) as usize {
             let src = &r[y];
             for x in cg..(cg + 8).min(cuw as usize) {
-                intermediate[8 * y + x - cg] = round_shift(
+                intermediate.data[8 * y + x - cg] = round_shift(
                     unsafe { run_filter(src[x..].as_ptr(), 1, &tbl_mc_l_coeff[dx as usize]) },
                     MAC_ADD_NN_S1,
                     MAC_SFT_NN_S1,
@@ -231,7 +232,7 @@ fn evc_mc_l_nn(p: &Plane<pel>, gmv_x: i16, gmv_y: i16, pred: &mut [pel], cuw: i1
                 dst[x] = round_shift(
                     unsafe {
                         run_filter(
-                            intermediate[8 * y + x - cg..].as_ptr(),
+                            intermediate.data[8 * y + x - cg..].as_ptr(),
                             8,
                             &tbl_mc_l_coeff[dy as usize],
                         )
@@ -311,7 +312,8 @@ fn evc_mc_c_0n(p: &Plane<pel>, gmv_x: i16, gmv_y: i16, pred: &mut [pel], cuw: i1
 }
 
 fn evc_mc_c_nn(p: &Plane<pel>, gmv_x: i16, gmv_y: i16, pred: &mut [pel], cuw: i16, cuh: i16) {
-    let mut intermediate = [0i16; ((MAX_CU_SIZE >> 1) + MC_IBUF_PAD_C) * 8];
+    let mut intermediate =
+        Aligned::<[i16; ((MAX_CU_SIZE >> 1) + MC_IBUF_PAD_C) * 8]>::uninitialized();
 
     let dx = gmv_x & 7;
     let dy = gmv_y & 7;
@@ -325,7 +327,7 @@ fn evc_mc_c_nn(p: &Plane<pel>, gmv_x: i16, gmv_y: i16, pred: &mut [pel], cuw: i1
         for y in 0..(cuh + MC_IBUF_PAD_C as i16) as usize {
             let src = &r[y];
             for x in cg..(cg + 8).min(cuw as usize) {
-                intermediate[8 * y + x - cg] = round_shift(
+                intermediate.data[8 * y + x - cg] = round_shift(
                     unsafe { run_filter(src[x..].as_ptr(), 1, &tbl_mc_c_coeff[dx as usize]) },
                     MAC_ADD_NN_S1,
                     MAC_SFT_NN_S1,
@@ -339,7 +341,7 @@ fn evc_mc_c_nn(p: &Plane<pel>, gmv_x: i16, gmv_y: i16, pred: &mut [pel], cuw: i1
                 dst[x] = round_shift(
                     unsafe {
                         run_filter(
-                            intermediate[8 * y + x - cg..].as_ptr(),
+                            intermediate.data[8 * y + x - cg..].as_ptr(),
                             8,
                             &tbl_mc_c_coeff[dy as usize],
                         )
