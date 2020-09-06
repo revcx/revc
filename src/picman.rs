@@ -195,6 +195,12 @@ impl EvcPm {
         }
     }
 
+    fn picman_move_tbm(tbm: &mut [bool], from: usize, to: usize) {
+        for i in from..to {
+            tbm.swap(i, i + 1);
+        }
+    }
+
     fn pic_marking_no_rpl(&mut self, ref_pic_gap_length: u32) {
         // mark all pics with layer id > 0 as unused for reference
         /* this is coding order */
@@ -218,10 +224,15 @@ impl EvcPm {
             }
             i += 1;
         }
-        for i in 0..tbm.len() {
+
+        i = 0;
+        while i < tbm.len() {
             if tbm[i] {
                 EvcPm::picman_move_pic(&mut self.pic, i, MAX_PB_SIZE - 1);
-                tbm[i] = false;
+                EvcPm::picman_move_tbm(&mut tbm, i, MAX_PB_SIZE - 1);
+                tbm[MAX_PB_SIZE - 1] = false;
+            } else {
+                i += 1;
             }
         }
 
