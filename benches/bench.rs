@@ -1,6 +1,7 @@
 use criterion::*;
 
+mod df;
 mod mc;
 mod transform;
 
-criterion_main!(mc::mc, transform::itdq);
+criterion_main!(df::df, mc::mc, transform::itdq);

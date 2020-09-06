@@ -205,8 +205,6 @@ pub(crate) fn TRACE_CU(
 pub(crate) fn TRACE_DBF(
     tracer: &mut Option<Tracer>,
     ch_type: usize,
-    x: usize,
-    y: usize,
     size: usize,
     hor: bool,
     dbf: &PlaneRegionMut<'_, pel>,
@@ -225,22 +223,22 @@ pub(crate) fn TRACE_DBF(
     EVC_TRACE(tracer, " : ");
     for k in 0..size {
         if hor {
-            EVC_TRACE(tracer, dbf[y - 2][x + k]);
+            EVC_TRACE(tracer, dbf[0][k]);
             EVC_TRACE(tracer, " , ");
-            EVC_TRACE(tracer, dbf[y - 1][x + k]);
+            EVC_TRACE(tracer, dbf[1][k]);
             EVC_TRACE(tracer, " , ");
-            EVC_TRACE(tracer, dbf[y + 0][x + k]);
+            EVC_TRACE(tracer, dbf[2][k]);
             EVC_TRACE(tracer, " , ");
-            EVC_TRACE(tracer, dbf[y + 1][x + k]);
+            EVC_TRACE(tracer, dbf[3][k]);
             EVC_TRACE(tracer, " , ");
         } else {
-            EVC_TRACE(tracer, dbf[y + k][x - 2]);
+            EVC_TRACE(tracer, dbf[k][0]);
             EVC_TRACE(tracer, " , ");
-            EVC_TRACE(tracer, dbf[y + k][x - 1]);
+            EVC_TRACE(tracer, dbf[k][1]);
             EVC_TRACE(tracer, " , ");
-            EVC_TRACE(tracer, dbf[y + k][x + 0]);
+            EVC_TRACE(tracer, dbf[k][2]);
             EVC_TRACE(tracer, " , ");
-            EVC_TRACE(tracer, dbf[y + k][x + 1]);
+            EVC_TRACE(tracer, dbf[k][3]);
             EVC_TRACE(tracer, " , ");
         }
     }
@@ -382,8 +380,6 @@ pub(crate) fn TRACE_CU(
 pub(crate) fn TRACE_DBF(
     tracer: &mut Option<Tracer>,
     ch_type: usize,
-    x: usize,
-    y: usize,
     size: usize,
     hor: bool,
     dbf: &PlaneRegionMut<'_, pel>,

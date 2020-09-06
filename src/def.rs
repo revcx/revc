@@ -20,9 +20,8 @@ pub type pel = u16;
 pub(crate) const POC_LSB_BIT: usize = (11);
 
 pub(crate) const BIT_DEPTH: usize = 10;
-//pub(crate) const PEL2BYTE(pel)                      ((pel)*((BIT_DEPTH + 7)>>3))
-
-//pub(crate) const STRIDE_IMGB2PIC(s_imgb)            ((s_imgb)>>1)
+pub(crate) const MAX_SAMPLE_VAL_I32: i32 = ((1 << BIT_DEPTH) - 1);
+pub(crate) const MAX_SAMPLE_VAL_I16: i16 = ((1 << BIT_DEPTH) - 1);
 
 pub(crate) const Y_C: usize = 0; /* Y luma */
 pub(crate) const U_C: usize = 1; /* Cb Chroma */

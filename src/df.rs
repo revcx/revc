@@ -1,6 +1,7 @@
 use super::def::*;
 use super::picman::*;
-use super::region::PlaneRegionMut;
+use super::plane::*;
+use super::region::*;
 use super::tbl::*;
 use super::tracer::*;
 use super::util::*;
@@ -319,18 +320,22 @@ pub(crate) fn evc_deblock_cu_hor(
                 &map_mv[offset + i],
                 &map_mv[offset + i - w_scu],
             );
-
             let qp = map_scu[offset + i].GET_QP();
-            let t = (i << MIN_CU_LOG2);
+            let t = (i << MIN_CU_LOG2) as isize;
 
-            deblock_scu_hor(
+            let area_luma = Area::Rect {
+                x: x_pel as isize + t,
+                y: y_pel as isize - 2,
+                width: MIN_CU_SIZE,
+                height: MIN_CU_SIZE,
+            };
+
+            deblock_scu_hor_luma(
                 tracer,
-                &mut planes[Y_C].as_region_mut(),
+                &mut planes[Y_C].as_region_mut().subregion_mut(area_luma),
                 qp as usize,
                 Y_C,
                 tbl_qp_to_st,
-                x_pel + t,
-                y_pel,
             );
 
             let qp_u = EVC_CLIP3(
@@ -343,26 +348,28 @@ pub(crate) fn evc_deblock_cu_hor(
                 57,
                 qp as i8 + pic.pic_qp_v_offset,
             );
+            let area_chroma = Area::Rect {
+                x: (x_pel as isize + t) >> 1,
+                y: (y_pel as isize >> 1) - 2,
+                width: MIN_CU_SIZE >> 1,
+                height: MIN_CU_SIZE,
+            };
 
             deblock_scu_hor_chroma(
                 tracer,
-                &mut planes[U_C].as_region_mut(),
+                &mut planes[U_C].as_region_mut().subregion_mut(area_chroma),
                 evc_tbl_qp_chroma_dynamic_ext[0][(EVC_TBL_CHROMA_QP_OFFSET + qp_u) as usize]
                     as usize,
                 U_C,
                 tbl_qp_to_st,
-                (x_pel + t) >> 1,
-                y_pel >> 1,
             );
             deblock_scu_hor_chroma(
                 tracer,
-                &mut planes[V_C].as_region_mut(),
+                &mut planes[V_C].as_region_mut().subregion_mut(area_chroma),
                 evc_tbl_qp_chroma_dynamic_ext[1][(EVC_TBL_CHROMA_QP_OFFSET + qp_v) as usize]
                     as usize,
                 V_C,
                 tbl_qp_to_st,
-                (x_pel + t) >> 1,
-                y_pel >> 1,
             );
         }
     }
@@ -405,16 +412,21 @@ pub(crate) fn evc_deblock_cu_ver(
                 &map_mv[offset + j * w_scu - 1],
             );
             let qp = map_scu[offset + j * w_scu + 0].GET_QP();
-            let t = (j << MIN_CU_LOG2);
+            let t = (j << MIN_CU_LOG2) as isize;
 
-            deblock_scu_ver(
+            let area_luma = Area::Rect {
+                x: x_pel as isize - 2,
+                y: y_pel as isize + t,
+                width: MIN_CU_SIZE,
+                height: MIN_CU_SIZE,
+            };
+
+            deblock_scu_ver_luma(
                 tracer,
-                &mut planes[Y_C].as_region_mut(),
+                &mut planes[Y_C].as_region_mut().subregion_mut(area_luma),
                 qp as usize,
                 Y_C,
                 tbl_qp_to_st,
-                x_pel,
-                y_pel + t,
             );
 
             let qp_u = EVC_CLIP3(
@@ -427,25 +439,28 @@ pub(crate) fn evc_deblock_cu_ver(
                 57,
                 qp as i8 + pic.pic_qp_v_offset,
             );
+            let area_chroma = Area::Rect {
+                x: (x_pel as isize >> 1) - 2,
+                y: (y_pel as isize + t) >> 1,
+                width: MIN_CU_SIZE,
+                height: MIN_CU_SIZE >> 1,
+            };
+
             deblock_scu_ver_chroma(
                 tracer,
-                &mut planes[U_C].as_region_mut(),
+                &mut planes[U_C].as_region_mut().subregion_mut(area_chroma),
                 evc_tbl_qp_chroma_dynamic_ext[0][(EVC_TBL_CHROMA_QP_OFFSET + qp_u) as usize]
                     as usize,
                 U_C,
                 tbl_qp_to_st,
-                x_pel >> 1,
-                (y_pel + t) >> 1,
             );
             deblock_scu_ver_chroma(
                 tracer,
-                &mut planes[V_C].as_region_mut(),
+                &mut planes[V_C].as_region_mut().subregion_mut(area_chroma),
                 evc_tbl_qp_chroma_dynamic_ext[0][(EVC_TBL_CHROMA_QP_OFFSET + qp_v) as usize]
                     as usize,
                 V_C,
                 tbl_qp_to_st,
-                x_pel >> 1,
-                (y_pel + t) >> 1,
             );
         }
     }
@@ -461,16 +476,21 @@ pub(crate) fn evc_deblock_cu_ver(
                 &map_mv[offset + j * w_scu + w - 1],
             );
             let qp = map_scu[offset + j * w_scu + w].GET_QP();
-            let t = (j << MIN_CU_LOG2);
+            let t = (j << MIN_CU_LOG2) as isize;
 
-            deblock_scu_ver(
+            let area_luma = Area::Rect {
+                x: x_pel as isize + cuw as isize - 2,
+                y: y_pel as isize + t,
+                width: MIN_CU_SIZE,
+                height: MIN_CU_SIZE,
+            };
+
+            deblock_scu_ver_luma(
                 tracer,
-                &mut planes[Y_C].as_region_mut(),
+                &mut planes[Y_C].as_region_mut().subregion_mut(area_luma),
                 qp as usize,
                 Y_C,
                 tbl_qp_to_st,
-                x_pel + cuw,
-                y_pel + t,
             );
 
             let qp_u = EVC_CLIP3(
@@ -483,25 +503,28 @@ pub(crate) fn evc_deblock_cu_ver(
                 57,
                 qp as i8 + pic.pic_qp_v_offset,
             );
+            let area_chroma = Area::Rect {
+                x: ((x_pel as isize + cuw as isize) >> 1) - 2,
+                y: (y_pel as isize + t) >> 1,
+                width: MIN_CU_SIZE,
+                height: MIN_CU_SIZE >> 1,
+            };
+
             deblock_scu_ver_chroma(
                 tracer,
-                &mut planes[U_C].as_region_mut(),
+                &mut planes[U_C].as_region_mut().subregion_mut(area_chroma),
                 evc_tbl_qp_chroma_dynamic_ext[0][(EVC_TBL_CHROMA_QP_OFFSET + qp_u) as usize]
                     as usize,
                 U_C,
                 tbl_qp_to_st,
-                (x_pel + cuw) >> 1,
-                (y_pel + t) >> 1,
             );
             deblock_scu_ver_chroma(
                 tracer,
-                &mut planes[V_C].as_region_mut(),
+                &mut planes[V_C].as_region_mut().subregion_mut(area_chroma),
                 evc_tbl_qp_chroma_dynamic_ext[0][(EVC_TBL_CHROMA_QP_OFFSET + qp_v) as usize]
                     as usize,
                 V_C,
                 tbl_qp_to_st,
-                (x_pel + cuw) >> 1,
-                (y_pel + t) >> 1,
             );
         }
     }
@@ -583,32 +606,28 @@ fn evc_get_tbl_qp_to_st(
     return &evc_tbl_df_st[idx];
 }
 
-fn deblock_scu_hor(
+//TODO: evc_mc_l should be private, but in order to be visible for benchmark,
+// change it to pub. Need to figure out a way to hide visible for API caller
+pub fn deblock_scu_hor_luma(
     tracer: &mut Option<Tracer>,
     buf: &mut PlaneRegionMut<'_, pel>,
     qp: usize,
     ch_type: usize,
     tbl_qp_to_st: &[u8],
-    x: usize,
-    y: usize,
 ) {
     let st = (tbl_qp_to_st[qp] as i16) << (BIT_DEPTH as i16 - 8);
-    let size = if ch_type == Y_C {
-        MIN_CU_SIZE
-    } else {
-        MIN_CU_SIZE >> 1
-    };
 
     if st != 0 {
-        for i in 0..size {
-            let mut A = buf[y - 2][x + i] as i16;
-            let mut B = buf[y - 1][x + i] as i16;
-            let mut C = buf[y + 0][x + i] as i16;
-            let mut D = buf[y + 1][x + i] as i16;
-
+        for i in 0..MIN_CU_SIZE {
+            let (mut A, mut B, mut C, mut D) = (
+                buf[0][i] as i16,
+                buf[1][i] as i16,
+                buf[2][i] as i16,
+                buf[3][i] as i16,
+            );
             let d = (A - (B << 2) + (C << 2) - D) / 8;
 
-            let abs: i16 = d.abs();
+            let abs = d.abs();
             let sign = d < 0;
 
             let t16 = max(0, ((abs - st) << 1));
@@ -622,37 +641,33 @@ fn deblock_scu_hor(
             C -= d1;
             D += d2;
 
-            buf[y - 2][x + i] = EVC_CLIP3(0, (1 << BIT_DEPTH as i16) - 1, A) as pel;
-            buf[y - 1][x + i] = EVC_CLIP3(0, (1 << BIT_DEPTH as i16) - 1, B) as pel;
-            buf[y + 0][x + i] = EVC_CLIP3(0, (1 << BIT_DEPTH as i16) - 1, C) as pel;
-            buf[y + 1][x + i] = EVC_CLIP3(0, (1 << BIT_DEPTH as i16) - 1, D) as pel;
+            buf[0][i] = EVC_CLIP3(0, MAX_SAMPLE_VAL_I16, A) as pel;
+            buf[1][i] = EVC_CLIP3(0, MAX_SAMPLE_VAL_I16, B) as pel;
+            buf[2][i] = EVC_CLIP3(0, MAX_SAMPLE_VAL_I16, C) as pel;
+            buf[3][i] = EVC_CLIP3(0, MAX_SAMPLE_VAL_I16, D) as pel;
         }
-        TRACE_DBF(tracer, ch_type, x, y, size, true, buf);
+        TRACE_DBF(tracer, ch_type, MIN_CU_SIZE, true, buf);
     }
 }
 
-fn deblock_scu_hor_chroma(
+//TODO: evc_mc_l should be private, but in order to be visible for benchmark,
+// change it to pub. Need to figure out a way to hide visible for API caller
+pub fn deblock_scu_hor_chroma(
     tracer: &mut Option<Tracer>,
     buf: &mut PlaneRegionMut<'_, pel>,
     qp: usize,
     ch_type: usize,
     tbl_qp_to_st: &[u8],
-    x: usize,
-    y: usize,
 ) {
-    let st = (tbl_qp_to_st[qp] as i16) << (BIT_DEPTH as i16 - 8);
-    let size = if ch_type == Y_C {
-        MIN_CU_SIZE
-    } else {
-        MIN_CU_SIZE >> 1
-    };
-
+    let st = (tbl_qp_to_st[qp] as i16) << (BIT_DEPTH - 8);
     if st != 0 {
-        for i in 0..size {
-            let mut A = buf[y - 2][x + i] as i16;
-            let mut B = buf[y - 1][x + i] as i16;
-            let mut C = buf[y + 0][x + i] as i16;
-            let mut D = buf[y + 1][x + i] as i16;
+        for i in 0..MIN_CU_SIZE >> 1 {
+            let (mut A, mut B, mut C, mut D) = (
+                buf[0][i] as i16,
+                buf[1][i] as i16,
+                buf[2][i] as i16,
+                buf[3][i] as i16,
+            );
 
             let d = (A - (B << 2) + (C << 2) - D) / 8;
 
@@ -666,39 +681,36 @@ fn deblock_scu_hor_chroma(
             B += d1;
             C -= d1;
 
-            buf[y - 1][x + i] = EVC_CLIP3(0, (1 << BIT_DEPTH as i16) - 1, B) as pel;
-            buf[y + 0][x + i] = EVC_CLIP3(0, (1 << BIT_DEPTH as i16) - 1, C) as pel;
+            buf[1][i] = EVC_CLIP3(0, MAX_SAMPLE_VAL_I16, B) as pel;
+            buf[2][i] = EVC_CLIP3(0, MAX_SAMPLE_VAL_I16, C) as pel;
         }
-        TRACE_DBF(tracer, ch_type, x, y, size, true, buf);
+        TRACE_DBF(tracer, ch_type, MIN_CU_SIZE >> 1, true, buf);
     }
 }
 
-fn deblock_scu_ver(
+//TODO: evc_mc_l should be private, but in order to be visible for benchmark,
+// change it to pub. Need to figure out a way to hide visible for API caller
+pub fn deblock_scu_ver_luma(
     tracer: &mut Option<Tracer>,
     buf: &mut PlaneRegionMut<'_, pel>,
     qp: usize,
     ch_type: usize,
     tbl_qp_to_st: &[u8],
-    x: usize,
-    y: usize,
 ) {
-    let st = (tbl_qp_to_st[qp] as i16) << (BIT_DEPTH as i16 - 8);
-    let size = if ch_type == Y_C {
-        MIN_CU_SIZE
-    } else {
-        MIN_CU_SIZE >> 1
-    };
+    let st = (tbl_qp_to_st[qp] as i16) << (BIT_DEPTH - 8);
 
     if st != 0 {
-        for j in 0..size {
-            let mut A = buf[y + j][x - 2] as i16;
-            let mut B = buf[y + j][x - 1] as i16;
-            let mut C = buf[y + j][x + 0] as i16;
-            let mut D = buf[y + j][x + 1] as i16;
+        for j in 0..MIN_CU_SIZE {
+            let (mut A, mut B, mut C, mut D) = (
+                buf[j][0] as i16,
+                buf[j][1] as i16,
+                buf[j][2] as i16,
+                buf[j][3] as i16,
+            );
 
             let d = (A - (B << 2) + (C << 2) - D) / 8;
 
-            let abs: i16 = d.abs();
+            let abs = d.abs();
             let sign = d < 0;
 
             let t16 = max(0, ((abs - st) << 1));
@@ -712,41 +724,38 @@ fn deblock_scu_ver(
             C -= d1;
             D += d2;
 
-            buf[y + j][x - 2] = EVC_CLIP3(0, (1 << BIT_DEPTH as i16) - 1, A) as pel;
-            buf[y + j][x - 1] = EVC_CLIP3(0, (1 << BIT_DEPTH as i16) - 1, B) as pel;
-            buf[y + j][x + 0] = EVC_CLIP3(0, (1 << BIT_DEPTH as i16) - 1, C) as pel;
-            buf[y + j][x + 1] = EVC_CLIP3(0, (1 << BIT_DEPTH as i16) - 1, D) as pel;
+            buf[j][0] = EVC_CLIP3(0, MAX_SAMPLE_VAL_I16, A) as pel;
+            buf[j][1] = EVC_CLIP3(0, MAX_SAMPLE_VAL_I16, B) as pel;
+            buf[j][2] = EVC_CLIP3(0, MAX_SAMPLE_VAL_I16, C) as pel;
+            buf[j][3] = EVC_CLIP3(0, MAX_SAMPLE_VAL_I16, D) as pel;
         }
-        TRACE_DBF(tracer, ch_type, x, y, size, false, buf);
+        TRACE_DBF(tracer, ch_type, MIN_CU_SIZE, false, buf);
     }
 }
 
-fn deblock_scu_ver_chroma(
+//TODO: evc_mc_l should be private, but in order to be visible for benchmark,
+// change it to pub. Need to figure out a way to hide visible for API caller
+pub fn deblock_scu_ver_chroma(
     tracer: &mut Option<Tracer>,
     buf: &mut PlaneRegionMut<'_, pel>,
     qp: usize,
     ch_type: usize,
     tbl_qp_to_st: &[u8],
-    x: usize,
-    y: usize,
 ) {
-    let st = (tbl_qp_to_st[qp] as i16) << (BIT_DEPTH as i16 - 8);
-    let size = if ch_type == Y_C {
-        MIN_CU_SIZE
-    } else {
-        MIN_CU_SIZE >> 1
-    };
+    let st = (tbl_qp_to_st[qp] as i16) << (BIT_DEPTH - 8);
 
     if st != 0 {
-        for j in 0..size {
-            let mut A = buf[y + j][x - 2] as i16;
-            let mut B = buf[y + j][x - 1] as i16;
-            let mut C = buf[y + j][x + 0] as i16;
-            let mut D = buf[y + j][x + 1] as i16;
+        for j in 0..MIN_CU_SIZE >> 1 {
+            let (mut A, mut B, mut C, mut D) = (
+                buf[j][0] as i16,
+                buf[j][1] as i16,
+                buf[j][2] as i16,
+                buf[j][3] as i16,
+            );
 
             let d = (A - (B << 2) + (C << 2) - D) / 8;
 
-            let abs: i16 = d.abs();
+            let abs = d.abs();
             let sign = d < 0;
 
             let t16 = max(0, ((abs - st) << 1));
@@ -756,9 +765,9 @@ fn deblock_scu_ver_chroma(
             B += d1;
             C -= d1;
 
-            buf[y + j][x - 1] = EVC_CLIP3(0, (1 << BIT_DEPTH as i16) - 1, B) as pel;
-            buf[y + j][x + 0] = EVC_CLIP3(0, (1 << BIT_DEPTH as i16) - 1, C) as pel;
+            buf[j][1] = EVC_CLIP3(0, MAX_SAMPLE_VAL_I16, B) as pel;
+            buf[j][2] = EVC_CLIP3(0, MAX_SAMPLE_VAL_I16, C) as pel;
         }
-        TRACE_DBF(tracer, ch_type, x, y, size, false, buf);
+        TRACE_DBF(tracer, ch_type, MIN_CU_SIZE >> 1, false, buf);
     }
 }
