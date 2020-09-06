@@ -16,7 +16,7 @@ do
 for BFRM in 1 3 7 15
 do
 ./evca_encoder -i foreman_mb.yuv -w 16 -h 16 -z 30 -f 300 -q ${QP} -r ./tmp/test_mb_ra_b${BFRM}_q${QP}_etm.yuv -o ./tmp/test_mb_ra_b${BFRM}_q${QP}_etm.evc --config ./cfg/encoder_randomaccess_baseline_bn.cfg --max_b_frames ${BFRM}
-./evca_decoder -i ./tmp/test_mb_ra_b${BFRM}_q${QP}_etm.evc          -o ./tmp/test_mb_ra_b${BFRM}_q${QP}_etm_dec.yuv
+./evca_decoder -i ./tmp/test_mb_ra_b${BFRM}_q${QP}_etm.evc         -o ./tmp/test_mb_ra_b${BFRM}_q${QP}_etm_dec.yuv
 done
 done
 
@@ -26,14 +26,14 @@ cargo run --bin revce --release -- -i foreman_mb.yuv -w 16 -h 16 -z 30 -f 300 -q
 cargo run --bin revce --release -- -i foreman_mb.yuv -w 16 -h 16 -z 30 -f 300 -q ${QP} -r ./tmp/test_mb_ld_p_q${QP}_revc.yuv -o ./tmp/test_mb_ld_p_q${QP}_revc.evc --ref_pic_gap_length 8 --inter_slice_type 1 -v
 cargo run --bin revce --release -- -i foreman_mb.yuv -w 16 -h 16 -z 30 -f 300 -q ${QP} -r ./tmp/test_mb_ld_b_q${QP}_revc.yuv -o ./tmp/test_mb_ld_b_q${QP}_revc.evc --ref_pic_gap_length 8 --inter_slice_type 0 -v
 
-cargo run --bin revcd --release -- -i ./tmp/test_mb_ld_i_q${QP}_revc.evc                     -o ./tmp/test_mb_ld_i_q${QP}_revc_dec.yuv -v
-cargo run --bin revcd --release -- -i ./tmp/test_mb_ld_p_q${QP}_revc.evc                     -o ./tmp/test_mb_ld_p_q${QP}_revc_dec.yuv -v
-cargo run --bin revcd --release -- -i ./tmp/test_mb_ld_b_q${QP}_revc.evc                     -o ./tmp/test_mb_ld_b_q${QP}_revc_dec.yuv -v
+cargo run --bin revcd --release -- -i ./tmp/test_mb_ld_i_q${QP}_etm.evc                     -o ./tmp/test_mb_ld_i_q${QP}_revc_dec.yuv -v
+cargo run --bin revcd --release -- -i ./tmp/test_mb_ld_p_q${QP}_etm.evc                     -o ./tmp/test_mb_ld_p_q${QP}_revc_dec.yuv -v
+cargo run --bin revcd --release -- -i ./tmp/test_mb_ld_b_q${QP}_etm.evc                     -o ./tmp/test_mb_ld_b_q${QP}_revc_dec.yuv -v
 
 for BFRM in 1 3 7 15
 do
 cargo run --bin revce --release -- -i foreman_mb.yuv -w 16 -h 16 -z 30 -f 300 -q ${QP} -r ./tmp/test_mb_ra_b${BFRM}_q${QP}_revc.yuv -o ./tmp/test_mb_ra_b${BFRM}_q${QP}_revc.evc --max_b_frames ${BFRM} --inter_slice_type 0 -v
-cargo run --bin revcd --release -- -i ./tmp/test_mb_ra_b${BFRM}_q${QP}_revc.evc         -o ./tmp/test_mb_ra_b${BFRM}_q${QP}_revc_dec.yuv -v
+cargo run --bin revcd --release -- -i ./tmp/test_mb_ra_b${BFRM}_q${QP}_etm.evc         -o ./tmp/test_mb_ra_b${BFRM}_q${QP}_revc_dec.yuv -v
 done
 done
 

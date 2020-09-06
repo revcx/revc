@@ -227,6 +227,7 @@ impl EvcPm {
 
         // TODO: change to signalled num ref pics
         while cur_num_ref_pics >= MAX_NUM_ACTIVE_REF_FRAME {
+            i = 0;
             for pic in &self.pic {
                 if let Some(p) = &pic {
                     let mut p = p.borrow_mut();
@@ -239,6 +240,7 @@ impl EvcPm {
                         break;
                     }
                 }
+                i += 1;
             }
         }
         for i in 0..tbm.len() {
