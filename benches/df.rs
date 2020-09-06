@@ -8,9 +8,9 @@ use revc::bench::plane::*;
 
 criterion_group!(
     df,
-    bench_deblock_scu_hor,
+    bench_deblock_scu_hor_luma,
     bench_deblock_scu_hor_chroma,
-    bench_deblock_scu_ver,
+    bench_deblock_scu_ver_luma,
     bench_deblock_scu_ver_chroma,
 );
 
@@ -32,7 +32,7 @@ fn new_plane<T: Pixel>(ra: &mut ChaChaRng, width: usize, height: usize) -> Plane
     p
 }
 
-fn bench_deblock_scu_hor(c: &mut Criterion) {
+fn bench_deblock_scu_hor_luma(c: &mut Criterion) {
     let mut ra = ChaChaRng::from_seed([0; 32]);
     let w = 640;
     let h = 480;
@@ -45,16 +45,14 @@ fn bench_deblock_scu_hor(c: &mut Criterion) {
         2, 2, 3, 3, 3, 4, 4, 4, 5, 5, 6, 6, 7, 8, 9, 10, 11, 12, 12, 12, 12, 12,
     ];
 
-    c.bench_function("deblock_scu_hor", |b| {
+    c.bench_function("deblock_scu_hor_luma", |b| {
         b.iter(|| {
-            let _ = black_box(deblock_scu_hor(
+            let _ = black_box(deblock_scu_hor_luma(
                 &mut None,
                 &mut plane.as_region_mut(),
                 qp,
                 0,
                 tbl,
-                8,
-                8,
             ));
         })
     });
@@ -81,14 +79,12 @@ fn bench_deblock_scu_hor_chroma(c: &mut Criterion) {
                 qp,
                 1,
                 tbl,
-                8,
-                8,
             ));
         })
     });
 }
 
-fn bench_deblock_scu_ver(c: &mut Criterion) {
+fn bench_deblock_scu_ver_luma(c: &mut Criterion) {
     let mut ra = ChaChaRng::from_seed([0; 32]);
     let w = 640;
     let h = 480;
@@ -101,16 +97,14 @@ fn bench_deblock_scu_ver(c: &mut Criterion) {
         2, 2, 3, 3, 3, 4, 4, 4, 5, 5, 6, 6, 7, 8, 9, 10, 11, 12, 12, 12, 12, 12,
     ];
 
-    c.bench_function("deblock_scu_ver", |b| {
+    c.bench_function("deblock_scu_ver_luma", |b| {
         b.iter(|| {
-            let _ = black_box(deblock_scu_ver(
+            let _ = black_box(deblock_scu_ver_luma(
                 &mut None,
                 &mut plane.as_region_mut(),
                 qp,
                 0,
                 tbl,
-                8,
-                8,
             ));
         })
     });
@@ -137,8 +131,6 @@ fn bench_deblock_scu_ver_chroma(c: &mut Criterion) {
                 qp,
                 1,
                 tbl,
-                8,
-                8,
             ));
         })
     });

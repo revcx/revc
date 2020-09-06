@@ -20,7 +20,6 @@ const MAC_SFT_NN_S1: i32 = (2);
 const MAC_ADD_NN_S1: i32 = (0); //TODO: Is MAC_ADD_NN_S1 = 0 a typo in ETM?
 const MAC_SFT_NN_S2: i32 = (10);
 const MAC_ADD_NN_S2: i32 = (1 << 9);
-const MAX_SAMPLE_VAL: i32 = ((1 << BIT_DEPTH) - 1);
 
 #[rustfmt::skip]
 static tbl_mc_l_coeff:[[i32;6];4] = [
@@ -172,7 +171,7 @@ fn evc_mc_l_n0(p: &Plane<pel>, gmv_x: i16, gmv_y: i16, pred: &mut [pel], cuw: i1
                 MAC_SFT_N0,
             )
             .max(0)
-            .min(MAX_SAMPLE_VAL) as pel;
+            .min(MAX_SAMPLE_VAL_I32) as pel;
         }
         dst = &mut dst[cuw as usize..];
     }
@@ -197,7 +196,7 @@ fn evc_mc_l_0n(p: &Plane<pel>, gmv_x: i16, gmv_y: i16, pred: &mut [pel], cuw: i1
                 MAC_SFT_0N,
             )
             .max(0)
-            .min(MAX_SAMPLE_VAL) as pel;
+            .min(MAX_SAMPLE_VAL_I32) as pel;
         }
         dst = &mut dst[cuw as usize..];
     }
@@ -241,7 +240,7 @@ fn evc_mc_l_nn(p: &Plane<pel>, gmv_x: i16, gmv_y: i16, pred: &mut [pel], cuw: i1
                     MAC_SFT_NN_S2,
                 )
                 .max(0)
-                .min(MAX_SAMPLE_VAL) as pel;
+                .min(MAX_SAMPLE_VAL_I32) as pel;
             }
             dst = &mut dst[cuw as usize..];
         }
@@ -280,7 +279,7 @@ fn evc_mc_c_n0(p: &Plane<pel>, gmv_x: i16, gmv_y: i16, pred: &mut [pel], cuw: i1
                 MAC_SFT_N0,
             )
             .max(0)
-            .min(MAX_SAMPLE_VAL) as pel;
+            .min(MAX_SAMPLE_VAL_I32) as pel;
         }
         dst = &mut dst[cuw as usize..];
     }
@@ -305,7 +304,7 @@ fn evc_mc_c_0n(p: &Plane<pel>, gmv_x: i16, gmv_y: i16, pred: &mut [pel], cuw: i1
                 MAC_SFT_0N,
             )
             .max(0)
-            .min(MAX_SAMPLE_VAL) as pel;
+            .min(MAX_SAMPLE_VAL_I32) as pel;
         }
         dst = &mut dst[cuw as usize..];
     }
@@ -350,7 +349,7 @@ fn evc_mc_c_nn(p: &Plane<pel>, gmv_x: i16, gmv_y: i16, pred: &mut [pel], cuw: i1
                     MAC_SFT_NN_S2,
                 )
                 .max(0)
-                .min(MAX_SAMPLE_VAL) as pel;
+                .min(MAX_SAMPLE_VAL_I32) as pel;
             }
             dst = &mut dst[cuw as usize..];
         }

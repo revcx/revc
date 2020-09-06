@@ -32,7 +32,7 @@ fn evc_recon_plane_region(
             let dst = &mut rec[y + j];
             for i in 0..cuw {
                 let t0 = src1[i] as i32 + src2[i] as i32;
-                dst[x + i] = EVC_CLIP3(0i32, ((1 << BIT_DEPTH) - 1) as i32, t0) as u16;
+                dst[x + i] = EVC_CLIP3(0i32, MAX_SAMPLE_VAL_I32, t0) as u16;
             }
             src1 = &src1[cuw..];
             src2 = &src2[cuw..];
@@ -64,7 +64,7 @@ pub(crate) fn evc_recon(
         for j in 0..cuh {
             for i in 0..cuw {
                 let t0 = src1[i] as i32 + src2[i] as i32;
-                dst[i] = EVC_CLIP3(0i32, ((1 << BIT_DEPTH) - 1) as i32, t0) as u16;
+                dst[i] = EVC_CLIP3(0i32, MAX_SAMPLE_VAL_I32, t0) as u16;
             }
             src1 = &src1[cuw..];
             src2 = &src2[cuw..];
