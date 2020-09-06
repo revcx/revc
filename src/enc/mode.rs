@@ -500,9 +500,8 @@ impl EvceCtx {
             0,
         );
         // for deblock
-        self.map_split[self.core.lcu_num as usize] = self.map_cu_data[self.core.lcu_num as usize]
-            .split_mode
-            .clone();
+        self.map_split[self.core.lcu_num as usize]
+            .clone_from(&self.map_cu_data[self.core.lcu_num as usize].split_mode);
 
         /* Reset all coded flag for the current lcu */
         self.core.x_scu = PEL2SCU(self.core.x_pel as usize) as u16;

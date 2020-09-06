@@ -40,7 +40,7 @@ fn ITX_CLIP_32(x: i64) -> i32 {
 
 pub(crate) fn evc_sub_block_itdq(
     tracer: &mut Option<Tracer>,
-    coef: &mut Vec<Vec<i16>>, //[[i16; MAX_CU_DIM]],
+    coef: &mut [Vec<i16>],
     log2_cuw: u8,
     log2_cuh: u8,
     qp_y: u8,
@@ -69,6 +69,42 @@ pub(crate) fn evc_sub_block_itdq(
                 1 << (log2_cuw - chroma) as usize,
                 1 << (log2_cuh - chroma) as usize,
                 &coef[c],
+            );
+        }
+    }
+}
+
+pub(crate) fn evc_sub_block_itdq2(
+    tracer: &mut Option<Tracer>,
+    coef: &mut [i16],
+    log2_cuw: u8,
+    log2_cuh: u8,
+    qp_y: u8,
+    qp_u: u8,
+    qp_v: u8,
+    flag: &[bool],
+) {
+    let qp: [u8; N_C] = [qp_y, qp_u, qp_v];
+    let mut scale = 0i32;
+
+    for c in 0..N_C {
+        let chroma = if c > 0 { 1 } else { 0 };
+        if flag[c] {
+            scale = (evc_tbl_dq_scale_b[qp[c] as usize % 6] as i32) << (qp[c] / 6) as i32;
+
+            evc_itdq(
+                &mut coef[tbl_cu_dim_offset[c]..],
+                (log2_cuw - chroma) as usize,
+                (log2_cuh - chroma) as usize,
+                scale,
+            );
+
+            TRACE_RESI(
+                tracer,
+                c,
+                1 << (log2_cuw - chroma) as usize,
+                1 << (log2_cuh - chroma) as usize,
+                &coef[tbl_cu_dim_offset[c]..],
             );
         }
     }

@@ -1,6 +1,7 @@
 use super::def::*;
 use super::plane::*;
 use super::region::*;
+use super::tbl::*;
 use super::tracer::*;
 use super::util::*;
 
@@ -81,7 +82,7 @@ pub(crate) fn evc_recon_yuv(
     mut y: usize,
     mut cuw: usize,
     mut cuh: usize,
-    coef: &Vec<Vec<i16>>, //[[i16; MAX_CU_DIM]; N_C],
+    coef: &[i16],
     pred: &Vec<Vec<pel>>, //[[pel; MAX_CU_DIM]; N_C],
     nnz: &[bool; N_C],
     planes: &mut [Plane<pel>; N_C],
@@ -89,7 +90,16 @@ pub(crate) fn evc_recon_yuv(
     /* Y */
     let rec = &mut planes[Y_C].as_region_mut();
     evc_recon_plane_region(
-        tracer, &coef[Y_C], &pred[Y_C], nnz[Y_C], x, y, cuw, cuh, rec, Y_C,
+        tracer,
+        &coef[tbl_cu_dim_offset[Y_C]..],
+        &pred[Y_C],
+        nnz[Y_C],
+        x,
+        y,
+        cuw,
+        cuh,
+        rec,
+        Y_C,
     );
 
     /* chroma */
@@ -100,11 +110,29 @@ pub(crate) fn evc_recon_yuv(
 
     let rec = &mut planes[U_C].as_region_mut();
     evc_recon_plane_region(
-        tracer, &coef[U_C], &pred[U_C], nnz[U_C], x, y, cuw, cuh, rec, U_C,
+        tracer,
+        &coef[tbl_cu_dim_offset[U_C]..],
+        &pred[U_C],
+        nnz[U_C],
+        x,
+        y,
+        cuw,
+        cuh,
+        rec,
+        U_C,
     );
 
     let rec = &mut planes[V_C].as_region_mut();
     evc_recon_plane_region(
-        tracer, &coef[V_C], &pred[V_C], nnz[V_C], x, y, cuw, cuh, rec, V_C,
+        tracer,
+        &coef[tbl_cu_dim_offset[V_C]..],
+        &pred[V_C],
+        nnz[V_C],
+        x,
+        y,
+        cuw,
+        cuh,
+        rec,
+        V_C,
     );
 }
