@@ -779,7 +779,7 @@ fn evcd_eco_coef(
                 bs,
                 sbac,
                 sbac_ctx,
-                &mut core.coef.data[c],
+                &mut core.coef.data[tbl_cu_dim_offset[c]..],
                 log2_cuw - chroma,
                 log2_cuh - chroma,
                 c,
@@ -928,12 +928,15 @@ fn evcd_eco_cu(
         }
 
         /* clear coefficient buffer */
-        for i in 0..(cuw * cuh) as usize {
-            core.coef.data[Y_C][i] = 0;
+        let cuwh = (cuw * cuh) as usize;
+        for v in &mut core.coef.data[tbl_cu_dim_offset[Y_C]..tbl_cu_dim_offset[Y_C] + cuwh] {
+            *v = 0;
         }
-        for i in 0..((cuw >> 1) * (cuh >> 1)) as usize {
-            core.coef.data[U_C][i] = 0;
-            core.coef.data[V_C][i] = 0;
+        for v in &mut core.coef.data[tbl_cu_dim_offset[U_C]..tbl_cu_dim_offset[U_C] + (cuwh >> 2)] {
+            *v = 0;
+        }
+        for v in &mut core.coef.data[tbl_cu_dim_offset[V_C]..tbl_cu_dim_offset[V_C] + (cuwh >> 2)] {
+            *v = 0;
         }
 
         /* parse coefficients */
@@ -1034,7 +1037,7 @@ pub(crate) fn evcd_eco_unit(
 
     /* inverse transform and dequantization */
     if core.pred_mode != PredMode::MODE_SKIP {
-        evc_sub_block_itdq(
+        evc_sub_block_itdq2(
             &mut bs.tracer,
             &mut core.coef.data,
             log2_cuw,
@@ -1103,7 +1106,8 @@ pub(crate) fn evcd_eco_unit(
         EVC_TRACE(&mut bs.tracer, core.mv[REFP_1][MV_Y]);
         EVC_TRACE(&mut bs.tracer, " )\n");
 
-        evc_mc(
+        let (pred0, pred1) = core.pred.split_at_mut(1);
+        evc_mc2(
             x as i16,
             y as i16,
             w as i16,
@@ -1113,7 +1117,8 @@ pub(crate) fn evcd_eco_unit(
             &core.refi,
             &core.mv,
             refp,
-            &mut core.pred,
+            &mut pred0[0].data,
+            &mut pred1[0].data,
         );
     } else {
         let avail_cu = evc_get_avail_intra(
@@ -1150,29 +1155,29 @@ pub(crate) fn evcd_eco_unit(
         EVC_TRACE(&mut bs.tracer, " \n");
 
         evc_ipred_b(
-            &core.nb.data[Y_C][..(cuh << 1) as usize],
-            core.nb.data[Y_C][(cuh << 1) as usize],
-            &core.nb.data[Y_C][(cuh << 1) as usize + 1..],
-            &mut core.pred[0].data[Y_C],
+            &core.nb.data[tbl_nb_siz_offset[Y_C]..tbl_nb_siz_offset[Y_C] + (cuh << 1) as usize],
+            core.nb.data[tbl_nb_siz_offset[Y_C] + (cuh << 1) as usize],
+            &core.nb.data[tbl_nb_siz_offset[Y_C] + (cuh << 1) as usize + 1..],
+            &mut core.pred[0].data[tbl_cu_dim_offset[Y_C]..],
             core.ipm[0],
             cuw as usize,
             cuh as usize,
         );
 
         evc_ipred_b(
-            &core.nb.data[U_C][..cuh as usize],
-            core.nb.data[U_C][cuh as usize],
-            &core.nb.data[U_C][cuh as usize + 1..],
-            &mut core.pred[0].data[U_C],
+            &core.nb.data[tbl_nb_siz_offset[U_C]..tbl_nb_siz_offset[U_C] + cuh as usize],
+            core.nb.data[tbl_nb_siz_offset[U_C] + cuh as usize],
+            &core.nb.data[tbl_nb_siz_offset[U_C] + cuh as usize + 1..],
+            &mut core.pred[0].data[tbl_cu_dim_offset[U_C]..],
             core.ipm[1],
             cuw as usize >> 1,
             cuh as usize >> 1,
         );
         evc_ipred_b(
-            &core.nb.data[V_C][..cuh as usize],
-            core.nb.data[V_C][cuh as usize],
-            &core.nb.data[V_C][cuh as usize + 1..],
-            &mut core.pred[0].data[V_C],
+            &core.nb.data[tbl_nb_siz_offset[V_C]..tbl_nb_siz_offset[V_C] + cuh as usize],
+            core.nb.data[tbl_nb_siz_offset[V_C] + cuh as usize],
+            &core.nb.data[tbl_nb_siz_offset[V_C] + cuh as usize + 1..],
+            &mut core.pred[0].data[tbl_cu_dim_offset[V_C]..],
             core.ipm[1],
             cuw as usize >> 1,
             cuh as usize >> 1,
@@ -1184,21 +1189,21 @@ pub(crate) fn evcd_eco_unit(
         Y_C,
         cuw as usize,
         cuh as usize,
-        &core.pred[0].data[Y_C],
+        &core.pred[0].data[tbl_cu_dim_offset[Y_C]..],
     );
     TRACE_PRED(
         &mut bs.tracer,
         U_C,
         cuw as usize >> 1,
         cuh as usize >> 1,
-        &core.pred[0].data[U_C],
+        &core.pred[0].data[tbl_cu_dim_offset[U_C]..],
     );
     TRACE_PRED(
         &mut bs.tracer,
         V_C,
         cuw as usize >> 1,
         cuh as usize >> 1,
-        &core.pred[0].data[V_C],
+        &core.pred[0].data[tbl_cu_dim_offset[V_C]..],
     );
 
     /* reconstruction */
@@ -1345,7 +1350,7 @@ fn evcd_get_nbr_yuv(
             cuh as usize,
             &planes[Y_C].as_region(),
             avail_cu,
-            &mut core.nb.data[Y_C],
+            &mut core.nb.data[tbl_nb_siz_offset[Y_C]..],
             scup as usize,
             map_scu,
             w_scu as usize,
@@ -1367,7 +1372,7 @@ fn evcd_get_nbr_yuv(
             cuh as usize,
             &planes[U_C].as_region(),
             avail_cu,
-            &mut core.nb.data[U_C],
+            &mut core.nb.data[tbl_nb_siz_offset[U_C]..],
             scup as usize,
             map_scu,
             w_scu as usize,
@@ -1384,7 +1389,7 @@ fn evcd_get_nbr_yuv(
             cuh as usize,
             &planes[V_C].as_region(),
             avail_cu,
-            &mut core.nb.data[V_C],
+            &mut core.nb.data[tbl_nb_siz_offset[V_C]..],
             scup as usize,
             map_scu,
             w_scu as usize,

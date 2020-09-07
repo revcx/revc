@@ -2,6 +2,7 @@ use super::def::*;
 use super::picman::*;
 use super::plane::*;
 use super::region::*;
+use super::tbl::*;
 use super::util::*;
 use crate::api::frame::Aligned;
 
@@ -538,6 +539,176 @@ pub(crate) fn evc_mc(
 
         let mut p0 = pred0[0].data[V_C].as_mut_slice();
         let mut p1 = pred1[0].data[V_C].as_slice();
+        for _ in 0..cuh >> 1 {
+            for x in 0..cuw as usize >> 1 {
+                p0[x] = (p0[x] + p1[x] + 1) >> 1;
+            }
+            p0 = &mut p0[cuw as usize >> 1..];
+            p1 = &p1[cuw as usize >> 1..];
+        }
+    }
+}
+
+pub(crate) fn evc_mc2(
+    x: i16,
+    y: i16,
+    pic_w: i16,
+    pic_h: i16,
+    cuw: i16,
+    cuh: i16,
+    refi: &[i8],
+    mv: &[[i16; MV_D]; REFP_NUM],
+    refp: &Vec<Vec<EvcRefP>>,
+    pred0: &mut [pel],
+    pred1: &mut [pel],
+) {
+    let mut bidx = 0;
+    let mut mv_t = [[0i16; MV_D]; REFP_NUM];
+
+    //store it to pass it to interpolation function for deriving correct interpolation filter
+    let mv_before_clipping = [
+        [mv[REFP_0][MV_X], mv[REFP_0][MV_Y]],
+        [mv[REFP_1][MV_X], mv[REFP_1][MV_Y]],
+    ];
+
+    mv_clip(x, y, pic_w, pic_h, cuw, cuh, refi, mv, &mut mv_t);
+
+    if REFI_IS_VALID(refi[REFP_0]) {
+        /* forward */
+        if let Some(ref_pic) = &refp[refi[REFP_0] as usize][REFP_0].pic {
+            let qpel_gmv_x = (x << 2) + mv_t[REFP_0][MV_X];
+            let qpel_gmv_y = (y << 2) + mv_t[REFP_0][MV_Y];
+            let pic = ref_pic.borrow();
+            let planes = &pic.frame.borrow().planes;
+
+            evc_mc_l(
+                mv_before_clipping[REFP_0][MV_X],
+                mv_before_clipping[REFP_0][MV_Y],
+                &planes[Y_C],
+                qpel_gmv_x,
+                qpel_gmv_y,
+                &mut pred0[tbl_cu_dim_offset[Y_C]..],
+                cuw,
+                cuh,
+            );
+            evc_mc_c(
+                mv_before_clipping[REFP_0][MV_X],
+                mv_before_clipping[REFP_0][MV_Y],
+                &planes[U_C],
+                qpel_gmv_x,
+                qpel_gmv_y,
+                &mut pred0[tbl_cu_dim_offset[U_C]..],
+                cuw >> 1,
+                cuh >> 1,
+            );
+            evc_mc_c(
+                mv_before_clipping[REFP_0][MV_X],
+                mv_before_clipping[REFP_0][MV_Y],
+                &planes[V_C],
+                qpel_gmv_x,
+                qpel_gmv_y,
+                &mut pred0[tbl_cu_dim_offset[V_C]..],
+                cuw >> 1,
+                cuh >> 1,
+            );
+
+            bidx += 1;
+        }
+    }
+
+    /* check identical motion */
+    if REFI_IS_VALID(refi[REFP_0]) && REFI_IS_VALID(refi[REFP_1]) {
+        if let (Some(pic0), Some(pic1)) = (
+            &refp[refi[REFP_0] as usize][REFP_0].pic,
+            &refp[refi[REFP_1] as usize][REFP_1].pic,
+        ) {
+            if pic0.borrow().poc == pic1.borrow().poc
+                && mv_t[REFP_0][MV_X] == mv_t[REFP_1][MV_X]
+                && mv_t[REFP_0][MV_Y] == mv_t[REFP_1][MV_Y]
+            {
+                return;
+            }
+        }
+    }
+
+    if REFI_IS_VALID(refi[REFP_1]) {
+        /* backward */
+        if let Some(ref_pic) = &refp[refi[REFP_1] as usize][REFP_1].pic {
+            let qpel_gmv_x = (x << 2) + mv_t[REFP_1][MV_X];
+            let qpel_gmv_y = (y << 2) + mv_t[REFP_1][MV_Y];
+            let pic = ref_pic.borrow();
+            let planes = &pic.frame.borrow().planes;
+
+            evc_mc_l(
+                mv_before_clipping[REFP_1][MV_X],
+                mv_before_clipping[REFP_1][MV_Y],
+                &planes[Y_C],
+                qpel_gmv_x,
+                qpel_gmv_y,
+                if bidx == 0 {
+                    &mut pred0[tbl_cu_dim_offset[Y_C]..]
+                } else {
+                    &mut pred1[tbl_cu_dim_offset[Y_C]..]
+                },
+                cuw,
+                cuh,
+            );
+            evc_mc_c(
+                mv_before_clipping[REFP_1][MV_X],
+                mv_before_clipping[REFP_1][MV_Y],
+                &planes[U_C],
+                qpel_gmv_x,
+                qpel_gmv_y,
+                if bidx == 0 {
+                    &mut pred0[tbl_cu_dim_offset[U_C]..]
+                } else {
+                    &mut pred1[tbl_cu_dim_offset[U_C]..]
+                },
+                cuw >> 1,
+                cuh >> 1,
+            );
+            evc_mc_c(
+                mv_before_clipping[REFP_1][MV_X],
+                mv_before_clipping[REFP_1][MV_Y],
+                &planes[V_C],
+                qpel_gmv_x,
+                qpel_gmv_y,
+                if bidx == 0 {
+                    &mut pred0[tbl_cu_dim_offset[V_C]..]
+                } else {
+                    &mut pred1[tbl_cu_dim_offset[V_C]..]
+                },
+                cuw >> 1,
+                cuh >> 1,
+            );
+
+            bidx += 1;
+        }
+    }
+
+    if bidx == 2 {
+        let mut p0 = &mut pred0[tbl_cu_dim_offset[Y_C]..];
+        let mut p1 = &pred1[tbl_cu_dim_offset[Y_C]..];
+        for _ in 0..cuh {
+            for x in 0..cuw as usize {
+                p0[x] = (p0[x] + p1[x] + 1) >> 1;
+            }
+            p0 = &mut p0[cuw as usize..];
+            p1 = &p1[cuw as usize..];
+        }
+
+        let mut p0 = &mut pred0[tbl_cu_dim_offset[U_C]..];
+        let mut p1 = &pred1[tbl_cu_dim_offset[U_C]..];
+        for _ in 0..cuh >> 1 {
+            for x in 0..cuw as usize >> 1 {
+                p0[x] = (p0[x] + p1[x] + 1) >> 1;
+            }
+            p0 = &mut p0[cuw as usize >> 1..];
+            p1 = &p1[cuw as usize >> 1..];
+        }
+
+        let mut p0 = &mut pred0[tbl_cu_dim_offset[V_C]..];
+        let mut p1 = &pred1[tbl_cu_dim_offset[V_C]..];
         for _ in 0..cuh >> 1 {
             for x in 0..cuw as usize >> 1 {
                 p0[x] = (p0[x] + p1[x] + 1) >> 1;

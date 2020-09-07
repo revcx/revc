@@ -27,29 +27,21 @@ use sbac::*;
  *
  * The variables in this structure are very often used in decoding process.
  *****************************************************************************/
-#[derive(Default)]
+//#[derive(Default)]
 pub(crate) struct EvcdCore {
     /************** LCU-based processing **************/
-    top_mcu: Vec<MCU>, //[Width/MIN_CU_SIZE]
-    lft_mcu: Vec<MCU>, //[MAX_CU_SIZE/MIN_CU_SIZE]
+    //top_mcu: Vec<MCU>, //[Width/MIN_CU_SIZE]
+    //lft_mcu: Vec<MCU>, //[MAX_CU_SIZE/MIN_CU_SIZE]
     // intra prediction pixel line buffer
-    top_pel: Vec<Vec<pel>>, //[N_C][Width]
-    lft_pel: Vec<Vec<pel>>, //[N_C][MAX_CU_SIZE]
+    //top_pel: Vec<Vec<pel>>, //[N_C][Width]
+    //lft_pel: Vec<Vec<pel>>, //[N_C][MAX_CU_SIZE]
 
     /* coefficient buffer of current CU */
-    coef: CUBuffer<i16>, //[N_C][MAX_CU_DIM]
-    /* pred buffer of current CU */
-    /* [1] is used for bi-pred. */
-    pred: [CUBuffer<pel>; 2], //[2][N_C][MAX_CU_DIM]
-
-    // deblocking line buffer
-    //TODO:
-
-    /************** Frame-based processing **************/
-
-    /************** current CU **************/
-    /* neighbor pixel buffer for intra prediction */
-    nb: NBBuffer<pel>, // [N_C][MAX_CU_SIZE*4+1];
+    coef: Aligned<[i16; MAX_CU_DIM + (MAX_CU_DIM >> 1)]>, //[N_C][MAX_CU_DIM]
+    /* pred buffer of current CU:  [1] is used for bi-pred. */
+    pred: [Aligned<[pel; MAX_CU_DIM + (MAX_CU_DIM >> 1)]>; 2], //[2][N_C][MAX_CU_DIM]
+    /* neighbor pixel buffer for intra prediction: left*2 + top_left + top*2 */
+    nb: Aligned<[pel; (MAX_CU_SIZE << 3) + 3 + 1]>, // [N_C][MAX_CU_SIZE*4+1];
 
     /* prediction mode of current CU: INTRA, INTER, ... */
     pred_mode: PredMode,
@@ -82,6 +74,31 @@ pub(crate) struct EvcdCore {
     split_mode: LcuSplitMode,
 
     evc_tbl_qp_chroma_dynamic_ext: Vec<Vec<i8>>, // [[i8; MAX_QP_TABLE_SIZE_EXT]; 2],
+}
+
+impl EvcdCore {
+    fn new() -> Self {
+        EvcdCore {
+            coef: Aligned::uninitialized(),
+            pred: [Aligned::uninitialized(), Aligned::uninitialized()],
+            nb: Aligned::uninitialized(),
+            pred_mode: PredMode::default(),
+            ipm: [IntraPredDir::default(); 2],
+            inter_dir: InterPredDir::default(),
+            refi: [0; REFP_NUM],
+            mv: [[0; MV_D]; REFP_NUM],
+            mvp_idx: [0; REFP_NUM],
+            mvd: [[0; MV_D]; REFP_NUM],
+            is_coef: [false; N_C],
+            qp: 0,
+            qp_y: 0,
+            qp_u: 0,
+            qp_v: 0,
+            cu_qp_delta_is_coded: false,
+            split_mode: LcuSplitMode::default(),
+            evc_tbl_qp_chroma_dynamic_ext: vec![],
+        }
+    }
 }
 
 /******************************************************************************
@@ -182,7 +199,7 @@ impl EvcdCtx {
             pkt: None,
 
             /* CORE information used for fast operation */
-            core: EvcdCore::default(),
+            core: EvcdCore::new(),
 
             /* MAPS *******************************************************************/
             /* SCU map for CU information */
@@ -274,7 +291,7 @@ impl EvcdCtx {
         self.f_scu = (self.w_scu * self.h_scu) as u32;
 
         // Top/Left Line Buffer
-        self.core.top_mcu = vec![MCU::default(); self.w_scu as usize];
+        /*self.core.top_mcu = vec![MCU::default(); self.w_scu as usize];
         self.core.top_pel = vec![
             vec![0; self.w as usize],
             vec![0; (self.w >> 1) as usize],
@@ -285,7 +302,7 @@ impl EvcdCtx {
             vec![0; MAX_CU_SIZE],
             vec![0; MAX_CU_SIZE >> 1],
             vec![0; MAX_CU_SIZE >> 1],
-        ];
+        ];*/
 
         /* alloc SCU map */
         self.map_scu = vec![MCU::default(); self.f_scu as usize];

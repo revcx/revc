@@ -2,6 +2,13 @@ use super::api::*;
 use super::def::*;
 use super::util::*;
 
+pub(crate) static tbl_cu_dim_offset: [usize; 3] = [0, MAX_CU_DIM, MAX_CU_DIM + (MAX_CU_DIM >> 2)];
+pub(crate) static tbl_nb_siz_offset: [usize; 3] = [
+    0,
+    (MAX_CU_SIZE << 2) + 1,
+    (MAX_CU_SIZE << 2) + 1 + (MAX_CU_SIZE << 1) + 1,
+];
+
 pub(crate) static evey_tbl_mpm: [[[u8; 5]; 6]; 6] = [
     [
         [0, 2, 3, 1, 4],
