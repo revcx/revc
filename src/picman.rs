@@ -144,11 +144,11 @@ pub(crate) struct EvcPm {
 impl EvcPm {
     pub(crate) fn new(width: usize, height: usize, chroma_sampling: ChromaSampling) -> Self {
         let mut pic = vec![];
-        for i in 0..MAX_PB_SIZE {
+        for _ in 0..MAX_PB_SIZE {
             pic.push(None);
         }
         let mut pic_ref = vec![];
-        for i in 0..MAX_NUM_REF_PICS {
+        for _ in 0..MAX_NUM_REF_PICS {
             pic_ref.push(None);
         }
 
@@ -402,9 +402,6 @@ impl EvcPm {
 
         Err(EvcError::EVC_ERR_UNKNOWN)
     }
-
-    /*This is the implementation of reference picture marking based on RPL*/
-    pub(crate) fn evc_picman_refpic_marking(&mut self, sh: &EvcSh, poc_val: u32) {}
 
     pub(crate) fn evc_picman_put_pic(
         &mut self,

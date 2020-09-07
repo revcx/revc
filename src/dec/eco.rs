@@ -138,11 +138,7 @@ pub(crate) fn evcd_eco_sps(bs: &mut EvcdBsr, sps: &mut EvcSps) -> Result<(), Evc
     Ok(())
 }
 
-pub(crate) fn evcd_eco_pps(
-    bs: &mut EvcdBsr,
-    sps: &EvcSps,
-    pps: &mut EvcPps,
-) -> Result<(), EvcError> {
+pub(crate) fn evcd_eco_pps(bs: &mut EvcdBsr, pps: &mut EvcPps) -> Result<(), EvcError> {
     EVC_TRACE(&mut bs.tracer, "***********************************\n");
     EVC_TRACE(&mut bs.tracer, "************ PPS Start ************\n");
 
@@ -185,7 +181,6 @@ pub(crate) fn evcd_eco_pps(
 
 pub(crate) fn evcd_eco_sh(
     bs: &mut EvcdBsr,
-    sps: &EvcSps,
     pps: &EvcPps,
     sh: &mut EvcSh,
     nalu_type: NaluType,
@@ -1081,9 +1076,6 @@ pub(crate) fn evcd_eco_unit(
                     scup as usize
                         + ((1 << (log2_cuw as usize - MIN_CU_LOG2)) - 1)
                         + ((1 << (log2_cuh as usize - MIN_CU_LOG2)) - 1) * w_scu as usize,
-                    scup as usize,
-                    w_scu,
-                    h_scu,
                     &mut core.mv,
                 );
                 core.refi[REFP_0] = 0;

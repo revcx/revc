@@ -62,7 +62,7 @@ pub(crate) fn evc_recon(
         let mut src1 = coef;
         let mut src2 = pred;
         let mut dst = &mut rec[..];
-        for j in 0..cuh {
+        for _ in 0..cuh {
             for i in 0..cuw {
                 let t0 = src1[i] as i32 + src2[i] as i32;
                 dst[i] = EVC_CLIP3(0i32, MAX_SAMPLE_VAL_I32, t0) as u16;
