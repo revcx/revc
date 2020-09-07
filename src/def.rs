@@ -733,20 +733,3 @@ impl<T: Default + Copy> Default for CUBuffer<T> {
         }
     }
 }
-
-#[derive(Clone)]
-pub(crate) struct NBBuffer<T: Default + Copy> {
-    pub(crate) data: Vec<Vec<T>>,
-}
-
-impl<T: Default + Copy> Default for NBBuffer<T> {
-    fn default() -> Self {
-        NBBuffer {
-            data: vec![
-                vec![T::default(); (MAX_CU_SIZE << 2) + 1], //left*2 + top_left + top*2
-                vec![T::default(); (MAX_CU_SIZE << 1) + 1],
-                vec![T::default(); (MAX_CU_SIZE << 1) + 1],
-            ],
-        }
-    }
-}

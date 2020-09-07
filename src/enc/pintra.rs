@@ -147,7 +147,7 @@ impl EvceCtx {
                 cuh,
                 &planes[Y_C].as_region(),
                 self.core.avail_cu,
-                &mut self.core.nb.data[Y_C],
+                &mut self.core.nb.data[tbl_nb_siz_offset[Y_C]..],
                 self.core.scup as usize,
                 &self.map_scu,
                 self.w_scu as usize,
@@ -163,7 +163,7 @@ impl EvceCtx {
                 cuh >> 1,
                 &planes[U_C].as_region(),
                 self.core.avail_cu,
-                &mut self.core.nb.data[U_C],
+                &mut self.core.nb.data[tbl_nb_siz_offset[U_C]..],
                 self.core.scup as usize,
                 &self.map_scu,
                 self.w_scu as usize,
@@ -179,7 +179,7 @@ impl EvceCtx {
                 cuh >> 1,
                 &planes[V_C].as_region(),
                 self.core.avail_cu,
-                &mut self.core.nb.data[V_C],
+                &mut self.core.nb.data[tbl_nb_siz_offset[V_C]..],
                 self.core.scup as usize,
                 &self.map_scu,
                 self.w_scu as usize,
@@ -334,9 +334,9 @@ impl EvceCtx {
             let pred_buf = &mut pi.pred_cache[i as usize];
 
             evc_ipred_b(
-                &core.nb.data[Y_C][..cuh << 1],
-                core.nb.data[Y_C][cuh << 1],
-                &core.nb.data[Y_C][(cuh << 1) + 1..],
+                &core.nb.data[tbl_nb_siz_offset[Y_C]..tbl_nb_siz_offset[Y_C] + (cuh << 1) as usize],
+                core.nb.data[tbl_nb_siz_offset[Y_C] + (cuh << 1) as usize],
+                &core.nb.data[tbl_nb_siz_offset[Y_C] + (cuh << 1) as usize + 1..],
                 pred_buf,
                 i.into(),
                 cuw,
@@ -517,9 +517,9 @@ impl EvceCtx {
             cost += (self.lambda[0] * bit_cnt as f64);
         } else {
             evc_ipred_b(
-                &self.core.nb.data[U_C][..cuh as usize],
-                self.core.nb.data[U_C][cuh as usize],
-                &self.core.nb.data[U_C][cuh as usize + 1..],
+                &self.core.nb.data[tbl_nb_siz_offset[U_C]..tbl_nb_siz_offset[U_C] + cuh as usize],
+                self.core.nb.data[tbl_nb_siz_offset[U_C] + cuh as usize],
+                &self.core.nb.data[tbl_nb_siz_offset[U_C] + cuh as usize + 1..],
                 &mut self.pintra.pred.data[U_C],
                 self.core.ipm[1],
                 cuw as usize >> 1,
@@ -527,9 +527,9 @@ impl EvceCtx {
             );
 
             evc_ipred_b(
-                &self.core.nb.data[V_C][..cuh as usize],
-                self.core.nb.data[V_C][cuh as usize],
-                &self.core.nb.data[V_C][cuh as usize + 1..],
+                &self.core.nb.data[tbl_nb_siz_offset[V_C]..tbl_nb_siz_offset[V_C] + cuh as usize],
+                self.core.nb.data[tbl_nb_siz_offset[V_C] + cuh as usize],
+                &self.core.nb.data[tbl_nb_siz_offset[V_C] + cuh as usize + 1..],
                 &mut self.pintra.pred.data[V_C],
                 self.core.ipm[1],
                 cuw as usize >> 1,

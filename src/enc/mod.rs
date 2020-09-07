@@ -144,18 +144,18 @@ pub(crate) struct EvceRdoqEst {
 pub(crate) struct EvceCore {
     /* coefficient buffer of current CU */
     coef: CUBuffer<i16>, //[[i16; MAX_CU_DIM]; N_C]
-    /* CU data for RDO */
-    cu_data_best: Vec<Vec<EvceCUData>>, //[[EvceCUData; MAX_CU_DEPTH]; MAX_CU_DEPTH],
-    cu_data_temp: Vec<Vec<EvceCUData>>, //[[EvceCUData; MAX_CU_DEPTH]; MAX_CU_DEPTH],
-
-    dqp_data: Vec<Vec<EvceDQP>>, //[[EvceDQP; MAX_CU_DEPTH]; MAX_CU_DEPTH],
-
     /* temporary coefficient buffer */
     ctmp: CUBuffer<i16>, //[[i16;MAX_CU_DIM];N_C]
     /* pred buffer of current CU. [1][x][x] is used for bi-pred */
     pred: [CUBuffer<pel>; 2], //[2][N_C][MAX_CU_DIM];
     /* neighbor pixel buffer for intra prediction */
-    nb: NBBuffer<pel>, // [N_C][MAX_CU_SIZE*4+1];
+    nb: Aligned<[pel; (MAX_CU_SIZE << 3) + 3 + 1]>, // [N_C][MAX_CU_SIZE*4+1];
+
+    /* CU data for RDO */
+    cu_data_best: Vec<Vec<EvceCUData>>, //[[EvceCUData; MAX_CU_DEPTH]; MAX_CU_DEPTH],
+    cu_data_temp: Vec<Vec<EvceCUData>>, //[[EvceCUData; MAX_CU_DEPTH]; MAX_CU_DEPTH],
+    dqp_data: Vec<Vec<EvceDQP>>,        //[[EvceDQP; MAX_CU_DEPTH]; MAX_CU_DEPTH],
+
     /* current encoding LCU number */
     lcu_num: u16,
     /*QP for current encoding CU. Used to derive Luma and chroma qp*/

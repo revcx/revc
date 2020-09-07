@@ -27,7 +27,7 @@ use sbac::*;
  *
  * The variables in this structure are very often used in decoding process.
  *****************************************************************************/
-//#[derive(Default)]
+#[derive(Default)]
 pub(crate) struct EvcdCore {
     /************** LCU-based processing **************/
     //top_mcu: Vec<MCU>, //[Width/MIN_CU_SIZE]
@@ -74,31 +74,6 @@ pub(crate) struct EvcdCore {
     split_mode: LcuSplitMode,
 
     evc_tbl_qp_chroma_dynamic_ext: Vec<Vec<i8>>, // [[i8; MAX_QP_TABLE_SIZE_EXT]; 2],
-}
-
-impl EvcdCore {
-    fn new() -> Self {
-        EvcdCore {
-            coef: Aligned::uninitialized(),
-            pred: [Aligned::uninitialized(), Aligned::uninitialized()],
-            nb: Aligned::uninitialized(),
-            pred_mode: PredMode::default(),
-            ipm: [IntraPredDir::default(); 2],
-            inter_dir: InterPredDir::default(),
-            refi: [0; REFP_NUM],
-            mv: [[0; MV_D]; REFP_NUM],
-            mvp_idx: [0; REFP_NUM],
-            mvd: [[0; MV_D]; REFP_NUM],
-            is_coef: [false; N_C],
-            qp: 0,
-            qp_y: 0,
-            qp_u: 0,
-            qp_v: 0,
-            cu_qp_delta_is_coded: false,
-            split_mode: LcuSplitMode::default(),
-            evc_tbl_qp_chroma_dynamic_ext: vec![],
-        }
-    }
 }
 
 /******************************************************************************
@@ -199,7 +174,7 @@ impl EvcdCtx {
             pkt: None,
 
             /* CORE information used for fast operation */
-            core: EvcdCore::new(),
+            core: EvcdCore::default(),
 
             /* MAPS *******************************************************************/
             /* SCU map for CU information */
