@@ -83,7 +83,7 @@ pub(crate) fn evc_recon_yuv(
     mut cuw: usize,
     mut cuh: usize,
     coef: &[i16],
-    pred: &Vec<Vec<pel>>, //[[pel; MAX_CU_DIM]; N_C],
+    pred: &[pel],
     nnz: &[bool; N_C],
     planes: &mut [Plane<pel>; N_C],
 ) {
@@ -92,7 +92,7 @@ pub(crate) fn evc_recon_yuv(
     evc_recon_plane_region(
         tracer,
         &coef[tbl_cu_dim_offset[Y_C]..],
-        &pred[Y_C],
+        &pred[tbl_cu_dim_offset[Y_C]..],
         nnz[Y_C],
         x,
         y,
@@ -112,7 +112,7 @@ pub(crate) fn evc_recon_yuv(
     evc_recon_plane_region(
         tracer,
         &coef[tbl_cu_dim_offset[U_C]..],
-        &pred[U_C],
+        &pred[tbl_cu_dim_offset[U_C]..],
         nnz[U_C],
         x,
         y,
@@ -126,7 +126,7 @@ pub(crate) fn evc_recon_yuv(
     evc_recon_plane_region(
         tracer,
         &coef[tbl_cu_dim_offset[V_C]..],
-        &pred[V_C],
+        &pred[tbl_cu_dim_offset[V_C]..],
         nnz[V_C],
         x,
         y,

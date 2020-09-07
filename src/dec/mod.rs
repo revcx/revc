@@ -39,11 +39,9 @@ pub(crate) struct EvcdCore {
     /* coefficient buffer of current CU */
     coef: Aligned<[i16; MAX_CU_DIM + (MAX_CU_DIM >> 1)]>, //[N_C][MAX_CU_DIM]
     /* pred buffer of current CU:  [1] is used for bi-pred. */
-    //pred: [Aligned<[pel; MAX_CU_DIM + (MAX_CU_DIM >> 1)]>; 2], //[2][N_C][MAX_CU_DIM]
+    pred: [Aligned<[pel; MAX_CU_DIM + (MAX_CU_DIM >> 1)]>; 2], //[2][N_C][MAX_CU_DIM]
     /* neighbor pixel buffer for intra prediction: left*2 + top_left + top*2 */
     nb: Aligned<[pel; (MAX_CU_SIZE << 3) + 3 + 1]>, // [N_C][MAX_CU_SIZE*4+1];
-    pred: [CUBuffer<pel>; 2],                       //[2][N_C][MAX_CU_DIM]
-    //nb: NBBuffer<pel>,        // [N_C][MAX_CU_SIZE*4+1];
 
     /* prediction mode of current CU: INTRA, INTER, ... */
     pred_mode: PredMode,
@@ -82,8 +80,8 @@ impl EvcdCore {
     fn new() -> Self {
         EvcdCore {
             coef: Aligned::uninitialized(),
-            pred: [CUBuffer::default(), CUBuffer::default()], //[Aligned::uninitialized(); 2],
-            nb: Aligned::uninitialized(), //NBBuffer::default(),                          //
+            pred: [Aligned::uninitialized(), Aligned::uninitialized()],
+            nb: Aligned::uninitialized(),
             pred_mode: PredMode::default(),
             ipm: [IntraPredDir::default(); 2],
             inter_dir: InterPredDir::default(),
