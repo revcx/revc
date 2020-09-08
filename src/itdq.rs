@@ -111,9 +111,10 @@ pub(crate) fn evc_sub_block_itdq2(
 }
 
 fn evc_dquant(coef: &mut [i16], log2_w: usize, log2_h: usize, scale: i32, offset: i32, shift: u8) {
-    for i in 0..1 << (log2_w + log2_h) {
-        let lev = (coef[i] as i64 * scale as i64 + offset as i64) >> shift;
-        coef[i] = EVC_CLIP3(-32768, 32767, lev) as i16;
+    for v in &mut coef[0..1 << (log2_w + log2_h)] {
+        *v = ((*v as i64 * scale as i64 + offset as i64) >> shift)
+            .min(32767)
+            .max(-32768) as i16;
     }
 }
 
@@ -123,8 +124,8 @@ fn itx_pb2b0(src: &[i16], dst: &mut [i32], log2_line: usize) {
         let E = src[(0 << log2_line) + j] as i64 + src[(1 << log2_line) + j] as i64;
         let O = src[(0 << log2_line) + j] as i64 - src[(1 << log2_line) + j] as i64;
 
-        dst[j * 2 + 0] = ITX_CLIP_32(evc_tbl_tm2[0][0] as i64 * E);
-        dst[j * 2 + 1] = ITX_CLIP_32(evc_tbl_tm2[1][0] as i64 * O);
+        dst[(j << 1) + 0] = ITX_CLIP_32(evc_tbl_tm2[0][0] as i64 * E);
+        dst[(j << 1) + 1] = ITX_CLIP_32(evc_tbl_tm2[1][0] as i64 * O);
     }
 }
 
@@ -140,10 +141,10 @@ fn itx_pb4b0(src: &[i16], dst: &mut [i32], log2_line: usize) {
         let E1 = evc_tbl_tm4[0][1] as i64 * src[(0 << log2_line) + j] as i64
             + evc_tbl_tm4[2][1] as i64 * src[(2 << log2_line) + j] as i64;
 
-        dst[j * 4 + 0] = ITX_CLIP_32(E0 + O0);
-        dst[j * 4 + 1] = ITX_CLIP_32(E1 + O1);
-        dst[j * 4 + 2] = ITX_CLIP_32(E1 - O1);
-        dst[j * 4 + 3] = ITX_CLIP_32(E0 - O0);
+        dst[(j << 2) + 0] = ITX_CLIP_32(E0 + O0);
+        dst[(j << 2) + 1] = ITX_CLIP_32(E1 + O1);
+        dst[(j << 2) + 2] = ITX_CLIP_32(E1 - O1);
+        dst[(j << 2) + 3] = ITX_CLIP_32(E0 - O0);
     }
 }
 
@@ -175,8 +176,8 @@ fn itx_pb8b0(src: &[i16], dst: &mut [i32], log2_line: usize) {
         E[2] = EE1 - EO1;
 
         for k in 0..4 {
-            dst[j * 8 + k] = ITX_CLIP_32(E[k] + O[k]);
-            dst[j * 8 + k + 4] = ITX_CLIP_32(E[3 - k] - O[3 - k]);
+            dst[(j << 3) + k] = ITX_CLIP_32(E[k] + O[k]);
+            dst[(j << 3) + k + 4] = ITX_CLIP_32(E[3 - k] - O[3 - k]);
         }
     }
 }
@@ -228,8 +229,8 @@ fn itx_pb16b0(src: &[i16], dst: &mut [i32], log2_line: usize) {
         }
 
         for k in 0..8 {
-            dst[j * 16 + k] = ITX_CLIP_32(E[k] + O[k]);
-            dst[j * 16 + k + 8] = ITX_CLIP_32(E[7 - k] - O[7 - k]);
+            dst[(j << 4) + k] = ITX_CLIP_32(E[k] + O[k]);
+            dst[(j << 4) + k + 8] = ITX_CLIP_32(E[7 - k] - O[7 - k]);
         }
     }
 }
@@ -304,8 +305,8 @@ fn itx_pb32b0(src: &[i16], dst: &mut [i32], log2_line: usize) {
         }
 
         for k in 0..16 {
-            dst[j * 32 + k] = ITX_CLIP_32(E[k] + O[k]);
-            dst[j * 32 + k + 16] = ITX_CLIP_32(E[15 - k] - O[15 - k]);
+            dst[(j << 5) + k] = ITX_CLIP_32(E[k] + O[k]);
+            dst[(j << 5) + k + 16] = ITX_CLIP_32(E[15 - k] - O[15 - k]);
         }
     }
 }
@@ -420,34 +421,26 @@ fn itx_pb64b0(src: &[i16], dst: &mut [i32], log2_line: usize) {
         }
 
         for k in 0..32 {
-            dst[j * 64 + k] = ITX_CLIP_32(E[k] + O[k]);
-            dst[j * 64 + k + 32] = ITX_CLIP_32(E[31 - k] - O[31 - k]);
+            dst[(j << 6) + k] = ITX_CLIP_32(E[k] + O[k]);
+            dst[(j << 6) + k + 32] = ITX_CLIP_32(E[31 - k] - O[31 - k]);
         }
     }
 }
 
 fn itx_pb2b1(src: &[i32], dst: &mut [i16], shift: usize, log2_line: usize) {
-    let add = if shift == 0 {
-        0
-    } else {
-        1 << (shift - 1) as i64
-    };
+    let add = if shift == 0 { 0 } else { 1 << (shift - 1) };
     for j in 0..(1 << log2_line) {
         /* E and O */
         let E = src[(0 << log2_line) + j] as i64 + src[(1 << log2_line) + j] as i64;
         let O = src[(0 << log2_line) + j] as i64 - src[(1 << log2_line) + j] as i64;
 
-        dst[j * 2 + 0] = ITX_CLIP((evc_tbl_tm2[0][0] as i64 * E + add) >> shift as i64);
-        dst[j * 2 + 1] = ITX_CLIP((evc_tbl_tm2[1][0] as i64 * O + add) >> shift as i64);
+        dst[(j << 1) + 0] = ITX_CLIP((evc_tbl_tm2[0][0] as i64 * E + add) >> shift as i64);
+        dst[(j << 1) + 1] = ITX_CLIP((evc_tbl_tm2[1][0] as i64 * O + add) >> shift as i64);
     }
 }
 
 fn itx_pb4b1(src: &[i32], dst: &mut [i16], shift: usize, log2_line: usize) {
-    let add = if shift == 0 {
-        0
-    } else {
-        1 << (shift - 1) as i64
-    };
+    let add = if shift == 0 { 0 } else { 1 << (shift - 1) };
     for j in 0..(1 << log2_line) {
         /* Utilizing symmetry properties to the maximum to minimize the number of multiplications */
         let O0 = evc_tbl_tm4[1][0] as i64 * src[(1 << log2_line) + j] as i64
@@ -459,19 +452,15 @@ fn itx_pb4b1(src: &[i32], dst: &mut [i16], shift: usize, log2_line: usize) {
         let E1 = evc_tbl_tm4[0][1] as i64 * src[(0 << log2_line) + j] as i64
             + evc_tbl_tm4[2][1] as i64 * src[(2 << log2_line) + j] as i64;
 
-        dst[j * 4 + 0] = ITX_CLIP((E0 + O0 + add) >> shift as i64);
-        dst[j * 4 + 1] = ITX_CLIP((E1 + O1 + add) >> shift as i64);
-        dst[j * 4 + 2] = ITX_CLIP((E1 - O1 + add) >> shift as i64);
-        dst[j * 4 + 3] = ITX_CLIP((E0 - O0 + add) >> shift as i64);
+        dst[(j << 2) + 0] = ITX_CLIP((E0 + O0 + add) >> shift as i64);
+        dst[(j << 2) + 1] = ITX_CLIP((E1 + O1 + add) >> shift as i64);
+        dst[(j << 2) + 2] = ITX_CLIP((E1 - O1 + add) >> shift as i64);
+        dst[(j << 2) + 3] = ITX_CLIP((E0 - O0 + add) >> shift as i64);
     }
 }
 
 fn itx_pb8b1(src: &[i32], dst: &mut [i16], shift: usize, log2_line: usize) {
-    let add = if shift == 0 {
-        0
-    } else {
-        1 << (shift - 1) as i64
-    };
+    let add = if shift == 0 { 0 } else { 1 << (shift - 1) };
 
     let mut E = [0i64; 4];
     let mut O = [0i64; 4];
@@ -500,18 +489,14 @@ fn itx_pb8b1(src: &[i32], dst: &mut [i16], shift: usize, log2_line: usize) {
         E[2] = EE1 - EO1;
 
         for k in 0..4 {
-            dst[j * 8 + k] = ITX_CLIP((E[k] + O[k] + add) >> shift as i64);
-            dst[j * 8 + k + 4] = ITX_CLIP((E[3 - k] - O[3 - k] + add) >> shift as i64);
+            dst[(j << 3) + k] = ITX_CLIP((E[k] + O[k] + add) >> shift as i64);
+            dst[(j << 3) + k + 4] = ITX_CLIP((E[3 - k] - O[3 - k] + add) >> shift as i64);
         }
     }
 }
 
 fn itx_pb16b1(src: &[i32], dst: &mut [i16], shift: usize, log2_line: usize) {
-    let add = if shift == 0 {
-        0
-    } else {
-        1 << (shift - 1) as i64
-    };
+    let add = if shift == 0 { 0 } else { 1 << (shift - 1) };
 
     let mut E = [0i64; 8];
     let mut O = [0i64; 8];
@@ -559,18 +544,14 @@ fn itx_pb16b1(src: &[i32], dst: &mut [i16], shift: usize, log2_line: usize) {
         }
 
         for k in 0..8 {
-            dst[j * 16 + k] = ITX_CLIP((E[k] + O[k] + add) >> shift as i64);
-            dst[j * 16 + k + 8] = ITX_CLIP((E[7 - k] - O[7 - k] + add) >> shift as i64);
+            dst[(j << 4) + k] = ITX_CLIP((E[k] + O[k] + add) >> shift as i64);
+            dst[(j << 4) + k + 8] = ITX_CLIP((E[7 - k] - O[7 - k] + add) >> shift as i64);
         }
     }
 }
 
 fn itx_pb32b1(src: &[i32], dst: &mut [i16], shift: usize, log2_line: usize) {
-    let add = if shift == 0 {
-        0
-    } else {
-        1 << (shift - 1) as i64
-    };
+    let add = if shift == 0 { 0 } else { 1 << (shift - 1) };
 
     let mut E = [0i64; 16];
     let mut O = [0i64; 16];
@@ -641,18 +622,14 @@ fn itx_pb32b1(src: &[i32], dst: &mut [i16], shift: usize, log2_line: usize) {
         }
 
         for k in 0..16 {
-            dst[j * 32 + k] = ITX_CLIP((E[k] + O[k] + add) >> shift as i64);
-            dst[j * 32 + k + 16] = ITX_CLIP((E[15 - k] - O[15 - k] + add) >> shift as i64);
+            dst[(j << 5) + k] = ITX_CLIP((E[k] + O[k] + add) >> shift as i64);
+            dst[(j << 5) + k + 16] = ITX_CLIP((E[15 - k] - O[15 - k] + add) >> shift as i64);
         }
     }
 }
 
 fn itx_pb64b1(src: &[i32], dst: &mut [i16], shift: usize, log2_line: usize) {
-    let add = if shift == 0 {
-        0
-    } else {
-        1 << (shift - 1) as i64
-    };
+    let add = if shift == 0 { 0 } else { 1 << (shift - 1) };
     let mut E = [0i64; 32];
     let mut O = [0i64; 32];
     let mut EE = [0i64; 16];
@@ -762,8 +739,8 @@ fn itx_pb64b1(src: &[i32], dst: &mut [i16], shift: usize, log2_line: usize) {
         }
 
         for k in 0..32 {
-            dst[j * 64 + k] = ITX_CLIP((E[k] + O[k] + add) >> shift as i64);
-            dst[j * 64 + k + 32] = ITX_CLIP((E[31 - k] - O[31 - k] + add) >> shift as i64);
+            dst[(j << 6) + k] = ITX_CLIP((E[k] + O[k] + add) >> shift as i64);
+            dst[(j << 6) + k + 32] = ITX_CLIP((E[31 - k] - O[31 - k] + add) >> shift as i64);
         }
     }
 }
@@ -792,11 +769,7 @@ pub fn evc_itdq(coef: &mut [i16], log2_w: usize, log2_h: usize, scale: i32) {
 
     let tr_shift: i8 = MAX_TX_DYNAMIC_RANGE as i8 - BIT_DEPTH as i8 - log2_size as i8;
     let shift: u8 = (QUANT_IQUANT_SHIFT as i8 - QUANT_SHIFT as i8 - tr_shift + ns_shift) as u8;
-    let offset: i32 = if shift == 0 {
-        0
-    } else {
-        1 << (shift as i32 - 1)
-    };
+    let offset: i32 = if shift == 0 { 0 } else { 1 << (shift - 1) };
 
     evc_dquant(coef, log2_w, log2_h, scale, offset, shift);
     evc_itrans(coef, log2_w, log2_h);
