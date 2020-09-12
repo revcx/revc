@@ -17,13 +17,11 @@ impl EvcdSbac {
         &mut self,
         bs: &mut EvcdBsr,
         sbac_ctx: &mut EvcSbacCtx,
-        slice_type: SliceType,
-        slice_qp: u8,
     ) -> Result<(), EvcError> {
         /* Initialization of the internal variables */
         self.range = 16384;
         self.value = 0;
-        for i in 0..14 {
+        for _ in 0..14 {
             let t0 = bs.read1(None)?;
             self.value = ((self.value << 1) | t0) & 0xFFFF;
         }

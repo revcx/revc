@@ -118,8 +118,8 @@ pub(crate) struct EvcePicOrg {
 
 #[derive(Default, Copy, Clone)]
 pub(crate) struct EvceDQP {
-    prev_QP: u8,
-    curr_QP: u8,
+    prev_qp: u8,
+    curr_qp: u8,
     cu_qp_delta_is_coded: bool,
     cu_qp_delta_code: u8,
 }
@@ -142,20 +142,16 @@ pub(crate) struct EvceRdoqEst {
  *****************************************************************************/
 #[derive(Default)]
 pub(crate) struct EvceCore {
-    /* coefficient buffer of current CU */
-    coef: CUBuffer<i16>, //[[i16; MAX_CU_DIM]; N_C]
+    /* temporary coefficient buffer */
+    ctmp: CUBuffer<i16>, //[[i16;MAX_CU_DIM];N_C]
+    /* neighbor pixel buffer for intra prediction */
+    nb: Aligned<[pel; (MAX_CU_SIZE << 3) + 3 + 1]>, // [N_C][MAX_CU_SIZE*4+1];
+
     /* CU data for RDO */
     cu_data_best: Vec<Vec<EvceCUData>>, //[[EvceCUData; MAX_CU_DEPTH]; MAX_CU_DEPTH],
     cu_data_temp: Vec<Vec<EvceCUData>>, //[[EvceCUData; MAX_CU_DEPTH]; MAX_CU_DEPTH],
+    dqp_data: Vec<Vec<EvceDQP>>,        //[[EvceDQP; MAX_CU_DEPTH]; MAX_CU_DEPTH],
 
-    dqp_data: Vec<Vec<EvceDQP>>, //[[EvceDQP; MAX_CU_DEPTH]; MAX_CU_DEPTH],
-
-    /* temporary coefficient buffer */
-    ctmp: CUBuffer<i16>, //[[i16;MAX_CU_DIM];N_C]
-    /* pred buffer of current CU. [1][x][x] is used for bi-pred */
-    pred: [CUBuffer<pel>; 2], //[2][N_C][MAX_CU_DIM];
-    /* neighbor pixel buffer for intra prediction */
-    nb: NBBuffer<pel>, // [N_C][MAX_CU_SIZE*4+1];
     /* current encoding LCU number */
     lcu_num: u16,
     /*QP for current encoding CU. Used to derive Luma and chroma qp*/
@@ -167,7 +163,6 @@ pub(crate) struct EvceCore {
     dqp_curr_best: Vec<Vec<EvceDQP>>, //[[EVCE_DQP; MAX_CU_DEPTH]; MAX_CU_DEPTH],
     dqp_next_best: Vec<Vec<EvceDQP>>, //[[EVCE_DQP; MAX_CU_DEPTH]; MAX_CU_DEPTH],
     dqp_temp_best: EvceDQP,
-    dqp_temp_best_merge: EvceDQP,
     dqp_temp_run: EvceDQP,
 
     /* QP for luma of current encoding CU */
@@ -197,12 +192,10 @@ pub(crate) struct EvceCore {
     avail_cu: u16,
     /* Left, right availability of current CU */
     avail_lr: u16,
-    bef_data_idx: u16,
     /* CU mode */
     cu_mode: PredMode,
     /* intra prediction mode */
     mpm_b_list: &'static [u8],
-    pims: [u8; IntraPredDir::IPD_CNT_B as usize], /* probable intra mode set*/
     ipm: [IntraPredDir; 2],
     /* skip flag for MODE_INTER */
     skip_flag: bool,
@@ -217,8 +210,6 @@ pub(crate) struct EvceCore {
     log2_cuh: u8,
     /* number of non-zero coefficient */
     nnz: [u16; N_C],
-    /* platform specific data, if needed */
-    //void          *pf;
 
     /* bitstream structure for RDO */
     bs_temp: EvceBsw,
@@ -229,7 +220,6 @@ pub(crate) struct EvceCore {
     s_curr_best: [[EvceSbac; MAX_CU_DEPTH]; MAX_CU_DEPTH],
     s_next_best: [[EvceSbac; MAX_CU_DEPTH]; MAX_CU_DEPTH],
     s_temp_best: EvceSbac,
-    s_temp_best_merge: EvceSbac,
     s_temp_prev_comp_best: EvceSbac,
     s_temp_prev_comp_run: EvceSbac,
     s_curr_before_split: [[EvceSbac; MAX_CU_DEPTH]; MAX_CU_DEPTH],
@@ -238,19 +228,14 @@ pub(crate) struct EvceCore {
     c_curr_best: [[EvcSbacCtx; MAX_CU_DEPTH]; MAX_CU_DEPTH],
     c_next_best: [[EvcSbacCtx; MAX_CU_DEPTH]; MAX_CU_DEPTH],
     c_temp_best: EvcSbacCtx,
-    c_temp_best_merge: EvcSbacCtx,
     c_temp_prev_comp_best: EvcSbacCtx,
     c_temp_prev_comp_run: EvcSbacCtx,
     c_curr_before_split: [[EvcSbacCtx; MAX_CU_DEPTH]; MAX_CU_DEPTH],
 
-    //EVCE_BEF_DATA  bef_data[MAX_CU_DEPTH][MAX_CU_DEPTH][MAX_CU_CNT_IN_LCU][MAX_BEF_DATA_NUM];
     cost_best: f64,
     inter_satd: u32,
     dist_cu: i32,
     dist_cu_best: i32, //dist of the best intra mode (note: only updated in intra coding now)
-
-    split_mode_child: [bool; 4],
-    parent_split_allow: [bool; 6],
 
     //one picture that arranges cu pixels and neighboring pixels for deblocking (just to match the interface of deblocking functions)
     delta_dist: [i64; N_C], //delta distortion from filtering (negative values mean distortion reduced)
@@ -481,9 +466,9 @@ pub(crate) struct EvceCtx {
 impl EvceCtx {
     pub(crate) fn new(cfg: &Config) -> Self {
         let mut refp = Vec::with_capacity(MAX_NUM_REF_PICS);
-        for j in 0..MAX_NUM_REF_PICS {
+        for _ in 0..MAX_NUM_REF_PICS {
             let mut refp1d = Vec::with_capacity(REFP_NUM);
-            for i in 0..REFP_NUM {
+            for _ in 0..REFP_NUM {
                 refp1d.push(EvcRefP::new());
             }
             refp.push(refp1d);
@@ -512,7 +497,7 @@ impl EvceCtx {
 
         /*  allocate CU data map*/
         let mut map_cu_data = Vec::with_capacity(f_lcu as usize);
-        for i in 0..f_lcu as usize {
+        for _ in 0..f_lcu as usize {
             let mut cu_data = EvceCUData::new(
                 log2_max_cuwh - MIN_CU_LOG2 as u8,
                 log2_max_cuwh - MIN_CU_LOG2 as u8,
@@ -536,7 +521,7 @@ impl EvceCtx {
         );
 
         let mut pico_buf = Vec::with_capacity(pico_max_cnt);
-        for i in 0..pico_max_cnt {
+        for _ in 0..pico_max_cnt {
             pico_buf.push(EvcePicOrg::default());
         }
 
@@ -835,7 +820,6 @@ impl EvceCtx {
     }
 
     fn evce_enc_pic(&mut self) -> Result<(), EvcError> {
-        let split_allow: [bool; 6] = [false, false, false, false, false, true];
         let num_slice_in_pic = self.param.num_slices_in_pic;
 
         /* initialize bitstream container */
@@ -896,13 +880,7 @@ impl EvceCtx {
 
             self.set_sh();
             /* Encode slice header */
-            evce_eco_sh(
-                &mut self.bs,
-                &self.sps,
-                &self.pps,
-                &self.sh,
-                self.nalu.nal_unit_type,
-            );
+            evce_eco_sh(&mut self.bs, &self.sh, self.nalu.nal_unit_type);
 
             {
                 let core = &mut self.core;
@@ -919,23 +897,20 @@ impl EvceCtx {
                 sh.qp_prev_eco = sh.qp;
                 sh.qp_prev_mode = sh.qp;
                 core.dqp_data[self.log2_max_cuwh as usize - 2][self.log2_max_cuwh as usize - 2]
-                    .prev_QP = sh.qp_prev_mode;
+                    .prev_qp = sh.qp_prev_mode;
                 core.dqp_curr_best[self.log2_max_cuwh as usize - 2]
                     [self.log2_max_cuwh as usize - 2]
-                    .curr_QP = sh.qp;
+                    .curr_qp = sh.qp;
                 core.dqp_curr_best[self.log2_max_cuwh as usize - 2]
                     [self.log2_max_cuwh as usize - 2]
-                    .prev_QP = sh.qp;
+                    .prev_qp = sh.qp;
             }
 
-            self.sbac_enc
-                .reset(&mut self.sbac_ctx, self.sh.slice_type, self.sh.qp);
+            self.sbac_enc.reset(&mut self.sbac_ctx);
             self.core.s_curr_best[self.log2_max_cuwh as usize - 2][self.log2_max_cuwh as usize - 2]
                 .reset(
                     &mut self.core.c_curr_best[self.log2_max_cuwh as usize - 2]
                         [self.log2_max_cuwh as usize - 2],
-                    self.sh.slice_type,
-                    self.sh.qp,
                 );
 
             /*Set entry point for each Tile in the tile Slice*/
@@ -1528,7 +1503,6 @@ impl EvceCtx {
     }
 
     fn evce_eco_unit(&mut self, x: u16, y: u16, cup: usize, cuw: u16, cuh: u16) {
-        let enc_dqp = 0;
         let slice_type = self.slice_type;
 
         self.cu_init(x, y, cup, cuw, cuh);
@@ -1838,7 +1812,7 @@ impl EvceCtx {
 
         /* sequence parameter set*/
         self.set_pps();
-        evce_eco_pps(&mut self.bs, &self.sps, &self.pps);
+        evce_eco_pps(&mut self.bs, &self.pps);
 
         /* de-init BSW */
         self.bs.deinit();

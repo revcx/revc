@@ -18,7 +18,7 @@ pub(crate) struct EvceSbac {
 }
 
 impl EvceSbac {
-    pub(crate) fn reset(&mut self, sbac_ctx: &mut EvcSbacCtx, slice_type: SliceType, slice_qp: u8) {
+    pub(crate) fn reset(&mut self, sbac_ctx: &mut EvcSbacCtx) {
         /* Initialization of the internal variables */
         self.range = 16384;
         self.code = 0;
@@ -179,7 +179,7 @@ impl EvceSbac {
         self.is_pending_byte = 1;
     }
 
-    fn write_est(&mut self, byte: u32, len: isize) {
+    fn write_est(&mut self, _byte: u32, len: isize) {
         self.bitcounter += len as u32;
     }
 
@@ -254,7 +254,6 @@ impl EvceSbac {
         bs: &mut EvceBsw,
         models: &mut [SBAC_CTX_MODEL],
         mut sym: u32,
-        num_ctx: u32,
         max_num: u32,
     ) {
         if max_num > 1 {

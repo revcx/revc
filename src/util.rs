@@ -373,7 +373,7 @@ pub(crate) fn evc_get_motion(
     map_mv: &Vec<[[i16; MV_D]; REFP_NUM]>,
     refp: &Vec<Vec<EvcRefP>>,
     cuw: usize,
-    cuh: usize,
+    _cuh: usize,
     w_scu: usize,
     avail: u16,
     refi: &mut [i8; MAX_NUM_MVP],
@@ -421,9 +421,6 @@ pub(crate) fn evc_get_mv_dir(
     refp: &[EvcRefP],
     poc: i32,
     scup: usize,
-    c_scu: usize,
-    w_scu: u16,
-    h_scu: u16,
     mvp: &mut [[i16; MV_D]; REFP_NUM],
 ) {
     let mut mvc = [0i16; MV_D];

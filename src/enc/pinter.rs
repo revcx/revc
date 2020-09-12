@@ -100,20 +100,8 @@ pub(crate) struct EvcePInter {
     mvp_idx: [[u8; REFP_NUM]; InterPredDir::PRED_NUM as usize],
     mvp_scale: [[[[i16; MV_D]; MAX_NUM_MVP]; MAX_NUM_ACTIVE_REF_FRAME]; REFP_NUM],
     mv_scale: [[[i16; MV_D]; MAX_NUM_ACTIVE_REF_FRAME]; REFP_NUM],
-    /*u8   mvp_idx_temp_for_bi[PRED_NUM][REFP_NUM][MAX_NUM_ACTIVE_REF_FRAME];
-    int  best_index[PRED_NUM][4];
-
-    s8   first_refi[PRED_NUM][REFP_NUM];
-    u8   bi_idx[PRED_NUM];
-    u8   curr_bi;
-
-     u8   mvp_idx_scale[REFP_NUM][MAX_NUM_ACTIVE_REF_FRAME];
-
-    pel  p_error[MAX_CU_DIM];
-    int  i_gradient[2][MAX_CU_DIM];*/
     pub(crate) max_search_range: i16,
     resi: CUBuffer<i16>,
-    coff_save: CUBuffer<i16>,
 
     /* MV predictor */
     mvp: [[[i16; MV_D]; MAX_NUM_MVP]; REFP_NUM],
@@ -154,26 +142,18 @@ pub(crate) struct EvcePInter {
 
     /* original (input) picture buffer */
     pub(crate) pic_o: Option<Rc<RefCell<EvcPic>>>,
-    /* mode picture buffer */
-    pic_m: Option<Rc<RefCell<EvcPic>>>,
-    /* motion vector map */
-    map_mv: Option<Rc<RefCell<Vec<[[i16; MV_D]; REFP_NUM]>>>>,
-    /* picture width in SCU unit */
-    w_scu: u16,
+
     /* QP for luma of current encoding CU */
     pub(crate) qp_y: u8,
     /* QP for chroma of current encoding CU */
     pub(crate) qp_u: u8,
     pub(crate) qp_v: u8,
     pub(crate) lambda_mv: u32,
-    /* reference pictures */
-    //refp: Option<Rc<RefCell<Vec<Vec<EvcRefP>>>>>,
+
     slice_type: SliceType,
     /* search level for motion estimation */
     pub(crate) me_level: usize,
     pub(crate) complexity: usize,
-    /*void            *pdata[4];
-    int             *ndata[4];*/
     /* current picture order count */
     pub(crate) poc: i32,
     /* gop size */
@@ -221,12 +201,6 @@ impl EvceCtx {
         pi.slice_type = self.slice_type;
         if let Some(pic) = &self.pic[PIC_IDX_ORIG] {
             pi.pic_o = Some(Rc::clone(pic));
-        }
-        if let Some(pic) = &self.pic[PIC_IDX_MODE] {
-            pi.pic_m = Some(Rc::clone(pic));
-        }
-        if let Some(mv) = &self.map_mv {
-            pi.map_mv = Some(Rc::clone(mv));
         }
     }
 
@@ -477,25 +451,19 @@ impl EvceCtx {
             &is_coef,
         );
 
-        if let Some(pic) = &self.pinter.pic_o {
-            let frame = &pic.borrow().frame;
-            let planes = &frame.borrow().planes;
-            for i in 0..N_C {
-                //rec[i] = self.pinter.rec[best_idx][i];
-                //s_rec[i] = (i == 0 ? cuw : cuw >> 1);
-                evc_recon(
-                    &mut self.core.bs_temp.tracer,
-                    &self.pinter.residue.data[i],
-                    &self.pinter.pred[best_idx][0].data[i],
-                    is_coef[i],
-                    if i == 0 { cuw } else { cuw >> 1 },
-                    if i == 0 { cuh } else { cuh >> 1 },
-                    &mut self.pinter.rec[best_idx].data[i],
-                    i,
-                );
+        for i in 0..N_C {
+            evc_recon(
+                &mut self.core.bs_temp.tracer,
+                &self.pinter.residue.data[i],
+                &self.pinter.pred[best_idx][0].data[i],
+                is_coef[i],
+                if i == 0 { cuw } else { cuw >> 1 },
+                if i == 0 { cuh } else { cuh >> 1 },
+                &mut self.pinter.rec[best_idx].data[i],
+                i,
+            );
 
-                self.core.nnz[i] = self.pinter.nnz_best[best_idx][i];
-            }
+            self.core.nnz[i] = self.pinter.nnz_best[best_idx][i];
         }
 
         self.mode.inter_best_idx = best_idx; //self.pinter.pred[best_idx][0][0];
@@ -524,7 +492,7 @@ impl EvceCtx {
     ) -> f64 {
         if self.pps.cu_qp_delta_enabled_flag {
             if self.core.cu_qp_delta_code_mode != 2 {
-                self.evce_set_qp(self.core.dqp_curr_best[log2_cuw - 2][log2_cuh - 2].prev_QP);
+                self.evce_set_qp(self.core.dqp_curr_best[log2_cuw - 2][log2_cuh - 2].prev_qp);
             }
         }
 
@@ -719,7 +687,6 @@ impl EvceCtx {
     }
 
     fn analyze_t_direct(&mut self, x: usize, y: usize, log2_cuw: usize, log2_cuh: usize) -> f64 {
-        let refidx = 0;
         let pidx = InterPredDir::PRED_DIR as usize;
         evc_get_mv_dir(
             &self.refp[0],
@@ -727,9 +694,6 @@ impl EvceCtx {
             self.core.scup as usize
                 + ((1 << (self.core.log2_cuw as usize - MIN_CU_LOG2)) - 1)
                 + ((1 << (self.core.log2_cuh as usize - MIN_CU_LOG2)) - 1) * self.w_scu as usize,
-            self.core.scup as usize,
-            self.w_scu,
-            self.h_scu,
             &mut self.pinter.mv[pidx],
         );
 
@@ -820,7 +784,7 @@ impl EvceCtx {
         refi[REFP_0] = t0;
         refi[REFP_1] = t1;
 
-        for i in 0..BI_ITER {
+        for _ in 0..BI_ITER {
             /* predict reference */
             evc_mc(
                 x as i16,
@@ -1040,7 +1004,7 @@ impl EvceCtx {
             log2_cuh,
         );
         if self.pps.cu_qp_delta_enabled_flag {
-            self.evce_set_qp(self.core.dqp_curr_best[log2_cuw - 2][log2_cuh - 2].curr_QP);
+            self.evce_set_qp(self.core.dqp_curr_best[log2_cuw - 2][log2_cuh - 2].curr_qp);
         }
 
         /* transform and quantization */
@@ -1192,13 +1156,7 @@ impl EvceCtx {
                 self.core.dqp_temp_run = self.core.dqp_curr_best[log2_cuw - 2][log2_cuh - 2];
                 self.core.s_temp_run.bit_reset();
 
-                self.evce_rdo_bit_cnt_cu_inter(
-                    self.sh.slice_type,
-                    self.core.scup,
-                    pidx,
-                    mvp_idx,
-                    pred_coef_idx,
-                );
+                self.evce_rdo_bit_cnt_cu_inter(self.sh.slice_type, pidx, mvp_idx, pred_coef_idx);
 
                 let bit_cnt = self.core.s_temp_run.get_bit_number();
                 cost += (self.lambda[0] * bit_cnt as f64);
@@ -1237,13 +1195,7 @@ impl EvceCtx {
 
             self.core.s_temp_run.bit_reset();
 
-            self.evce_rdo_bit_cnt_cu_inter(
-                self.sh.slice_type,
-                self.core.scup,
-                pidx,
-                mvp_idx,
-                pred_coef_idx,
-            );
+            self.evce_rdo_bit_cnt_cu_inter(self.sh.slice_type, pidx, mvp_idx, pred_coef_idx);
 
             let bit_cnt = self.core.s_temp_run.get_bit_number();
             cost += (self.lambda[0] * bit_cnt as f64);
@@ -1282,7 +1234,7 @@ impl EvceCtx {
                         self.core.s_temp_run = self.core.s_temp_prev_comp_run;
                         self.core.c_temp_run = self.core.c_temp_prev_comp_run;
                         self.core.s_temp_run.bit_reset();
-                        self.evce_rdo_bit_cnt_cu_inter_comp(i, pidx, pred_coef_idx);
+                        self.evce_rdo_bit_cnt_cu_inter_comp(i, pred_coef_idx);
 
                         let bit_cnt = self.core.s_temp_run.get_bit_number();
                         cost += (self.lambda[i] * bit_cnt as f64);
@@ -1320,13 +1272,7 @@ impl EvceCtx {
                 self.core.dqp_temp_run = self.core.dqp_curr_best[log2_cuw - 2][log2_cuh - 2];
                 self.core.s_temp_run.bit_reset();
 
-                self.evce_rdo_bit_cnt_cu_inter(
-                    self.sh.slice_type,
-                    self.core.scup,
-                    pidx,
-                    mvp_idx,
-                    pred_coef_idx,
-                );
+                self.evce_rdo_bit_cnt_cu_inter(self.sh.slice_type, pidx, mvp_idx, pred_coef_idx);
 
                 let bit_cnt = self.core.s_temp_run.get_bit_number();
                 cost += (self.lambda[0] * bit_cnt as f64);
@@ -1360,7 +1306,7 @@ impl EvceCtx {
         } else {
             if self.pps.cu_qp_delta_enabled_flag {
                 if self.core.cu_qp_delta_code_mode != 2 {
-                    self.evce_set_qp(self.core.dqp_curr_best[log2_cuw - 2][log2_cuh - 2].prev_QP);
+                    self.evce_set_qp(self.core.dqp_curr_best[log2_cuw - 2][log2_cuh - 2].prev_qp);
                 }
             }
 
@@ -1404,13 +1350,7 @@ impl EvceCtx {
 
             self.core.s_temp_run.bit_reset();
 
-            self.evce_rdo_bit_cnt_cu_inter(
-                self.sh.slice_type,
-                self.core.scup,
-                pidx,
-                mvp_idx,
-                pred_coef_idx,
-            );
+            self.evce_rdo_bit_cnt_cu_inter(self.sh.slice_type, pidx, mvp_idx, pred_coef_idx);
 
             let bit_cnt = self.core.s_temp_run.get_bit_number();
             cost_best += (self.lambda[0] * bit_cnt as f64);

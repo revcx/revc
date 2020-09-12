@@ -27,7 +27,7 @@ use sbac::*;
  *
  * The variables in this structure are very often used in decoding process.
  *****************************************************************************/
-//#[derive(Default)]
+#[derive(Default)]
 pub(crate) struct EvcdCore {
     /************** LCU-based processing **************/
     //top_mcu: Vec<MCU>, //[Width/MIN_CU_SIZE]
@@ -74,31 +74,6 @@ pub(crate) struct EvcdCore {
     split_mode: LcuSplitMode,
 
     evc_tbl_qp_chroma_dynamic_ext: Vec<Vec<i8>>, // [[i8; MAX_QP_TABLE_SIZE_EXT]; 2],
-}
-
-impl EvcdCore {
-    fn new() -> Self {
-        EvcdCore {
-            coef: Aligned::uninitialized(),
-            pred: [Aligned::uninitialized(), Aligned::uninitialized()],
-            nb: Aligned::uninitialized(),
-            pred_mode: PredMode::default(),
-            ipm: [IntraPredDir::default(); 2],
-            inter_dir: InterPredDir::default(),
-            refi: [0; REFP_NUM],
-            mv: [[0; MV_D]; REFP_NUM],
-            mvp_idx: [0; REFP_NUM],
-            mvd: [[0; MV_D]; REFP_NUM],
-            is_coef: [false; N_C],
-            qp: 0,
-            qp_y: 0,
-            qp_u: 0,
-            qp_v: 0,
-            cu_qp_delta_is_coded: false,
-            split_mode: LcuSplitMode::default(),
-            evc_tbl_qp_chroma_dynamic_ext: vec![],
-        }
-    }
 }
 
 /******************************************************************************
@@ -185,11 +160,11 @@ pub(crate) struct EvcdCtx {
 }
 
 impl EvcdCtx {
-    pub(crate) fn new(cfg: &Config) -> Self {
+    pub(crate) fn new(_cfg: &Config) -> Self {
         let mut refp = Vec::with_capacity(MAX_NUM_REF_PICS);
-        for j in 0..MAX_NUM_REF_PICS {
+        for _ in 0..MAX_NUM_REF_PICS {
             let mut refp1d = Vec::with_capacity(REFP_NUM);
-            for i in 0..REFP_NUM {
+            for _ in 0..REFP_NUM {
                 refp1d.push(EvcRefP::new());
             }
             refp.push(refp1d);
@@ -199,7 +174,7 @@ impl EvcdCtx {
             pkt: None,
 
             /* CORE information used for fast operation */
-            core: EvcdCore::new(),
+            core: EvcdCore::default(),
 
             /* MAPS *******************************************************************/
             /* SCU map for CU information */
@@ -527,12 +502,7 @@ impl EvcdCtx {
 
     fn decode_slice(&mut self) -> Result<(), EvcError> {
         // Initialize CABAC at each tile
-        self.sbac_dec.reset(
-            &mut self.bs,
-            &mut self.sbac_ctx,
-            self.sh.slice_type,
-            self.sh.qp,
-        );
+        self.sbac_dec.reset(&mut self.bs, &mut self.sbac_ctx);
 
         //TODO: move x_lcu/y_lcu=0 to pic init
         let mut x_lcu = 0; //entry point lcu's x location
@@ -566,7 +536,7 @@ impl EvcdCtx {
 
             self.num_ctb -= 1;
             // read end_of_picture_flag
-            if (self.num_ctb == 0) {
+            if self.num_ctb == 0 {
                 evcd_eco_tile_end_flag(&mut self.bs, &mut self.sbac_dec)?;
             } else {
                 x_lcu += 1;
@@ -634,12 +604,12 @@ impl EvcdCtx {
 
             self.sequence_init()?;
         } else if nalu_type == NaluType::EVC_PPS_NUT {
-            evcd_eco_pps(&mut self.bs, &self.sps, &mut self.pps)?;
+            evcd_eco_pps(&mut self.bs, &mut self.pps)?;
         } else if nalu_type < NaluType::EVC_SPS_NUT {
             /* decode slice header */
             self.sh.num_ctb = self.f_lcu as u16;
 
-            evcd_eco_sh(&mut self.bs, &self.sps, &self.pps, &mut self.sh, nalu_type)?;
+            evcd_eco_sh(&mut self.bs, &self.pps, &mut self.sh, nalu_type)?;
 
             if self.num_ctb == 0 {
                 self.num_ctb = self.f_lcu;

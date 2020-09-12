@@ -62,7 +62,7 @@ impl EvceCUData {
             reco,
         }
     }
-    pub(crate) fn init(&mut self, log2_cuw: u8, log2_cuh: u8, qp_y: u8, qp_u: u8, qp_v: u8) {
+    pub(crate) fn init(&mut self, log2_cuw: u8, log2_cuh: u8) {
         let cuw_scu = 1 << (log2_cuw - MIN_CU_LOG2 as u8);
         let cuh_scu = 1 << (log2_cuh - MIN_CU_LOG2 as u8);
         let cu_cnt = cuw_scu * cuh_scu;
@@ -263,9 +263,6 @@ impl EvceCUData {
         qp_v: u8,
         nnz: &[u16],
     ) {
-        let log2_cuw = CONV_LOG2(cuw as usize);
-        let log2_cuh = CONV_LOG2(cuh as usize);
-
         let size = cuw as usize * cuh as usize;
 
         /* copy coef */
@@ -276,7 +273,7 @@ impl EvceCUData {
 
         /* copy mode info */
         let mut idx = 0;
-        for j in 0..(cuh as usize) >> MIN_CU_LOG2 {
+        for _ in 0..(cuh as usize) >> MIN_CU_LOG2 {
             for i in 0..(cuw as usize) >> MIN_CU_LOG2 {
                 self.pred_mode[idx + i] = cu_mode;
                 self.skip_flag[idx + i] = cu_mode == PredMode::MODE_SKIP;
@@ -345,7 +342,7 @@ impl EvceCUData {
 
         /* copy mode info */
         let mut idx = 0;
-        for j in 0..(cuh as usize) >> MIN_CU_LOG2 {
+        for _ in 0..(cuh as usize) >> MIN_CU_LOG2 {
             for i in 0..(cuw as usize) >> MIN_CU_LOG2 {
                 self.nnz[U_C][idx + i] = nnz[U_C];
                 self.nnz[V_C][idx + i] = nnz[V_C];
@@ -388,24 +385,10 @@ pub(crate) struct EvceMode {
 }
 
 impl EvceMode {
-    fn get_cu_pred_data(
-        &mut self,
-        src: &EvceCUData,
-        x: u16,
-        y: u16,
-        log2_cuw: u8,
-        log2_cuh: u8,
-        log2_cus: u8,
-        cud: u16,
-    ) {
+    fn get_cu_pred_data(&mut self, src: &EvceCUData, x: u16, y: u16, log2_cus: u8) {
         let cx = x as usize >> MIN_CU_LOG2; //x = position in LCU, cx = 4x4 CU horizontal index
         let cy = y as usize >> MIN_CU_LOG2; //y = position in LCU, cy = 4x4 CU vertical index
 
-        let cuw = (1 << log2_cuw) as usize; //current CU width
-        let cuh = (1 << log2_cuh) as usize; //current CU height
-        let cus = (1 << log2_cus) as usize; //current CU buffer stride (= current CU width)
-        let cuw_scu = (1 << log2_cuw) as usize - MIN_CU_LOG2; //4x4 CU number in width
-        let cuh_scu = (1 << log2_cuh) as usize - MIN_CU_LOG2; //4x4 CU number in height
         let cus_scu = (1 << log2_cus) as usize - MIN_CU_LOG2; //4x4 CU number in stride
 
         // only copy src's first row of 4x4 CUs to dis's all 4x4 CUs
@@ -443,28 +426,13 @@ impl EvceCtx {
     }
 
     pub(crate) fn mode_analyze_lcu(&mut self) {
-        let mut split_mode_child = [false, false, false, false]; //&mut self.core.split_mode_child;
-        let mut parent_split_allow = [false, false, false, false, false, true]; //&mut self.core.parent_split_allow;
-
         let mi = &mut self.mode;
 
         /* initialize cu data */
         self.core.cu_data_best[self.log2_max_cuwh as usize - 2][self.log2_max_cuwh as usize - 2]
-            .init(
-                self.log2_max_cuwh,
-                self.log2_max_cuwh,
-                self.qp,
-                self.qp,
-                self.qp,
-            );
+            .init(self.log2_max_cuwh, self.log2_max_cuwh);
         self.core.cu_data_temp[self.log2_max_cuwh as usize - 2][self.log2_max_cuwh as usize - 2]
-            .init(
-                self.log2_max_cuwh,
-                self.log2_max_cuwh,
-                self.qp,
-                self.qp,
-                self.qp,
-            );
+            .init(self.log2_max_cuwh, self.log2_max_cuwh);
 
         for i in 0..REFP_NUM {
             mi.mvp_idx[i] = 0;
@@ -566,25 +534,16 @@ impl EvceCtx {
         let mut do_split = false;
         let mut do_curr = false;
         let mut best_split_cost = MAX_COST;
-        let best_curr_cost = MAX_COST;
-        let mut split_mode_child = vec![false; 4];
         let mut curr_split_allow = vec![false; MAX_SPLIT_NUM];
-        let remaining_split = 0;
-        let mut num_split_tried = 0;
         let mut num_split_to_try = 0;
         let mut nev_max_depth = 0;
-        let eval_parent_node_first = 1;
         let mut nbr_map_skip_flag = false;
-        let cud_min = cud;
-        let cud_max = cud;
-        let cud_avg = cud;
         let mut dqp_temp_depth = EvceDQP::default();
         let mut best_dqp = qp;
         let mut min_qp = 0;
         let mut max_qp = 0;
         let mut cost_temp_dqp = 0.0f64;
         let mut cost_best_dqp = MAX_COST;
-        let mut dqp_coded = 0;
         let mut cu_mode_dqp = PredMode::MODE_INTRA;
         let mut dist_cu_best_dqp = 0;
 
@@ -599,8 +558,6 @@ impl EvceCtx {
         //based on CU size located at boundary
         if cuw > self.min_cuwh || cuh > self.min_cuwh {
             /***************************** Step 1: decide normatively allowed split modes ********************************/
-            let boundary_b = boundary && (y0 + cuh > self.h) && !(x0 + cuw > self.w);
-            let boundary_r = boundary && (x0 + cuw > self.w) && !(y0 + cuh > self.h);
             evc_check_split_mode(&mut split_allow);
             //save normatively allowed split modes, as it will be used in in child nodes for entropy coding of split mode
             curr_split_allow.copy_from_slice(&split_allow);
@@ -626,16 +583,7 @@ impl EvceCtx {
                 do_curr = true;
             }
 
-            self.check_run_split(
-                log2_cuw,
-                log2_cuh,
-                cup,
-                next_split,
-                do_curr,
-                do_split,
-                &mut split_allow,
-                boundary,
-            );
+            self.check_run_split(next_split, do_curr, do_split, &mut split_allow);
         } else {
             split_allow[0] = true;
             for i in 1..MAX_SPLIT_NUM {
@@ -646,15 +594,9 @@ impl EvceCtx {
         if !boundary {
             cost_temp = 0.0;
 
-            self.core.cu_data_temp[log2_cuw - 2][log2_cuh - 2].init(
-                log2_cuw as u8,
-                log2_cuh as u8,
-                self.qp,
-                self.qp,
-                self.qp,
-            );
+            self.core.cu_data_temp[log2_cuw - 2][log2_cuh - 2].init(log2_cuw as u8, log2_cuh as u8);
 
-            self.sh.qp_prev_mode = self.core.dqp_data[log2_cuw - 2][log2_cuh - 2].prev_QP as u8;
+            self.sh.qp_prev_mode = self.core.dqp_data[log2_cuw - 2][log2_cuh - 2].prev_qp as u8;
             best_dqp = self.sh.qp_prev_mode;
 
             split_mode = SplitMode::NO_SPLIT;
@@ -710,12 +652,10 @@ impl EvceCtx {
                     cuw,
                     cuh,
                     qp,
-                    x0,
-                    y0,
                 );
                 for dqp in min_qp..=max_qp {
                     self.core.qp = GET_QP(qp as i8, dqp as i8 - qp as i8) as u8;
-                    self.core.dqp_curr_best[log2_cuw - 2][log2_cuh - 2].curr_QP = self.core.qp;
+                    self.core.dqp_curr_best[log2_cuw - 2][log2_cuh - 2].curr_qp = self.core.qp;
                     if self.core.cu_qp_delta_code_mode != 2 || is_dqp_set {
                         self.core.dqp_curr_best[log2_cuw - 2][log2_cuh - 2].cu_qp_delta_code =
                             1 + if is_dqp_set { 1 } else { 0 };
@@ -723,13 +663,8 @@ impl EvceCtx {
                             false;
                     }
                     cost_temp_dqp = cost_temp;
-                    self.core.cu_data_temp[log2_cuw - 2][log2_cuh - 2].init(
-                        log2_cuw as u8,
-                        log2_cuh as u8,
-                        self.qp,
-                        self.qp,
-                        self.qp,
-                    );
+                    self.core.cu_data_temp[log2_cuw - 2][log2_cuh - 2]
+                        .init(log2_cuw as u8, log2_cuh as u8);
 
                     self.clear_map_scu(x0, y0, cuw, cuh);
                     cost_temp_dqp += self.mode_coding_unit(x0, y0, log2_cuw, log2_cuh, cud);
@@ -776,9 +711,6 @@ impl EvceCtx {
                             0,
                             0,
                             log2_cuw as u8,
-                            log2_cuh as u8,
-                            log2_cuw as u8,
-                            cud,
                         );
                     }
                 }
@@ -852,13 +784,8 @@ impl EvceCtx {
                 let mut prev_log2_sub_cuw = split_struct.log_cuw[0] as usize;
                 let mut prev_log2_sub_cuh = split_struct.log_cuh[0] as usize;
 
-                self.core.cu_data_temp[log2_cuw - 2][log2_cuh - 2].init(
-                    log2_cuw as u8,
-                    log2_cuh as u8,
-                    self.qp,
-                    self.qp,
-                    self.qp,
-                );
+                self.core.cu_data_temp[log2_cuw - 2][log2_cuh - 2]
+                    .init(log2_cuw as u8, log2_cuh as u8);
                 self.clear_map_scu(x0, y0, cuw, cuh);
 
                 let mut cost_temp = 0.0;
@@ -918,8 +845,6 @@ impl EvceCtx {
                     cuw,
                     cuh,
                     qp,
-                    x0,
-                    y0,
                 );
 
                 let mut loop_counter = 0;
@@ -934,17 +859,12 @@ impl EvceCtx {
                         self.core.dqp_curr_best[log2_cuw - 2][log2_cuh - 2].cu_qp_delta_code = 2;
                         self.core.dqp_curr_best[log2_cuw - 2][log2_cuh - 2].cu_qp_delta_is_coded =
                             false;
-                        self.core.dqp_curr_best[log2_cuw - 2][log2_cuh - 2].curr_QP = self.core.qp;
+                        self.core.dqp_curr_best[log2_cuw - 2][log2_cuh - 2].curr_qp = self.core.qp;
                     }
 
                     cost_temp_dqp = cost_temp;
-                    self.core.cu_data_temp[log2_cuw - 2][log2_cuh - 2].init(
-                        log2_cuw as u8,
-                        log2_cuh as u8,
-                        self.qp,
-                        self.qp,
-                        self.qp,
-                    );
+                    self.core.cu_data_temp[log2_cuw - 2][log2_cuh - 2]
+                        .init(log2_cuw as u8, log2_cuh as u8);
                     self.clear_map_scu(x0, y0, cuw, cuh);
 
                     //#if TRACE_ENC_CU_DATA_CHECK
@@ -1051,7 +971,7 @@ impl EvceCtx {
                         );
                         cost_best = cost_temp_dqp;
                         best_dqp = self.core.dqp_data[prev_log2_sub_cuw - 2][prev_log2_sub_cuh - 2]
-                            .prev_QP;
+                            .prev_qp;
                         dqp_temp_depth =
                             self.core.dqp_next_best[prev_log2_sub_cuw - 2][prev_log2_sub_cuh - 2];
 
@@ -1136,8 +1056,6 @@ impl EvceCtx {
         let log2_scuh = log2_cuh - MIN_CU_LOG2 as u8;
         let scuw = 1 << log2_scuw;
         let scuh = 1 << log2_scuh;
-
-        let mut size_cnt = vec![0; MAX_CU_DEPTH];
 
         *do_curr = true;
         *do_split = true;
@@ -1265,16 +1183,11 @@ impl EvceCtx {
 
     fn check_run_split(
         &mut self,
-        log2_cuw: usize,
-        log2_cuh: usize,
-        cup: u16,
         next_split: bool,
         do_curr: bool,
         do_split: bool,
         split_allow: &mut [bool],
-        boundary: bool,
     ) {
-        let min_cost = MAX_COST;
         let mut run_list = vec![false; MAX_SPLIT_NUM]; //a smaller set of allowed split modes based on a save & load technique
 
         if !next_split {
@@ -1319,8 +1232,6 @@ impl EvceCtx {
         cuw: u16,
         cuh: u16,
         qp: u8,
-        x0: u16,
-        y0: u16,
     ) {
         *is_dqp_set = false;
         if !self.pps.cu_qp_delta_enabled_flag {
@@ -1395,7 +1306,7 @@ impl EvceCtx {
             let (mut map_refi, mut map_mv) = (map_refi.borrow_mut(), map_mv.borrow_mut());
             let mut map_ipm = &mut self.map_ipm;
 
-            for i in 0..h {
+            for _ in 0..h {
                 for j in 0..w {
                     if cu_data.pred_mode[core_idx + j] == PredMode::MODE_INTRA {
                         map_ipm[ctx_idx + j] = cu_data.ipm[0][core_idx + j];
@@ -1560,7 +1471,7 @@ impl EvceCtx {
                 cost_best = cost;
 
                 if self.pps.cu_qp_delta_enabled_flag {
-                    self.evce_set_qp(self.core.dqp_next_best[log2_cuw - 2][log2_cuh - 2].prev_QP);
+                    self.evce_set_qp(self.core.dqp_next_best[log2_cuw - 2][log2_cuh - 2].prev_qp);
                 }
 
                 let cu_data = &mut self.core.cu_data_temp[log2_cuw - 2][log2_cuh - 2];
@@ -1610,7 +1521,7 @@ impl EvceCtx {
                 self.core.inter_satd = u32::MAX;
             }
             if self.pps.cu_qp_delta_enabled_flag {
-                self.evce_set_qp(self.core.dqp_curr_best[log2_cuw - 2][log2_cuh - 2].curr_QP as u8);
+                self.evce_set_qp(self.core.dqp_curr_best[log2_cuw - 2][log2_cuh - 2].curr_qp as u8);
             }
 
             self.core.avail_cu = evc_get_avail_intra(
@@ -1767,7 +1678,7 @@ impl EvceCtx {
         if self.pps.cu_qp_delta_enabled_flag {
             self.core.cu_qp_delta_code = self.core.dqp_temp_run.cu_qp_delta_code;
             self.core.cu_qp_delta_is_coded = self.core.dqp_temp_run.cu_qp_delta_is_coded;
-            self.core.qp_prev_eco = self.core.dqp_temp_run.prev_QP;
+            self.core.qp_prev_eco = self.core.dqp_temp_run.prev_qp;
         }
 
         evce_eco_coef(
@@ -1793,12 +1704,12 @@ impl EvceCtx {
         if self.pps.cu_qp_delta_enabled_flag {
             self.core.dqp_temp_run.cu_qp_delta_code = self.core.cu_qp_delta_code;
             self.core.dqp_temp_run.cu_qp_delta_is_coded = self.core.cu_qp_delta_is_coded;
-            self.core.dqp_temp_run.prev_QP = self.core.qp_prev_eco;
-            self.core.dqp_temp_run.curr_QP = self.core.qp;
+            self.core.dqp_temp_run.prev_qp = self.core.qp_prev_eco;
+            self.core.dqp_temp_run.curr_qp = self.core.qp;
         }
     }
 
-    pub(crate) fn evce_rdo_bit_cnt_cu_intra_chroma(&mut self, slice_type: SliceType) {
+    pub(crate) fn evce_rdo_bit_cnt_cu_intra_chroma(&mut self, _: SliceType) {
         let log2_cuw = self.core.log2_cuw;
         let log2_cuh = self.core.log2_cuh;
 
@@ -1852,7 +1763,7 @@ impl EvceCtx {
         if self.pps.cu_qp_delta_enabled_flag {
             self.core.cu_qp_delta_code = self.core.dqp_temp_run.cu_qp_delta_code;
             self.core.cu_qp_delta_is_coded = self.core.dqp_temp_run.cu_qp_delta_is_coded;
-            self.core.qp_prev_eco = self.core.dqp_temp_run.prev_QP;
+            self.core.qp_prev_eco = self.core.dqp_temp_run.prev_qp;
         }
 
         evce_eco_coef(
@@ -1878,15 +1789,14 @@ impl EvceCtx {
         if self.pps.cu_qp_delta_enabled_flag {
             self.core.dqp_temp_run.cu_qp_delta_code = self.core.cu_qp_delta_code;
             self.core.dqp_temp_run.cu_qp_delta_is_coded = self.core.cu_qp_delta_is_coded;
-            self.core.dqp_temp_run.prev_QP = self.core.qp_prev_eco;
-            self.core.dqp_temp_run.curr_QP = self.core.qp;
+            self.core.dqp_temp_run.prev_qp = self.core.qp_prev_eco;
+            self.core.dqp_temp_run.curr_qp = self.core.qp;
         }
     }
 
     pub(crate) fn evce_rdo_bit_cnt_cu_inter(
         &mut self,
         slice_type: SliceType,
-        cup: u32,
         pidx: usize,
         mvp_idx: &[u8],
         coef_idx: usize,
@@ -1977,7 +1887,7 @@ impl EvceCtx {
         if self.pps.cu_qp_delta_enabled_flag {
             self.core.cu_qp_delta_code = self.core.dqp_temp_run.cu_qp_delta_code;
             self.core.cu_qp_delta_is_coded = self.core.dqp_temp_run.cu_qp_delta_is_coded;
-            self.core.qp_prev_eco = self.core.dqp_temp_run.prev_QP;
+            self.core.qp_prev_eco = self.core.dqp_temp_run.prev_qp;
         }
         evce_eco_coef(
             &mut self.core.bs_temp,
@@ -2002,17 +1912,12 @@ impl EvceCtx {
         if self.pps.cu_qp_delta_enabled_flag {
             self.core.dqp_temp_run.cu_qp_delta_code = self.core.cu_qp_delta_code;
             self.core.dqp_temp_run.cu_qp_delta_is_coded = self.core.cu_qp_delta_is_coded;
-            self.core.dqp_temp_run.prev_QP = self.core.qp_prev_eco;
-            self.core.dqp_temp_run.curr_QP = self.core.qp;
+            self.core.dqp_temp_run.prev_qp = self.core.qp_prev_eco;
+            self.core.dqp_temp_run.curr_qp = self.core.qp;
         }
     }
 
-    pub(crate) fn evce_rdo_bit_cnt_cu_inter_comp(
-        &mut self,
-        ch_type: usize,
-        pidx: usize,
-        coef_idx: usize,
-    ) {
+    pub(crate) fn evce_rdo_bit_cnt_cu_inter_comp(&mut self, ch_type: usize, coef_idx: usize) {
         //coef=&self.pinter.coef[coef_idx],
         //int* nnz = self.core.nnz;
         //EVCE_SBAC* sbac = &self.core.s_temp_run;

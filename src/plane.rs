@@ -193,7 +193,7 @@ impl<T: Pixel> Plane<T> {
     pub fn wrap(data: Vec<T>, stride: usize) -> Self {
         let len = data.len();
 
-        assert!(len % stride == 0);
+        assert_eq!(len % stride, 0);
 
         Self {
             data: PlaneData::from_slice(&data),
@@ -403,8 +403,8 @@ impl<T: Pixel> Plane<T> {
         let yorigin = self.cfg.yorigin;
         let stride = self.cfg.stride;
 
-        assert!(width * 2 == src.cfg.width);
-        assert!(height * 2 == src.cfg.height);
+        assert_eq!(width * 2, src.cfg.width);
+        assert_eq!(height * 2, src.cfg.height);
 
         for row in 0..height {
             let base = (yorigin + row) * stride + xorigin;

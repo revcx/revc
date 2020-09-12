@@ -43,6 +43,12 @@ impl<T> Aligned<T> {
     }
 }
 
+impl<T> Default for Aligned<T> {
+    fn default() -> Self {
+        Aligned::uninitialized()
+    }
+}
+
 /// An analog to a Box<[T]> where the underlying slice is aligned.
 /// Alignment is according to the architecture-specific SIMD constraints.
 pub struct AlignedBoxedSlice<T> {

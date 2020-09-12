@@ -6,8 +6,7 @@ fn evc_had_8x8(
     y: usize,
     u: usize,
     v: usize,
-    w: usize,
-    h: usize,
+    stride: usize,
     org: &PlaneRegion<'_, pel>,
     cur: &[pel],
 ) -> u32 {
@@ -19,7 +18,7 @@ fn evc_had_8x8(
 
     for j in 0..8 {
         for i in 0..8 {
-            diff[j][i] = org[y + v + j][x + u + i] as i32 - cur[(v + j) * w + (u + i)] as i32;
+            diff[j][i] = org[y + v + j][x + u + i] as i32 - cur[(v + j) * stride + (u + i)] as i32;
         }
     }
 
@@ -103,8 +102,7 @@ fn evc_had_4x4(
     y: usize,
     u: usize,
     v: usize,
-    w: usize,
-    h: usize,
+    stride: usize,
     org: &PlaneRegion<'_, pel>,
     cur: &[pel],
 ) -> u32 {
@@ -115,7 +113,8 @@ fn evc_had_4x4(
 
     for j in 0..4 {
         for i in 0..4 {
-            diff[j * 4 + i] = org[y + v + j][x + u + i] as i32 - cur[(v + j) * w + (u + i)] as i32;
+            diff[j * 4 + i] =
+                org[y + v + j][x + u + i] as i32 - cur[(v + j) * stride + (u + i)] as i32;
         }
     }
 
@@ -201,8 +200,7 @@ fn evc_had_2x2(
     y: usize,
     u: usize,
     v: usize,
-    w: usize,
-    h: usize,
+    stride: usize,
     org: &PlaneRegion<'_, pel>,
     cur: &[pel],
 ) -> u32 {
@@ -212,7 +210,8 @@ fn evc_had_2x2(
 
     for j in 0..2 {
         for i in 0..2 {
-            diff[j * 2 + i] = org[y + v + j][x + u + i] as i32 - cur[(v + j) * w + (u + i)] as i32;
+            diff[j * 2 + i] =
+                org[y + v + j][x + u + i] as i32 - cur[(v + j) * stride + (u + i)] as i32;
         }
     }
     m[0] = diff[0] + diff[2];
@@ -236,24 +235,23 @@ pub(crate) fn evce_satd_16b(
     cur: &[pel],
 ) -> u32 {
     let mut sum = 0u32;
-    let mut step = 1;
 
     if (w % 8 == 0) && (h % 8 == 0) {
         for v in (0..h).step_by(8) {
             for u in (0..w).step_by(8) {
-                sum += evc_had_8x8(x, y, u, v, w, h, org, cur);
+                sum += evc_had_8x8(x, y, u, v, w, org, cur);
             }
         }
     } else if (w % 4 == 0) && (h % 4 == 0) {
         for v in (0..h).step_by(4) {
             for u in (0..w).step_by(4) {
-                sum += evc_had_4x4(x, y, u, v, w, h, org, cur);
+                sum += evc_had_4x4(x, y, u, v, w, org, cur);
             }
         }
     } else if (w % 2 == 0) && (h % 2 == 0) {
         for v in (0..h).step_by(2) {
             for u in (0..w).step_by(2) {
-                sum += evc_had_2x2(x, y, u, v, w, h, org, cur);
+                sum += evc_had_2x2(x, y, u, v, w, org, cur);
             }
         }
     } else {

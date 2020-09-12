@@ -170,7 +170,7 @@ pub(crate) fn evce_eco_sps(bs: &mut EvceBsw, sps: &EvcSps) {
     EVC_TRACE(&mut bs.tracer, "***********************************\n");
 }
 
-pub(crate) fn evce_eco_pps(bs: &mut EvceBsw, sps: &EvcSps, pps: &EvcPps) {
+pub(crate) fn evce_eco_pps(bs: &mut EvceBsw, pps: &EvcPps) {
     EVC_TRACE(&mut bs.tracer, "***********************************\n");
     EVC_TRACE(&mut bs.tracer, "************ PPS Start ************\n");
 
@@ -245,13 +245,7 @@ pub(crate) fn evce_eco_pps(bs: &mut EvceBsw, sps: &EvcSps, pps: &EvcPps) {
     EVC_TRACE(&mut bs.tracer, "***********************************\n");
 }
 
-pub(crate) fn evce_eco_sh(
-    bs: &mut EvceBsw,
-    sps: &EvcSps,
-    pps: &EvcPps,
-    sh: &EvcSh,
-    nalu_type: NaluType,
-) {
+pub(crate) fn evce_eco_sh(bs: &mut EvceBsw, sh: &EvcSh, nalu_type: NaluType) {
     EVC_TRACE(&mut bs.tracer, "***********************************\n");
     EVC_TRACE(&mut bs.tracer, "************ SH  Start ************\n");
 
@@ -434,7 +428,7 @@ pub(crate) fn evce_eco_cbf(
     /* code allcbf */
     if pred_mode != PredMode::MODE_INTRA {
         if b_no_cbf {
-            assert!(cbf_all != 0);
+            assert_ne!(cbf_all, 0);
         } else if (run[Y_C] as u8 + run[U_C] as u8 + run[V_C] as u8) == 3 {
             // not count bits of root_cbf when checking each component
 
@@ -631,7 +625,7 @@ pub(crate) fn coef_rect_to_series(
     let mut sidx = ((x & (max_cuwh - 1)) + ((y & (max_cuwh - 1)) << log2_max_cuwh)) as usize;
     let mut didx = 0;
 
-    for j in 0..cuh as usize {
+    for _ in 0..cuh as usize {
         for i in 0..cuw as usize {
             coef_dst.data[Y_C][didx] = coef_src[Y_C][sidx + i];
             didx += 1;
@@ -648,7 +642,7 @@ pub(crate) fn coef_rect_to_series(
         as usize;
     didx = 0;
 
-    for j in 0..cuh as usize {
+    for _ in 0..cuh as usize {
         for i in 0..cuw as usize {
             coef_dst.data[U_C][didx] = coef_src[U_C][sidx + i];
             coef_dst.data[V_C][didx] = coef_src[V_C][sidx + i];
@@ -680,7 +674,7 @@ pub(crate) fn evce_eco_mvp_idx(
     sbac_ctx: &mut EvcSbacCtx,
     mvp_idx: u32,
 ) {
-    sbac.write_truncate_unary_sym(bs, &mut sbac_ctx.mvp_idx, mvp_idx, 3, 4);
+    sbac.write_truncate_unary_sym(bs, &mut sbac_ctx.mvp_idx, mvp_idx, 4);
 
     EVC_TRACE_COUNTER(&mut bs.tracer);
     EVC_TRACE(&mut bs.tracer, "mvp idx ");
@@ -877,7 +871,7 @@ pub(crate) fn evce_eco_coef(
         (run_stats >> 2) & 1 != 0,
     ];
 
-    assert!(run_stats != 0);
+    assert_ne!(run_stats, 0);
 
     let mut cbf_all = 0;
     for c in 0..N_C {

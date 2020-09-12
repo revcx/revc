@@ -160,7 +160,6 @@ pub(crate) fn evce_diff_pred(
     log2_cuh -= 1;
 
     /* U */
-    let buf = &planes[U_C].as_region();
     evce_diff_16b(
         x,
         y,
@@ -172,7 +171,6 @@ pub(crate) fn evce_diff_pred(
     );
 
     /* V */
-    let buf = &planes[V_C].as_region();
     evce_diff_16b(
         x,
         y,

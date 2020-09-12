@@ -173,20 +173,7 @@ impl EvcePInter {
             mvi[MV_X] = mv[MV_X] + (x << 2);
             mvi[MV_Y] = mv[MV_Y] + (y << 2);
             cost = self.me_ipel_refinement(
-                x,
-                y,
-                log2_cuw,
-                log2_cuh,
-                refi,
-                lidx,
-                &range,
-                &gmvp,
-                &mvi,
-                &mut mvt,
-                bi,
-                &mut tmpstep,
-                MAX_REFINE_SEARCH_STEP,
-                refp,
+                x, y, log2_cuw, log2_cuh, refi, lidx, &range, &gmvp, &mvi, &mut mvt, bi, refp,
             );
             if cost < cost_best {
                 cost_best = cost;
@@ -826,8 +813,6 @@ impl EvcePInter {
         mvi: &[i16],
         mv: &mut [i16],
         bi: u8,
-        beststep: &mut i16,
-        faststep: i16,
         refp: &Vec<Vec<EvcRefP>>,
     ) -> u32 {
         let mut cost = std::u32::MAX;
